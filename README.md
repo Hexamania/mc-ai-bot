@@ -1,4 +1,4 @@
-# ⚠️ AI-Assisted Code Notice: Parts of this project were built using generative AI. Also, heads up: this hasn't been fully tested on Windows yet, so expect some bugs or path/dependency quirks
+# ⚠️ AI-Assisted Code Notice: Parts of this project were built using generative AI. Also, heads up: this hasn't been fully tested on Windows yet, so expect some bugs or path/dependency quirks, Web Server Isnt Finished
 
 # Mineflayer AI Bot & Web Dashboard
 
@@ -37,7 +37,7 @@ An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://gith
 
 1. **Clone the repository:**
    ```bash
-   https://github.com/r3dtyyyyyyy/mc-ai-bot.git
+   https://github.com/Hexamania/mc-ai-bot.git
    cd mc-ai-bot
    ```
 

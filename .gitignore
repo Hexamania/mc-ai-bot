@@ -1,0 +1,11 @@
+# Environment variables & secrets
+.env
+*.env
+
+# Node dependencies
+node_modules/
+
+# Local state, logs, and database files
+memory.json
+users.json
+*.log

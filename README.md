@@ -1,3 +1,5 @@
+# THIS ISNT TEST ON WINDOWS YET!
+
 # Mineflayer AI Bot & Web Dashboard
 
 An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://github.com/PrismarineJS/mineflayer) and [OpenAI](https://platform.openai.com/). It comes equipped with pathfinding, combat automation, resource gathering, an automated speedrun/progression sequence, and a real-time web dashboard.
@@ -35,7 +37,7 @@ An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://gith
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/<your-username>/<your-repo-name>.git
+   https://github.com/r3dtyyyyyyy/mc-ai-bot.git
    cd <your-repo-name>
    ```
 

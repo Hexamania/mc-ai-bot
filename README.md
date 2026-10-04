@@ -38,7 +38,7 @@ An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://gith
 1. **Clone the repository:**
    ```bash
    https://github.com/r3dtyyyyyyy/mc-ai-bot.git
-   cd <your-repo-name>
+   cd mc-ai-bot
    ```
 
 2. **Install dependencies:**

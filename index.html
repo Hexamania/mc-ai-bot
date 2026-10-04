@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airi AI Bot Dashboard</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        header {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #4ecca3;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            flex: 1;
+            gap: 10px;
+            padding: 10px;
+            overflow: hidden;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .tab-btn {
+            background: none;
+            border: 1px solid #4ecca3;
+            color: #4ecca3;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .tab-btn.active {
+            background: #4ecca3;
+            color: #1a1a2e;
+        }
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+        }
+        .tab-content.active { display: flex; flex-direction: column; }
+        
+        .log-box {
+            background: #000;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: scroll;
+            font-size: 0.85rem;
+            color: #00ff00;
+        }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        button {
+            padding: 10px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-action { background: #4ecca3; color: #1a1a2e; }
+        .btn-danger { background: #e94560; color: white; }
+        .input-group { margin: 10px 0; }
+        input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            color: white;
+            border-radius: 4px;
+        }
+        .poi-item {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h2 style="margin:0">Airi OS Dashboard</h2>
+            <small id="bot-status">Status: Connecting...</small>
+        </div>
+        <div id="coords">X: 0, Y: 0, Z: 0</div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar: Stats & Inventory -->
+        <div class="card">
+            <h3>Bot Vitals</h3>
+            <p>❤️ Health: <span id="health">20</span></p>
+            <p>🍗 Food: <span id="food">20</span></p>
+            <button class="btn-action" onclick="sendCommand('force_eat')" style="width:100%; margin-top:5px">Force Eat Best Food</button>
+            <hr>
+            <h3>Inventory</h3>
+            <div id="inventory-list" style="font-size: 0.9rem"></div>
+        </div>
+
+        <!-- Main View: Console and Tabs -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab('console')">Console</button>
+                <button class="tab-btn" onclick="showTab('commands')">Commands</button>
+                <button class="tab-btn" onclick="showTab('favorites')">Favorites</button>
+                <button class="tab-btn" onclick="showTab('build')">Build</button>
+            </div>
+
+            <div id="console" class="tab-content active">
+                <div class="log-box" id="logs"></div>
+                <div class="input-group">
+                    <input type="text" id="chat-input" placeholder="Send server command or chat...">
+                    <button class="btn-action" onclick="sendCommand('servercmd', document.getElementById('chat-input').value)" style="margin-top:5px">Send</button>
+                </div>
+            </div>
+
+            <div id="commands" class="tab-content">
+                <div class="btn-grid">
+                    <button class="btn-action" onclick="sendCommand('roam')">Start Roaming</button>
+                    <button class="btn-danger" onclick="sendCommand('stop')">Stop All</button>
+                    <button class="btn-action" onclick="sendCommand('scout')">Toggle Scout Mode</button>
+                    <button class="btn-action" onclick="sendCommand('beat_game')">Start Speedrun</button>
+                    <button class="btn-action" onclick="sendCommand('guard')">Guard Position</button>
+                    <button class="btn-action" onclick="sendCommand('refuel')">Refuel (Coal)</button>
+                </div>
+                <hr>
+                <h4>Mining Operations</h4>
+                <p style="font-size:0.8rem">Mine area from current pos to relative offset:</p>
+                <div style="display:flex; gap:5px">
+                    <input type="number" id="mine-x" placeholder="X offset">
+                    <input type="number" id="mine-y" placeholder="Y offset">
+                    <input type="number" id="mine-z" placeholder="Z offset">
+                </div>
+                <button class="btn-action" onclick="triggerMineArea()" style="width:100%; margin-top:5px">Execute Mine Area</button>
+            </div>
+
+            <div id="favorites" class="tab-content">
+                <div id="fav-list"></div>
+                <hr>
+                <div class="input-group">
+                    <input type="text" id="fav-name" placeholder="Favorite name">
+                    <button class="btn-action" onclick="saveCurrentLoc()" style="margin-top:5px; width:100%">Save Current Location</button>
+                </div>
+            </div>
+
+            <div id="build" class="tab-content">
+                <h4>Pre-defined Structures</h4>
+                <div class="btn-grid">
+                    <button class="tab-btn" onclick="sendCommand('build', {type: 'shelter'})">Simple Shelter (3x3)</button>
+                    <button class="tab-btn" onclick="sendCommand('build', {type: 'house'})">Small House (5x5)</button>
+                </div>
+                <hr>
+                <h4>Custom Schematic (.json)</h4>
+                <p style="font-size:0.7rem; color:#ccc">Upload a simple JSON block list schematic:</p>
+                <div class="input-group">
+                    <input type="file" id="schematic-file" accept=".json" style="font-size: 0.8rem; padding: 5px;">
+                    <button class="btn-action" onclick="loadSchematic()" style="margin-top:5px; width:100%">Build Custom JSON</button>
+                </div>
+                <p style="font-size:0.8rem; margin-top:10px; color:#aaa">Note: Ensure bot has blocks like Cobblestone or Dirt in inventory.</p>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="card">
+            <h3>Settings</h3>
+            <div class="input-group">
+                <label><input type="checkbox" onchange="sendCommand('toggle_stealth')" id="set-stealth"> Stealth Mode</label>
+            </div>
+            <div class="input-group">
+                <label><input type="checkbox" checked id="set-defense"> Auto-Defense</label>
+            </div>
+            <div class="input-group">
+                <label><input type="checkbox" checked id="set-armor"> Auto-Armor</label>
+            </div>
+            <hr>
+            <h3>Manual Navigation</h3>
+            <input type="text" id="goto-coords" placeholder="X Y Z">
+            <button class="btn-action" onclick="sendCommand('goto', document.getElementById('goto-coords').value)" style="width:100%; margin-top:5px">Go to Location</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentPos = { x: 0, y: 0, z: 0 };
+
+        socket.on('bulk_update', (data) => {
+            const { botData, inventory, favorites } = data;
+            if (botData) {
+                document.getElementById('health').innerText = botData.health;
+                document.getElementById('food').innerText = botData.food;
+                document.getElementById('coords').innerText = `X: ${Math.floor(botData.pos.x)}, Y: ${Math.floor(botData.pos.y)}, Z: ${Math.floor(botData.pos.z)}`;
+                currentPos = botData.pos;
+            }
+
+            if (inventory) {
+                const list = document.getElementById('inventory-list');
+                list.innerHTML = inventory.map(i => `<div>${i.count}x ${i.name}</div>`).join('');
+            }
+
+            if (favorites) {
+                const list = document.getElementById('fav-list');
+                list.innerHTML = Object.keys(favorites).map(name => `
+                    <div class="poi-item">
+                        <span>${name}</span>
+                        <button class="btn-action" onclick="gotoFav('${name}')" style="padding:2px 8px">Go</button>
+                    </div>
+                `).join('');
+            }
+        });
+
+        socket.on('log', (msg) => {
+            const box = document.getElementById('logs');
+            box.innerHTML += `<div>${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        });
+
+        socket.on('bot_status', (data) => {
+            document.getElementById('bot-status').innerText = `Status: ${data.online ? 'Online' : 'Offline'} (${data.username})`;
+        });
+
+        function sendCommand(command, args = null) {
+            socket.emit('send_command', { command, args });
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function triggerMineArea() {
+            const x = parseFloat(document.getElementById('mine-x').value) || 0;
+            const y = parseFloat(document.getElementById('mine-y').value) || 0;
+            const z = parseFloat(document.getElementById('mine-z').value) || 0;
+            
+            const pos1 = { ...currentPos };
+            const pos2 = { x: currentPos.x + x, y: currentPos.y + y, z: currentPos.z + z };
+            
+            sendCommand('mine_area', { pos1, pos2 });
+        }
+
+        function saveCurrentLoc() {
+            const name = document.getElementById('fav-name').value;
+            if (!name) return alert("Enter a name!");
+            socket.emit('save_location', { name });
+            document.getElementById('fav-name').value = '';
+        }
+
+        function gotoFav(name) {
+            // Use the goto command logic already in bot.js
+            // Since favorites is on state, we just need to pass the coords
+            fetch('/api/state')
+                .then(r => r.json())
+                .then(state => {
+                    const pos = state.favorites[name];
+                    sendCommand('goto', pos);
+                });
+        }
+
+        function loadSchematic() {
+            const fileInput = document.getElementById('schematic-file');
+            if (!fileInput.files.length) return alert("Select a JSON schematic file!");
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    sendCommand('build', { type: 'schematic', data: data });
+                } catch (err) {
+                    alert("Invalid JSON format. Schematic should be an array of {x,y,z} offsets.");
+                }
+            };
+            reader.readAsText(fileInput.files[0]);
+        }
+    </script>
+</body>
+</html>

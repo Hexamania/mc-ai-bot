@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Airi Dashboard V2</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="sidebar">
+<h2>Airi</h2>
+<div>Dashboard</div>
+<div>Users</div>
+<div>Admins</div>
+<div>Logs</div>
+<div>Settings</div>
+</div>
+
+<div class="main">
+<h1>Airi Dashboard V2</h1>
+
+<div class="cards">
+<div class="card"><h3>Status</h3><p id="status">Offline</p></div>
+<div class="card"><h3>Users</h3><ul id="users"></ul></div>
+<div class="card"><h3>Admins</h3><ul id="admins"></ul></div>
+</div>
+
+<div class="card">
+<h3>Console</h3>
+<pre id="logs"></pre>
+</div>
+
+<div class="card">
+<h3>Settings</h3>
+<select>
+<option>Dark</option>
+<option>AMOLED</option>
+<option>Catppuccin</option>
+</select>
+</div>
+</div>
+<script src="app.js"></script>
+</body></html>

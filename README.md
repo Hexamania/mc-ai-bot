@@ -1,4 +1,4 @@
-# THIS ISNT TEST ON WINDOWS YET!
+# ⚠️ AI-Assisted Code Notice: Parts of this project were built using generative AI. Also, heads up: this hasn't been fully tested on Windows yet, so expect some bugs or path/dependency quirks
 
 # Mineflayer AI Bot & Web Dashboard
 

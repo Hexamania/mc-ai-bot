@@ -13,3 +13,6 @@ npm-debug.log*
 # Operating System / Editor files
 .DS_Store
 .vscode/
+
+# others
+chat.json

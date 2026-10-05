@@ -8,6 +8,7 @@ const http = require("http")
 const { Server } = require("socket.io")
 const vec3 = require("vec3")
 const path = require("path")
+const { createDefaultMemory, loadMemory, saveMemory } = require("./memory")
 
 const app = express()
 const server = http.createServer(app)
@@ -30,6 +31,7 @@ let miningBaseLocation = null
 let safeModeActive = false
 let killAuraActive = false
 let lumberjackActive = false
+let guarding = false
 let AUTO_QUICKIES = false
 let medicMode = false
 let medicTarget = null
@@ -49,12 +51,13 @@ let isFarming = false
 let isHandlingSafety = false
 let currentObjective = "Idle"
 let minerActive = false
+let mineAreaActive = false
 let minerProgress = 0
 let minerTotal = 0
 
 /* ================= OPENAI ================= */
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY
+  apiKey: process.env.OPENAI_KEY || process.env.OPENAI_API_KEY
 })
 
 /* ================= BOT ================= */
@@ -115,13 +118,138 @@ let state = {
   users: [],
   admins: [],
   logs: ['Dashboard started'],
-  settings: { theme: 'dark' },
+  settings: { theme: 'dark', autoDefense: true, autoArmor: true, stealth: false },
   botData: { health: 20, food: 20, pos: { x: 0, y: 0, z: 0 } },
   inventory: [],
   currentPath: [],
   favorites: {}, // Store named coordinates here
   equipment: {}
 };
+
+let memory = createDefaultMemory()
+let memorySaveTimer = null
+
+function persistMemory() {
+  try {
+    return saveMemory(memory)
+  } catch (error) {
+    log("MEMORY-ERR", `Could not save memory file: ${error.message}`)
+    return false
+  }
+}
+
+function queueMemorySave() {
+  if (process.env.ENABLE_MEMORY !== "true") return
+  clearTimeout(memorySaveTimer)
+  memorySaveTimer = setTimeout(persistMemory, 1000)
+}
+
+function rememberLocation(name, position, type = "waypoint") {
+  if (process.env.ENABLE_MEMORY !== "true" || !name || !position) return false
+  const coordinates = { x: Number(position.x), y: Number(position.y), z: Number(position.z) }
+  if (!Object.values(coordinates).every(Number.isFinite)) return false
+
+  const existing = memory.locations[name]
+  if (existing && existing.x === coordinates.x && existing.y === coordinates.y &&
+      existing.z === coordinates.z && existing.type === type) return true
+
+  memory.locations[name] = {
+    ...coordinates,
+    type,
+    updatedAt: new Date().toISOString()
+  }
+  return persistMemory()
+}
+
+function rememberPlayer(username) {
+  if (process.env.ENABLE_MEMORY !== "true" || !username) return
+  const existing = memory.players[username]
+  const role = adminSessions[username] ? "trusted" : existing?.role || "guest"
+  const now = new Date().toISOString()
+  memory.players[username] = {
+    ...(existing || {}),
+    username,
+    role,
+    preferences: existing?.preferences && typeof existing.preferences === "object"
+      ? existing.preferences
+      : {},
+    firstSeen: existing?.firstSeen || now,
+    lastSeen: now
+  }
+  if (!existing || existing.role !== role) persistMemory()
+  else queueMemorySave()
+}
+
+function rememberFact(key, fact) {
+  if (process.env.ENABLE_MEMORY !== "true") return false
+  const cleanKey = String(key || "").trim().slice(0, 80)
+  const cleanFact = String(fact || "").trim().slice(0, 500)
+  if (!cleanKey || !cleanFact) return false
+  memory.learnedFacts[cleanKey] = cleanFact
+  return persistMemory()
+}
+
+function forgetFact(key) {
+  if (process.env.ENABLE_MEMORY !== "true") return false
+  const cleanKey = String(key || "").trim()
+  if (!cleanKey || !Object.hasOwn(memory.learnedFacts, cleanKey)) return false
+  delete memory.learnedFacts[cleanKey]
+  return persistMemory()
+}
+
+function rememberTask(goal, status = "active", progress = null) {
+  if (process.env.ENABLE_MEMORY !== "true") return false
+  memory.currentTask = {
+    goal,
+    status,
+    progress,
+    updatedAt: new Date().toISOString()
+  }
+  queueMemorySave()
+  return true
+}
+
+function setCurrentObjective(objective) {
+  if (currentObjective === objective && memory.currentTask?.goal === objective &&
+      memory.currentTask?.status === "active") return
+  currentObjective = objective
+  if (process.env.ENABLE_MEMORY !== "true" || !objective || objective === "Idle") return
+  const progress = memory.currentTask?.goal === objective ? memory.currentTask.progress ?? null : null
+  rememberTask(objective, "active", progress)
+}
+
+function stopRememberedTask() {
+  currentObjective = "Idle"
+  if (process.env.ENABLE_MEMORY !== "true" || !memory.currentTask) return
+  memory.currentTask = {
+    ...memory.currentTask,
+    status: "stopped",
+    updatedAt: new Date().toISOString()
+  }
+  persistMemory()
+}
+
+function finishRememberedTask(status = "completed") {
+  currentObjective = "Idle"
+  if (process.env.ENABLE_MEMORY !== "true" || !memory.currentTask) return
+  memory.currentTask = {
+    ...memory.currentTask,
+    status,
+    updatedAt: new Date().toISOString()
+  }
+  persistMemory()
+}
+
+function getMemoryContext() {
+  if (process.env.ENABLE_MEMORY !== "true") return "Persistent memory is disabled."
+  const context = {
+    locations: Object.fromEntries(Object.entries(memory.locations).slice(-30)),
+    rules: memory.rules.slice(-30).map(rule => rule.slice(0, 300)),
+    currentTask: memory.currentTask,
+    learnedFacts: Object.fromEntries(Object.entries(memory.learnedFacts).slice(-50))
+  }
+  return JSON.stringify(context, null, 2).slice(0, 6000)
+}
 
 function getBotStatus(extra = {}) {
   return {
@@ -286,6 +414,20 @@ const say = (m) => {
   if (isOnline && bot.entity) bot.chat(m)
 }
 const pm = (u, m) => { console.log(`[BOT PM -> ${u}]`, m); bot.chat(`/msg ${u} ${m}`) }
+
+memory = loadMemory()
+if (memory.currentTask?.goal && memory.currentTask.status === "active") currentObjective = memory.currentTask.goal
+for (const [name, location] of Object.entries(memory.locations)) {
+  if (location?.type === "favorite" && name.startsWith("favorite:")) {
+    state.favorites[name.slice("favorite:".length)] = {
+      x: location.x,
+      y: location.y,
+      z: location.z
+    }
+  }
+}
+baseLocation = memory.locations.home || null
+miningBaseLocation = memory.locations.miningBase || null
 
 connectBot()
 
@@ -452,7 +594,7 @@ async function beatTheGame() {
 
   for (const item of brokenEssentials) {
     if (count(item.name) === 0 && Object.entries(item.materials).every(([m, amt]) => count(m) >= amt)) {
-      currentObjective = `Repairing ${item.name}`
+      setCurrentObjective(`Repairing ${item.name}`)
       const recipe = bot.recipesFor(registry.itemsByName[item.name].id, null, 1, tableBlock)[0]
       if (recipe) {
         say(`🛠️ Maintenance: Replacing broken ${item.name.replace('_', ' ')}...`)
@@ -471,7 +613,7 @@ async function beatTheGame() {
   // 1. Collect Wood
   const logs = registry.blocksArray.filter(b => b.name.includes('_log')).map(b => b.id)
   if (count('oak_planks') < 4 && count('oak_log') === 0) {
-    currentObjective = "Collecting Wood"
+    setCurrentObjective("Collecting Wood")
     const logBlock = bot.findBlock({ matching: logs, maxDistance: 32 })
     if (logBlock) {
       say("🌳 Objective: Collecting Wood...")
@@ -483,21 +625,21 @@ async function beatTheGame() {
 
   // 2. Craft Planks
   if (count('oak_log') > 0 && count('oak_planks') < 4) {
-    currentObjective = "Crafting Planks"
+    setCurrentObjective("Crafting Planks")
     const recipe = bot.recipesFor(registry.itemsByName.oak_planks.id, null, 1, null)[0]
     if (recipe) await bot.craft(recipe, 1, null)
   }
 
   // 3. Craft Crafting Table
   if (count('oak_planks') >= 4 && count('crafting_table') === 0) {
-    currentObjective = "Crafting Table"
+    setCurrentObjective("Crafting Table")
     const recipe = bot.recipesFor(registry.itemsByName.crafting_table.id, null, 1, null)[0]
     if (recipe) await bot.craft(recipe, 1, null)
   }
 
   // 4. Place Table and Craft Tools (Sticks -> Pickaxe)
   if (count('crafting_table') > 0 && count('wooden_pickaxe') === 0) {
-    currentObjective = "Crafting Basic Tools"
+    setCurrentObjective("Crafting Basic Tools")
     if (count('stick') < 2) {
       const stickRecipe = bot.recipesFor(registry.itemsByName.stick.id, null, 1, null)[0]
       if (stickRecipe) await bot.craft(stickRecipe, 1, null)
@@ -519,7 +661,7 @@ async function beatTheGame() {
 
   // 5. Mining Stone
   if (count('wooden_pickaxe') > 0 && count('cobblestone') < 16) {
-    currentObjective = "Mining Stone"
+    setCurrentObjective("Mining Stone")
     const stone = bot.findBlock({ matching: registry.blocksByName.stone.id, maxDistance: 32 })
     if (stone) {
       say("🪨 Objective: Mining Stone...")
@@ -531,7 +673,7 @@ async function beatTheGame() {
 
   // 6. Upgrade to Stone Pickaxe
   if (count('cobblestone') >= 3 && count('stone_pickaxe') === 0 && count('wooden_pickaxe') > 0) {
-    currentObjective = "Upgrading Pickaxe"
+    setCurrentObjective("Upgrading Pickaxe")
     const recipe = bot.recipesFor(registry.itemsByName.stone_pickaxe.id, null, 1, tableBlock)[0]
     if (recipe) {
       say("⚒️ Upgrading to Stone Pickaxe...")
@@ -541,7 +683,7 @@ async function beatTheGame() {
 
   // 7. Mining Iron
   if (count('stone_pickaxe') > 0 && count('iron_ingot') < 3 && count('raw_iron') === 0) {
-    currentObjective = "Mining Iron"
+    setCurrentObjective("Mining Iron")
     const ironBlocks = [registry.blocksByName.iron_ore.id, registry.blocksByName.deepslate_iron_ore.id]
     const iron = bot.findBlock({ matching: ironBlocks, maxDistance: 32 })
     if (iron) {
@@ -554,7 +696,7 @@ async function beatTheGame() {
 
   // 8. Smelting Iron (Checks for Furnace and Fuel)
   if (count('raw_iron') > 0 && count('iron_ingot') < 3) {
-    currentObjective = "Smelting Iron"
+    setCurrentObjective("Smelting Iron")
     let furnaceBlock = bot.findBlock({ matching: registry.blocksByName.furnace.id, maxDistance: 4 })
     
     if (!furnaceBlock) {
@@ -593,7 +735,7 @@ async function beatTheGame() {
 
   // 9. Craft Bucket & Get Water
   if (count('iron_ingot') >= 3 && count('bucket') === 0 && count('water_bucket') === 0) {
-    currentObjective = "Crafting Bucket"
+    setCurrentObjective("Crafting Bucket")
     const recipe = bot.recipesFor(registry.itemsByName.bucket.id, null, 1, tableBlock)[0]
     if (recipe) {
       say("🪣 Crafting Iron Bucket...")
@@ -602,7 +744,7 @@ async function beatTheGame() {
   }
 
   if (count('bucket') > 0 && count('water_bucket') === 0) {
-    currentObjective = "Collecting Water"
+    setCurrentObjective("Collecting Water")
     const water = bot.findBlock({ matching: registry.blocksByName.water.id, maxDistance: 32 })
     if (water) {
       say("💧 Collecting water...")
@@ -617,7 +759,7 @@ async function beatTheGame() {
 
   // 10. Finding Lava
   if (count('iron_ingot') >= 3 || count('water_bucket') > 0) {
-    currentObjective = "Finding Lava"
+    setCurrentObjective("Finding Lava")
     const lava = bot.findBlock({ matching: registry.blocksByName.lava.id, maxDistance: 32 })
     if (lava) {
       say("🔥 Found Lava! Preparing portal steps...")
@@ -628,7 +770,7 @@ async function beatTheGame() {
 
   // 11. Craft Iron Pickaxe (to mine diamonds)
   if (count('iron_ingot') >= 3 && count('iron_pickaxe') === 0) {
-    currentObjective = "Upgrading Pickaxe"
+    setCurrentObjective("Upgrading Pickaxe")
     const recipe = bot.recipesFor(registry.itemsByName.iron_pickaxe.id, null, 1, tableBlock)[0]
     if (recipe) {
       say("⚒️ Upgrading to Iron Pickaxe...")
@@ -638,7 +780,7 @@ async function beatTheGame() {
 
   // 12. Mining Diamonds
   if (count('iron_pickaxe') > 0 && count('diamond') < 27) {
-    currentObjective = "Mining Diamonds"
+    setCurrentObjective("Mining Diamonds")
     const diamondBlocks = [registry.blocksByName.diamond_ore.id, registry.blocksByName.deepslate_diamond_ore.id]
     const diamond = bot.findBlock({ matching: diamondBlocks, maxDistance: 64 })
     if (diamond) {
@@ -654,7 +796,7 @@ async function beatTheGame() {
 
   // 13. Craft Diamond Pickaxe
   if (count('diamond') >= 3 && count('diamond_pickaxe') === 0 && count('iron_pickaxe') > 0) {
-    currentObjective = "Upgrading Pickaxe"
+    setCurrentObjective("Upgrading Pickaxe")
     const recipe = bot.recipesFor(registry.itemsByName.diamond_pickaxe.id, null, 1, tableBlock)[0]
     if (recipe) {
       say("⚒️ Upgrading to Diamond Pickaxe...")
@@ -664,7 +806,7 @@ async function beatTheGame() {
 
   // 13.1 Mining Obsidian
   if (count('diamond_pickaxe') > 0 && count('obsidian') < 14) {
-    currentObjective = "Mining Obsidian"
+    setCurrentObjective("Mining Obsidian")
     const obsidian = bot.findBlock({ matching: registry.blocksByName.obsidian.id, maxDistance: 32 })
     if (obsidian) {
       say("🟣 Objective: Mining Obsidian...")
@@ -676,13 +818,13 @@ async function beatTheGame() {
   if (count('obsidian') >= 4 && count('book') < 16) {
     const cane = bot.findBlock({ matching: registry.blocksByName.sugar_cane.id, maxDistance: 64 })
     if (count('sugar_cane') < 48 && cane) {
-      currentObjective = "Collecting Sugar Cane"
+      setCurrentObjective("Collecting Sugar Cane")
       await mineBlock('sugar_cane')
     }
     
     const cow = bot.nearestEntity(e => e.name === 'cow')
     if (count('leather') < 16 && cow) {
-      currentObjective = "Hunting Cows"
+      setCurrentObjective("Hunting Cows")
       await bot.pathfinder.goto(new goals.GoalFollow(cow, 2))
       await bot.attack(cow)
     }
@@ -692,21 +834,21 @@ async function beatTheGame() {
   if (count('sugar_cane') >= 3 && count('paper') < 48) {
     const paperRecipe = bot.recipesFor(registry.itemsByName.paper.id, null, 1, null)[0]
     if (paperRecipe) {
-      currentObjective = "Crafting Paper"
+      setCurrentObjective("Crafting Paper")
       await bot.craft(paperRecipe, 1, null)
     }
   }
   if (count('paper') >= 3 && count('leather') >= 1 && count('book') < 16) {
     const bookRecipe = bot.recipesFor(registry.itemsByName.book.id, null, 1, null)[0]
     if (bookRecipe) {
-      currentObjective = "Crafting Books"
+      setCurrentObjective("Crafting Books")
       await bot.craft(bookRecipe, 1, null)
     }
   }
 
   // 13.4 Craft Enchanting Table
   if (count('obsidian') >= 4 && count('diamond') >= 2 && count('book') >= 1 && count('enchanting_table') === 0) {
-    currentObjective = "Crafting Enchanting Table"
+    setCurrentObjective("Crafting Enchanting Table")
     if (tableBlock) {
       const recipe = bot.recipesFor(registry.itemsByName.enchanting_table.id, null, 1, tableBlock)[0]
       if (recipe) {
@@ -725,7 +867,7 @@ async function beatTheGame() {
   ]
   for (const p of armorPieces) {
     if (count(p.name) === 0 && count('diamond') >= p.cost) {
-      currentObjective = `Crafting ${p.name.replace('_', ' ')}`
+      setCurrentObjective(`Crafting ${p.name.replace('_', ' ')}`)
       const recipe = bot.recipesFor(registry.itemsByName[p.name].id, null, 1, tableBlock)[0]
       if (recipe) {
         say(`⚒️ Upgrading protection: Crafting ${p.name.replace('_', ' ')}...`)
@@ -737,7 +879,7 @@ async function beatTheGame() {
 
   // 13.6 Craft Bookshelves
   if (count('enchanting_table') > 0 && count('book') >= 3 && count('oak_planks') >= 6 && count('bookshelf') < 15) {
-    currentObjective = "Crafting Bookshelves"
+    setCurrentObjective("Crafting Bookshelves")
     if (tableBlock) {
       const recipe = bot.recipesFor(registry.itemsByName.bookshelf.id, null, 1, tableBlock)[0]
       if (recipe) {
@@ -756,7 +898,7 @@ async function beatTheGame() {
       )
 
       if (gearToEnchant) {
-        currentObjective = `Enchanting ${gearToEnchant.name}`
+        setCurrentObjective(`Enchanting ${gearToEnchant.name}`)
         say(`✨ Level 30 reached! Enchanting my ${gearToEnchant.name}...`)
         
         try {
@@ -785,7 +927,7 @@ async function beatTheGame() {
 
   // 14. Search for Ancient Debris (Nether Only)
   if (count('diamond_pickaxe') > 0) {
-    currentObjective = "Nether Search"
+    setCurrentObjective("Nether Search")
     if (bot.game.dimension === 'the_nether') {
       const debris = bot.findBlock({ 
         matching: registry.blocksByName.ancient_debris.id, 
@@ -805,7 +947,7 @@ async function beatTheGame() {
 
   // 15. Build Nether Portal
   if (count('obsidian') >= 10 && count('flint_and_steel') > 0 && bot.game.dimension === 'overworld') {
-    currentObjective = "Building Nether Portal"
+    setCurrentObjective("Building Nether Portal")
     await buildNetherPortal()
   }
 
@@ -816,7 +958,7 @@ async function beatTheGame() {
       maxDistance: 16
     })
     if (portalBlock) {
-      currentObjective = "Entering the Nether"
+      setCurrentObjective("Entering the Nether")
       say("🌌 Nether Portal detected! Crossing dimensions...")
       await bot.pathfinder.goto(new goals.GoalBlock(portalBlock.position.x, portalBlock.position.y, portalBlock.position.z))
     }
@@ -824,7 +966,7 @@ async function beatTheGame() {
 
   // 16. Craft Brewing Stand
   if (count('blaze_rod') > 0 && count('brewing_stand') === 0 && !brewingStandBlock) {
-    currentObjective = "Crafting Brewing Stand"
+    setCurrentObjective("Crafting Brewing Stand")
     const recipe = bot.recipesFor(registry.itemsByName.brewing_stand.id, null, 1, tableBlock)[0]
     if (recipe) {
       say("🧪 Crafting Brewing Stand...")
@@ -847,7 +989,7 @@ async function beatTheGame() {
 
     // Need awkward potion first (Nether Wart)
     if (count('nether_wart') > 0 && count('potion') > 0) {
-      currentObjective = "Brewing Potions"
+      setCurrentObjective("Brewing Potions")
       try {
         const stand = await bot.openContainer(brewingStandBlock || bot.findBlock({ matching: registry.blocksByName.brewing_stand.id }))
         
@@ -877,7 +1019,7 @@ async function beatTheGame() {
 
   // 17.5 Craft Eyes of Ender
   if (count('ender_pearl') > 0 && (count('blaze_powder') > 0 || count('blaze_rod') > 0) && count('eye_of_ender') < 12) {
-    currentObjective = "Crafting Eyes of Ender"
+    setCurrentObjective("Crafting Eyes of Ender")
     if (count('blaze_powder') === 0 && count('blaze_rod') > 0) {
       const powderRecipe = bot.recipesFor(registry.itemsByName.blaze_powder.id, null, 1, null)[0]
       if (powderRecipe) {
@@ -897,7 +1039,7 @@ async function beatTheGame() {
 
   // 18. Find and Activate Stronghold
   if (count('eye_of_ender') >= 12) {
-    currentObjective = "Locating Stronghold"
+    setCurrentObjective("Locating Stronghold")
     const portalFrame = bot.findBlock({
       matching: registry.blocksByName.end_portal_frame.id,
       maxDistance: 64
@@ -946,7 +1088,7 @@ async function autoFarmWheat() {
 
   if (wheatBlock) {
     isFarming = true;
-    currentObjective = "Farming Wheat";
+    setCurrentObjective("Farming Wheat");
     say("🌾 Food low: Harvesting grown wheat...");
     try {
       await bot.pathfinder.goto(new goals.GoalLookAtBlock(wheatBlock.position, bot.world));
@@ -983,7 +1125,7 @@ async function safeModeLoop() {
     const hasShield = bot.inventory.slots[45]?.name === 'shield' || bot.heldItem?.name === 'shield';
     
     if (!hasShield) {
-      currentObjective = "Avoiding Creeper";
+      setCurrentObjective("Avoiding Creeper");
       log("SAFE-MODE", "Creeper detected! Running away (No shield equipped).");
       
       // Calculate escape position (opposite direction of creeper)
@@ -1117,7 +1259,7 @@ async function handleNightAndSleep() {
   const bed = bot.inventory.items().find(i => i.name.includes('_bed'));
   
   if (bed) {
-    currentObjective = "Sleeping";
+    setCurrentObjective("Sleeping");
     say("🌙 Night detected. Placing bed to skip...");
     try {
       const bedPos = bot.entity.position.floored().offset(1, 0, 0);
@@ -1228,7 +1370,7 @@ async function lumberjackLoop(radius = 20) {
   });
 
   if (tree) {
-    currentObjective = "Chopping trees";
+    setCurrentObjective("Chopping trees");
     try {
       await bot.pathfinder.goto(new goals.GoalLookAtBlock(tree.position, bot.world));
       const axe = bot.inventory.items().find(i => i.name.includes('_axe'));
@@ -1463,6 +1605,70 @@ async function mineBlock(name) {
   } catch (e) { log("MINE-ERR", e.message) }
 }
 
+async function mineArea(region) {
+  const { pos1, pos2 } = region || {}
+  const rawCoords = [pos1?.x, pos1?.y, pos1?.z, pos2?.x, pos2?.y, pos2?.z]
+  const coords = rawCoords.map(Number)
+  if (rawCoords.some(value => value === null || value === undefined || value === "") ||
+      !coords.every(Number.isFinite)) {
+    log("WEB-ERR", "Mine area requires two valid XYZ positions.")
+    return
+  }
+  if (mineAreaActive) {
+    log("WEB-ERR", "A mine-area operation is already running.")
+    return
+  }
+
+  const start = coords.slice(0, 3).map(Math.floor)
+  const end = coords.slice(3).map(Math.floor)
+  const min = start.map((value, axis) => Math.min(value, end[axis]))
+  const max = start.map((value, axis) => Math.max(value, end[axis]))
+  const volume = (max[0] - min[0] + 1) * (max[1] - min[1] + 1) * (max[2] - min[2] + 1)
+  if (volume > 512) {
+    log("WEB-ERR", `Mine area is ${volume} blocks; the maximum supported area is 512.`)
+    return
+  }
+
+  progressionActive = false
+  roaming = false
+  following = false
+  minerActive = false
+  lumberjackActive = false
+  mineAreaActive = true
+  setCurrentObjective(`Mining area (${volume} blocks)`)
+  log("WEB-MINE", `Mining area from ${min.join(", ")} to ${max.join(", ")} (${volume} blocks).`)
+
+  let taskStatus = "completed"
+  try {
+    for (let x = min[0]; x <= max[0]; x++) {
+      if (!mineAreaActive) break
+      for (let y = min[1]; y <= max[1]; y++) {
+        if (!mineAreaActive) break
+        for (let z = min[2]; z <= max[2]; z++) {
+          if (!mineAreaActive) break
+          const block = bot.blockAt(new vec3(x, y, z))
+          if (!block || block.name === "air" || !block.diggable) continue
+          await bot.pathfinder.goto(new goals.GoalLookAtBlock(block.position, bot.world))
+          if (!mineAreaActive) break
+          await equipToolForBlock(block)
+          await bot.dig(block)
+        }
+      }
+    }
+    if (mineAreaActive) say("✅ Mine area complete.")
+    else taskStatus = "stopped"
+  } catch (error) {
+    taskStatus = mineAreaActive ? "failed" : "stopped"
+    if (taskStatus === "failed") {
+      log("MINE-AREA-ERR", error.message)
+      say(`❌ Mine area stopped: ${error.message}`)
+    }
+  } finally {
+    mineAreaActive = false
+    finishRememberedTask(taskStatus)
+  }
+}
+
 /* ================= BASE & DEPOSIT LOGIC ================= */
 async function depositItems() {
   if (!baseLocation || isDepositing) return
@@ -1478,6 +1684,7 @@ async function depositItems() {
     
     const chestBlock = bot.findBlock({ matching: bot.registry.blocksByName.chest.id, maxDistance: 5 })
     if (chestBlock) {
+      rememberLocation("baseChest", chestBlock.position, "chest")
       const chest = await bot.openContainer(chestBlock)
       const essential = ['pickaxe', 'sword', 'axe', 'food', 'table', 'furnace', 'bucket']
       for (const item of bot.inventory.items()) {
@@ -1757,7 +1964,8 @@ bot.once("spawn", () => {
 /* ================= AUTO RESPAWN ================= */
 bot.on("death", () => {
   log("DEATH", "Respawning...")
-  setTimeout(() => bot.emit("respawn"), 1000)
+if (bot.entity?.position) rememberLocation("lastDeath", bot.entity.position, "death")
+setTimeout(() => bot.emit("respawn"), 1000)
 })
 
 /* ================= MESSAGE HANDLER ================= */
@@ -1770,6 +1978,7 @@ bot.on("message", async (msg) => {
   if (!parsed) return
 
   const { user, msg: content, type } = parsed
+  rememberPlayer(user)
   const isAdmin = adminSessions[user] === true
 
   /* ===== ADMIN LOGIN via PM only ===== */
@@ -1819,6 +2028,7 @@ bot.on("message", async (msg) => {
         const len = parseInt(args[1]) || 10;
         if (!['north', 'south', 'east', 'west'].includes(dir)) return say("❌ Usage: :miner <north|south|east|west> [length]");
         minerActive = true;
+        setCurrentObjective(`Mining tunnel ${dir}`);
         say(`⛏️ Starting ${len} block tunnel to the ${dir}...`);
         return minerLoop(dir, len, 0);
       }
@@ -1832,6 +2042,7 @@ bot.on("message", async (msg) => {
           const p = bot.entity.position
           baseLocation = { x: p.x, y: p.y, z: p.z }
         }
+        rememberLocation("home", baseLocation, "home")
         return say(`🏠 Base location set to X: ${Math.floor(baseLocation.x)}, Y: ${Math.floor(baseLocation.y)}, Z: ${Math.floor(baseLocation.z)}`)
       case "home":
         if (!baseLocation) return say("❌ No base location set. Use :sbase first.")
@@ -1839,6 +2050,7 @@ bot.on("message", async (msg) => {
         roaming = false
         following = false
         pvpTarget = null
+        setCurrentObjective("Returning to home base")
         bot.pathfinder.setGoal(null)
         bot.pathfinder.setGoal(new goals.GoalBlock(baseLocation.x, baseLocation.y, baseLocation.z))
         return say("🏃 Heading home to base location.")
@@ -1851,6 +2063,7 @@ bot.on("message", async (msg) => {
         await bot.pathfinder.goto(new goals.GoalBlock(baseLocation.x, baseLocation.y, baseLocation.z))
         const chestBlock = bot.findBlock({ matching: bot.registry.blocksByName.chest.id, maxDistance: 5 })
         if (chestBlock) {
+          rememberLocation("baseChest", chestBlock.position, "chest")
           const chest = await bot.openContainer(chestBlock)
           const items = chest.items()
           if (items.length === 0) {
@@ -1910,6 +2123,7 @@ bot.on("message", async (msg) => {
       case "sminebase":
         const p = bot.entity.position;
         miningBaseLocation = { x: p.x, y: p.y, z: p.z };
+        rememberLocation("miningBase", miningBaseLocation, "mining-base")
         return say(`⛏️ Mining base set to X: ${Math.floor(p.x)}, Y: ${Math.floor(p.y)}, Z: ${Math.floor(p.z)}`);
       case "minebase":
         if (!miningBaseLocation) return say("❌ No mining base set. Use :sminebase first.");
@@ -1925,10 +2139,13 @@ bot.on("message", async (msg) => {
         return say(lumberjackActive ? "🌲 Lumberjack Protocol: Engaged" : "🌲 Lumberjack Protocol: Disengaged");
       case "roam":
         if (!isAdmin) return pm(user, "❌ Access Denied.");
-        roaming = true; roam();
+        roaming = true; setCurrentObjective("Roaming"); roam();
         return say("🚶 Roaming protocol active");
       case "stop":
-        roaming = false; following = false; pvpTarget = null; progressionActive = false; minerActive = false; lumberjackActive = false;
+        roaming = false; following = false; pvpTarget = null; progressionActive = false;
+        minerActive = false; mineAreaActive = false; lumberjackActive = false; guarding = false; medicMode = false;
+        safeModeActive = false; killAuraActive = false;
+        stopRememberedTask()
         bot.pathfinder.setGoal(null);
         return say("⛔ All operations halted.");
       case "follow":
@@ -1940,14 +2157,31 @@ bot.on("message", async (msg) => {
         following = false; followTarget = null;
         bot.pathfinder.setGoal(null);
         return say("🛑 Stopped following.");
-      case "help": return say("Public: :ping, :status, :coords, :home, :sminebase, :minebase, :roof, :lumberjack, :rescue, :medic, :sort, :deposit | Admin: :follow, :roam, :stop, :guard, :pvp, $mine, $stealth, $panic")
+      case "help": return say("Public: :ping, :status, :coords, :home, :sminebase, :minebase, :roof, :lumberjack, :rescue, :medic, :sort, :deposit, :remember, :forget | Admin: :follow, :roam, :stop, :guard, :pvp, $mine, $stealth, $panic")
+      case "remember": {
+        const separator = content.indexOf("=")
+        if (separator < 0) return say("Usage: :remember <key>=<fact>")
+        const key = content.slice(PREFIX.length, separator).replace(/^remember\s*/i, "").trim()
+        const fact = content.slice(separator + 1).trim()
+        if (!rememberFact(key, fact)) return say("Memory is disabled or the key/fact is empty.")
+        return say(`🧠 Remembered: ${key}`)
+      }
+      case "forget":
+        if (!forgetFact(args[0])) return say("Memory is disabled or that fact was not found.")
+        return say(`🧠 Forgot: ${args[0]}`)
       case "chat": {
         const msgContent = args.join(" ")
         if (!msgContent) return pm(user, "❌ Usage: :chat <msg>")
         try {
           const response = await openai.chat.completions.create({
             model: "gpt-4",
-            messages: [{ role: "user", content: msgContent }]
+            messages: [
+              {
+                role: "system",
+                content: `You are Airi, a Minecraft bot assistant. Use these persistent notes as context, but do not invent facts. Follow stored behavioral rules.\n\n${getMemoryContext()}`
+              },
+              { role: "user", content: msgContent }
+            ]
           })
           const reply = response.choices[0].message.content
           say(reply)
@@ -1989,6 +2223,8 @@ bot.on("message", async (msg) => {
         bot.setControlState('sprint', false)
         return say("🛑 Auto-defense halted and target cleared.")
       case "guard":
+        guarding = true
+        setCurrentObjective("Guarding")
         say("🛡️ Guarding current location")
         return guardLoop()
       case "pvp": {
@@ -2123,6 +2359,7 @@ io.on("connection", (socket) => {
     // Use provided pos or current bot position
     state.favorites[name] = pos || (bot.entity ? { ...bot.entity.position } : null);
     if (!state.favorites[name]) return;
+    rememberLocation(`favorite:${name}`, state.favorites[name], "favorite")
     log("WEB", `Saved favorite location: ${name}`);
     io.emit("bulk_update", state);
   });
@@ -2138,14 +2375,32 @@ io.on("connection", (socket) => {
     switch(command) {
       case "stop":
         roaming = false; following = false; pvpTarget = null;
+        progressionActive = false; minerActive = false; lumberjackActive = false;
+        mineAreaActive = false;
+        guarding = false; medicMode = false; safeModeActive = false; killAuraActive = false;
+        stopRememberedTask()
         bot.pathfinder.setGoal(null);
         say("⛔ Movement halted via dashboard");
         break;
       case "roam":
-        roaming = true; roam();
+        roaming = true; setCurrentObjective("Roaming"); roam();
         say("🚶 Roaming protocol active");
         break;
+      case "scout":
+        roaming = !roaming
+        if (roaming) {
+          setCurrentObjective("Scouting nearby terrain")
+          roam()
+          say("🧭 Scout mode active")
+        } else {
+          bot.pathfinder.setGoal(null)
+          finishRememberedTask("stopped")
+          say("🧭 Scout mode stopped")
+        }
+        break;
       case "guard":
+        guarding = true
+        setCurrentObjective("Guarding")
         guardLoop();
         say("🛡️ Static guard initiated");
         break;
@@ -2160,6 +2415,7 @@ io.on("connection", (socket) => {
         }
         if (target && !isNaN(target.x) && !isNaN(target.y) && !isNaN(target.z)) {
           roaming = false; following = false; progressionActive = false; medicMode = false;
+          setCurrentObjective(`Navigating to ${Math.floor(target.x)}, ${Math.floor(target.y)}, ${Math.floor(target.z)}`)
           mcData = mcDataLoader(bot.version) || mcDataLoader(MC_VERSION);
           movements = new Movements(bot, mcData);
           const goal = new goals.GoalBlock(Math.floor(target.x), Math.floor(target.y), Math.floor(target.z));
@@ -2189,9 +2445,22 @@ io.on("connection", (socket) => {
         }
         break;
       case "toggle_stealth":
-        stealthMode = !stealthMode;
+        stealthMode = typeof args === "boolean" ? args : !stealthMode;
+        state.settings.stealth = stealthMode;
         bot.setControlState('sneak', stealthMode);
         say(stealthMode ? "👻 Stealth Mode enabled via Dashboard" : "👁️ Stealth Mode disabled via Dashboard");
+        break;
+      case "toggle_defense":
+        autoDefense = Boolean(args);
+        state.settings.autoDefense = autoDefense;
+        log("WEB", `Auto-defense ${autoDefense ? "enabled" : "disabled"}`);
+        io.emit("bulk_update", state);
+        break;
+      case "toggle_armor":
+        autoArmorEnabled = Boolean(args);
+        state.settings.autoArmor = autoArmorEnabled;
+        log("WEB", `Auto-armor ${autoArmorEnabled ? "enabled" : "disabled"}`);
+        io.emit("bulk_update", state);
         break;
       case "beat_game":
         if (progressionActive) return;
@@ -2207,6 +2476,9 @@ io.on("connection", (socket) => {
         break;
       case "build":
         buildStructure(args);
+        break;
+      case "mine_area":
+        mineArea(args);
         break;
     }
   })
@@ -2253,6 +2525,7 @@ async function pvpLoop() {
 
 /* ================= GUARD LOOP ================= */
 function guardLoop() {
+  if (!guarding) return
   const pos = bot.entity.position
   bot.pathfinder.setGoal(new goals.GoalBlock(pos.x, pos.y, pos.z))
   setTimeout(guardLoop, 2000)

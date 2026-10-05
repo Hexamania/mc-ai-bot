@@ -182,7 +182,7 @@
                     </div>
                     <hr class="divider">
                     <h2 class="tab-title">Mining operations</h2>
-                    <p class="hint">Mine an area using offsets relative to the bot's current position.</p>
+                    <p class="hint">Mine up to 512 blocks using offsets relative to the bot's current position.</p>
                     <div class="triple-input">
                         <input type="number" id="mine-x" placeholder="X offset" aria-label="X offset">
                         <input type="number" id="mine-y" placeholder="Y offset" aria-label="Y offset">
@@ -222,11 +222,10 @@
 
                 <div id="settings" class="tab-content">
                     <h2 class="tab-title">Bot settings</h2>
-                    <label class="settings-row"><input type="checkbox" onchange="sendCommand('toggle_stealth')" id="set-stealth"> Stealth mode</label>
+                    <label class="settings-row"><input type="checkbox" onchange="sendCommand('toggle_stealth', this.checked)" id="set-stealth"> Stealth mode</label>
                     <hr class="divider">
-                    <label class="settings-row"><input type="checkbox" checked id="set-defense"> Auto-defense (status display)</label>
-                    <label class="settings-row" style="margin-top:12px"><input type="checkbox" checked id="set-armor"> Auto-armor (status display)</label>
-                    <p class="hint" style="margin-top:14px">Auto-defense and auto-armor are configured in the bot process.</p>
+                    <label class="settings-row"><input type="checkbox" checked onchange="sendCommand('toggle_defense', this.checked)" id="set-defense"> Auto-defense</label>
+                    <label class="settings-row" style="margin-top:12px"><input type="checkbox" checked onchange="sendCommand('toggle_armor', this.checked)" id="set-armor"> Auto-armor</label>
                 </div>
             </section>
 
@@ -271,6 +270,11 @@
             if (Array.isArray(data.inventory)) renderInventory(data.inventory);
             if (data.favorites) renderFavorites(data.favorites);
             if (data.equipment) renderEquipment(data.equipment);
+            if (data.settings) {
+                document.getElementById('set-stealth').checked = Boolean(data.settings.stealth);
+                document.getElementById('set-defense').checked = data.settings.autoDefense !== false;
+                document.getElementById('set-armor').checked = data.settings.autoArmor !== false;
+            }
         });
 
         socket.on('log', (message) => {

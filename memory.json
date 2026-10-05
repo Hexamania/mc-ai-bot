@@ -1,1 +1,8 @@
-{}
+{
+  "schemaVersion": 1,
+  "locations": {},
+  "players": {},
+  "currentTask": null,
+  "rules": [],
+  "learnedFacts": {}
+}

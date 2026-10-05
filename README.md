@@ -53,8 +53,11 @@ An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://gith
    MC_PORT=25565
    MC_USERNAME=Airi
    MC_VERSION=1.21.1
+   ENABLE_MEMORY=true
    OPENAI_KEY=your_openai_api_key_here
    ```
+
+   Set `ENABLE_MEMORY=false` to disable all reads and writes to `memory.json`. When enabled, that file stores saved locations, recognized players, the current task, behavioral rules, and learned facts.
 
 ---
 
@@ -98,6 +101,8 @@ An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://gith
 | `:sort` | Organizes nearby chest contents by item category. |
 | `:deposit` | Deposits non-essential items into a nearby chest. |
 | `:refuel` | Gathers nearby coal ore or smelts logs into charcoal. |
+| `:remember <key>=<fact>` | Saves a short learned fact when persistent memory is enabled. |
+| `:forget <key>` | Removes a saved learned fact when persistent memory is enabled. |
 | `:help` | Displays available command list. |
 
 ### Admin Commands (`$` Prefix)

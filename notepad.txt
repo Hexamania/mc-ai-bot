@@ -1,2 +1,4 @@
-bot pass = airi123qqqqqqqq
-admin pass = Player_ADMIN132
+# what were u expecting lol
+
+bot pass = 
+admin pass =

@@ -1,4 +1,3 @@
-# what were u expecting lol
+For those who want to try to fix something and it didnt work add how many hours you worked on in this notepad
 
-bot pass = 
-admin pass =
+Hours wasted: 92

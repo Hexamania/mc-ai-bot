@@ -19,7 +19,7 @@ const ADMIN_PREFIX = "$"
 
 const BOT_PASSWORD = "airi123qqqqqqqq"
 const ADMIN_PASSWORD = "Player_ADMIN132"
-const MC_VERSION = process.env.MC_VERSION || "1.21.1"
+const MC_VERSION = process.env.MC_VERSION?.trim() || "1.21.1"
 
 /* ================= STATE ================= */
 let roaming = false
@@ -58,12 +58,55 @@ const openai = new OpenAI({
 })
 
 /* ================= BOT ================= */
-const bot = mineflayer.createBot({
-  host: process.env.MC_HOST,
-  port: Number(process.env.MC_PORT),
-  username: process.env.MC_USERNAME,
-  version: MC_VERSION,
-  auth: "offline"
+let client = null
+let reconnectTimer = null
+let reconnectAttempt = 0
+let dashboardInterval = null
+let spawnLookInterval = null
+let isOnline = false
+let statusEvent = "connecting"
+let statusReason = null
+let statusError = null
+let retryAt = null
+const botListeners = []
+let dispatchingBotListener = false
+
+function attachBotListener(instance, record) {
+  const wrapped = function (...args) {
+    if (instance !== client) return
+    const previousDispatchState = dispatchingBotListener
+    dispatchingBotListener = true
+    try {
+      return record.listener.apply(this, args)
+    } finally {
+      dispatchingBotListener = previousDispatchState
+    }
+  }
+
+  if (record.once) instance.once(record.event, wrapped)
+  else instance.on(record.event, wrapped)
+}
+
+const bot = new Proxy({}, {
+  get(_target, property) {
+    if (!client) return undefined
+    if (property === "on" || property === "once") {
+      return (event, listener) => {
+        const record = { event, listener, once: property === "once" }
+        if (!dispatchingBotListener) botListeners.push(record)
+        attachBotListener(client, record)
+        return bot
+      }
+    }
+
+    const value = client[property]
+    return typeof value === "function" ? value.bind(client) : value
+  },
+  set(_target, property, value) {
+    if (!client) return false
+    client[property] = value
+    return true
+  }
 })
 
 /* ================= WEB STATE ================= */
@@ -80,6 +123,140 @@ let state = {
   equipment: {}
 };
 
+function getBotStatus(extra = {}) {
+  return {
+    online: isOnline,
+    username: client?.username || process.env.MC_USERNAME || "Airi",
+    status: state.status,
+    event: statusEvent,
+    reason: statusReason,
+    error: statusError,
+    retryAt,
+    retryInMs: retryAt ? Math.max(0, retryAt - Date.now()) : null,
+    ...extra
+  }
+}
+
+function emitBotStatus(extra = {}) {
+  io.emit("bot_status", getBotStatus(extra))
+}
+
+function formatConnectionReason(reason) {
+  if (typeof reason === "string") return reason
+  if (reason && typeof reason === "object") {
+    try {
+      return JSON.stringify(reason)
+    } catch (error) {
+      return reason.toString()
+    }
+  }
+  return reason == null ? "Unknown reason" : String(reason)
+}
+
+function scheduleReconnect(instance, reason, detail, status = "Reconnecting", event = "end") {
+  if (instance !== client) return
+
+  isOnline = false
+  if (reconnectTimer) {
+    if (status === "Error" && (state.status !== "Error" || event === "kicked")) {
+      state.status = status
+      statusEvent = event
+      statusReason = reason
+      statusError = detail || reason
+    }
+    emitBotStatus()
+    return
+  }
+
+  state.status = status
+  statusEvent = event
+  statusReason = reason
+  statusError = status === "Error" ? detail || reason : null
+  const retryInMs = Math.min(1000 * (2 ** reconnectAttempt), 60000)
+  reconnectAttempt += 1
+  retryAt = Date.now() + retryInMs
+  emitBotStatus()
+  log("RECONNECT", `${reason}${detail ? `: ${detail}` : ""}. Retrying in ${Math.round(retryInMs / 1000)}s.`)
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null
+    connectBot()
+  }, retryInMs)
+}
+
+function connectBot() {
+  state.status = "Connecting"
+  statusEvent = "connecting"
+  statusReason = null
+  statusError = null
+  retryAt = null
+  isOnline = false
+  emitBotStatus()
+  try {
+    const instance = mineflayer.createBot({
+      host: process.env.MC_HOST,
+      port: Number(process.env.MC_PORT) || 25565,
+      username: process.env.MC_USERNAME,
+      version: MC_VERSION,
+      auth: "offline",
+      // Mineflayer's protocol layer handles Minecraft keep-alive packets; this is
+      // its local timeout for stalled connections, not a server-side AFK setting.
+      checkTimeoutInterval: 60000
+    })
+    client = instance
+    instance.loadPlugin(pathfinder)
+    for (const listener of botListeners) attachBotListener(instance, listener)
+
+    instance._client.on("finish_configuration", () => {
+      setImmediate(() => {
+        if (instance !== client) return
+        if (instance._client.state === "play") {
+          log("CONFIG", "Minecraft configuration finished; protocol client entered play state")
+        } else {
+          log("CONFIG-ERR", `Expected play state after finish_configuration, got "${instance._client.state}"`)
+        }
+      })
+    })
+
+    instance.on("login", () => {
+      if (instance !== client) return
+      state.status = "Connecting"
+      statusEvent = "login"
+      statusReason = null
+      statusError = null
+      retryAt = null
+      emitBotStatus()
+    })
+    instance.on("end", reason => {
+      if (instance !== client) return
+      clearInterval(spawnLookInterval)
+      spawnLookInterval = null
+      scheduleReconnect(instance, "Disconnected", formatConnectionReason(reason), "Reconnecting", "end")
+    })
+    instance.on("kicked", kickReason => {
+      if (instance !== client) return
+      clearInterval(spawnLookInterval)
+      spawnLookInterval = null
+      const detail = formatConnectionReason(kickReason)
+      scheduleReconnect(instance, "Kicked", detail, "Error", "kicked")
+      log("KICKED", detail)
+    })
+    instance.on("error", error => {
+      if (instance !== client) return
+      clearInterval(spawnLookInterval)
+      spawnLookInterval = null
+      scheduleReconnect(instance, "Connection error", error.message, "Error", "error")
+      log("ERROR", error.message)
+    })
+  } catch (error) {
+    isOnline = false
+    state.status = "Offline"
+    emitBotStatus({ reason: "Connection setup failed" })
+    log("ERROR", `Unable to create bot connection: ${error.message}`)
+    scheduleReconnect(client, "Connection setup failed", error.message, "Error", "error")
+  }
+}
+
 app.use(express.json());
 
 // Ensure the dashboard is served correctly
@@ -95,8 +272,6 @@ app.get('/api/state', (req, res) => res.json(state));
 
 server.listen(3000, () => log("WEB", "Dashboard running at http://localhost:3000"))
 
-bot.loadPlugin(pathfinder)
-
 /* ================= UTILS ================= */
 const log = (t, m) => {
   const entry = `[${t}] ${m}`;
@@ -106,8 +281,13 @@ const log = (t, m) => {
   io.emit("log", entry);
   if (t === "ERROR" || t.includes("ERR")) say(`⚠️ ${t}: ${m}`)
 }
-const say = (m) => { console.log("[BOT SAY]", m); bot.chat(m) }
+const say = (m) => {
+  console.log("[BOT SAY]", m)
+  if (isOnline && bot.entity) bot.chat(m)
+}
 const pm = (u, m) => { console.log(`[BOT PM -> ${u}]`, m); bot.chat(`/msg ${u} ${m}`) }
+
+connectBot()
 
 /* ================= PARSER ================= */
 function parse(raw) {
@@ -1170,7 +1350,8 @@ async function collectMaterials() {
 /* ================= EAT LOGIC ================= */
 async function forceEat() {
   const foodItems = ['cooked_beef', 'cooked_porkchop', 'golden_apple', 'bread', 'apple', 'cooked_chicken', 'cooked_mutton', 'cooked_salmon', 'cooked_cod'];
-  const food = bot.inventory.items().find(i => foodItems.includes(i.name));
+  const inventory = bot.inventory.items();
+  const food = foodItems.map(name => inventory.find(item => item.name === name)).find(Boolean);
   if (food) {
     try {
       roaming = false; following = false; progressionActive = false;
@@ -1416,10 +1597,43 @@ function autoArmor() {
 }
 
 /* ================= SPAWN / AUTH ================= */
+bot.on("resourcePack", () => {
+  // minecraft-protocol auto-accepts configuration packs after this synchronous
+  // event; do not send a second status packet during the handshake.
+  if (bot._client?.state !== "play") return
+  const packClient = bot._client
+  setImmediate(() => {
+    if (packClient !== client?._client || packClient.state !== "play") return
+    try {
+      bot.acceptResourcePack()
+      log("RESOURCE-PACK", "Accepted server resource pack")
+    } catch (error) {
+      log("RESOURCE-PACK-ERR", `Failed to accept server resource pack: ${error.message}`)
+    }
+  })
+})
+
 bot.once("spawn", () => {
   log("SPAWN", "Bot online")
-  state.status = 'Online';
-  io.emit("bot_status", { online: true, username: bot.username })
+  isOnline = true
+  reconnectAttempt = 0
+  state.status = "Online"
+  statusEvent = "spawn"
+  statusReason = null
+  statusError = null
+  retryAt = null
+  emitBotStatus()
+  // Send real, tiny look updates without moving or fabricating protocol packets.
+  let lookDirection = 1
+  const nudgeLook = () => {
+    if (!isOnline || !bot.entity) return
+    bot.look(bot.entity.yaw + lookDirection * Math.PI / 90, bot.entity.pitch, true)
+      .catch(error => log("LOOK-ERR", `Spawn look update failed: ${error.message}`))
+    lookDirection *= -1
+  }
+  clearInterval(spawnLookInterval)
+  nudgeLook()
+  spawnLookInterval = setInterval(nudgeLook, 15000)
   say("🤖 Airi online | :help")
 
   // Initialize data once on spawn
@@ -1470,7 +1684,8 @@ bot.once("spawn", () => {
   bot.on('health', () => { if (bot.food < 10) autoFarmWheat(); });
 
   // Periodic status updates to Dashboard
-  setInterval(() => {
+  clearInterval(dashboardInterval)
+  dashboardInterval = setInterval(() => {
     if (bot.entity) {
       depositItems()
 
@@ -1827,8 +2042,9 @@ function medicLoop() {
 /* ================= WEB CONTROL ================= */
 io.on("connection", (socket) => {
   log("WEB", "Dashboard session established")
-  socket.emit("bot_status", { online: true, username: bot.username })
+  socket.emit("bot_status", getBotStatus())
   socket.emit("state", state);
+  socket.emit("bulk_update", state)
 
   // Missing listeners for Web-to-Bot interactions
   socket.on("mine_block", async (data) => {
@@ -1905,7 +2121,8 @@ io.on("connection", (socket) => {
     const { name, pos } = data;
     if (!name) return;
     // Use provided pos or current bot position
-    state.favorites[name] = pos || { ...bot.entity.position };
+    state.favorites[name] = pos || (bot.entity ? { ...bot.entity.position } : null);
+    if (!state.favorites[name]) return;
     log("WEB", `Saved favorite location: ${name}`);
     io.emit("bulk_update", state);
   });
@@ -1913,6 +2130,10 @@ io.on("connection", (socket) => {
   socket.on("send_command", (data) => {
     const { command, args } = data
     log("WEB-CMD", `Executing: ${command} ${args || ""}`)
+    if (!isOnline || !bot.entity) {
+      log("WEB", `Ignored "${command}" because the bot is offline.`)
+      return
+    }
     
     switch(command) {
       case "stop":
@@ -2066,4 +2287,3 @@ bot.on('hurt', () => {
 
 /* ================= ERRORS ================= */
 bot.on("kicked", r => console.error("[KICKED]", r))
-bot.on("error", e => console.error("[ERROR]", e))

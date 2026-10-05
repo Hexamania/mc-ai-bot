@@ -1,11 +1,15 @@
-# Environment variables & secrets
-.env
-*.env
-
-# Node dependencies
+# Dependencies
 node_modules/
 
-# Local state, logs, and database files
-memory.json
-users.json
+# Log files
+bot_logs.txt
 *.log
+npm-debug.log*
+
+# Environment / API keys
+.env
+.env.local
+
+# Operating System / Editor files
+.DS_Store
+.vscode/

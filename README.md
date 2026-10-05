@@ -65,6 +65,11 @@ An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://gith
    node bot.js
    ```
 
+   For development with automatic restarts when files change:
+   ```bash
+   npm run dev
+   ```
+
 2. **Access the Web Dashboard:**
    Open your browser and navigate to:
    ```

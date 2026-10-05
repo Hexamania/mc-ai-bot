@@ -3,308 +3,464 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Airi AI Bot Dashboard</title>
+    <meta name="theme-color" content="#090d16">
+    <title>Airi OS Dashboard</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            color: white;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
+        :root {
+            color-scheme: dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #090d16;
+            color: #edf2ff;
+            font-synthesis: none;
+            --panel: #111827;
+            --panel-raised: #151f31;
+            --line: #263349;
+            --muted: #92a0b8;
+            --accent: #78e3bd;
+            --danger: #ff6e83;
+            --blue: #82aaff;
         }
-        header {
-            background: rgba(0, 0, 0, 0.5);
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #4ecca3;
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 50% -30%, #1b2b43 0, #090d16 65%); }
+        button, input { font: inherit; }
+        button { cursor: pointer; }
+        .app-shell { max-width: 1600px; min-height: 100vh; margin: 0 auto; padding: 22px; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+        .brand { display: flex; align-items: center; gap: 13px; }
+        .brand-mark { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #347461; border-radius: 13px; color: var(--accent); background: #10251f; font-size: 21px; }
+        h1 { margin: 0; font-size: 1.2rem; letter-spacing: .02em; }
+        .subtitle { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
+        .header-right { display: flex; align-items: center; gap: 14px; }
+        .status-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; background: #101725; color: var(--muted); font-size: .82rem; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #718096; box-shadow: 0 0 0 3px #71809622; }
+        .status-pill.online { border-color: #286950; color: var(--accent); }
+        .status-pill.online .status-dot { background: var(--accent); box-shadow: 0 0 0 3px #78e3bd22; }
+        .status-pill.connecting { border-color: #354e75; color: #a9c5ff; }
+        .status-pill.connecting .status-dot { background: var(--blue); box-shadow: 0 0 0 3px #82aaff22; animation: pulse 1.5s infinite; }
+        .status-pill.reconnecting .status-dot { background: #f7c66b; box-shadow: 0 0 0 3px #f7c66b22; animation: pulse 1.5s infinite; }
+        .status-pill.error { border-color: #713746; color: #ff9ba8; }
+        .status-pill.error .status-dot { background: var(--danger); box-shadow: 0 0 0 3px #ff6e8322; }
+        .coords { border: 1px solid var(--line); border-radius: 11px; background: #101725; padding: 10px 13px; font: 600 .8rem ui-monospace, SFMono-Regular, Consolas, monospace; color: #c8d3e6; white-space: nowrap; }
+        .layout { display: grid; grid-template-columns: minmax(225px, .8fr) minmax(400px, 1.8fr) minmax(250px, .9fr); gap: 16px; align-items: stretch; }
+        .card { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, #121a29f5, #0f1623f5); box-shadow: 0 14px 40px #00000024; padding: 18px; }
+        .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 15px; font-size: .9rem; letter-spacing: .02em; }
+        .section-kicker { color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+        .vital { margin-bottom: 15px; }
+        .vital-label { display: flex; justify-content: space-between; margin-bottom: 7px; color: #c4cee0; font-size: .82rem; }
+        .vital-value { font-weight: 700; color: #fff; }
+        .meter { height: 8px; overflow: hidden; border-radius: 99px; background: #283245; }
+        .meter-fill { width: 0; height: 100%; border-radius: inherit; transition: width .25s ease; }
+        .health-fill { background: linear-gradient(90deg, #f56b7e, #ff9b8f); }
+        .food-fill { background: linear-gradient(90deg, #f2ae55, #f8d274); }
+        .btn { display: inline-flex; justify-content: center; align-items: center; gap: 7px; min-height: 38px; border: 1px solid transparent; border-radius: 9px; padding: 8px 11px; background: #1d2a3e; color: #e8eef8; font-weight: 650; font-size: .78rem; transition: background .15s, border-color .15s, transform .15s; }
+        .btn:hover { transform: translateY(-1px); background: #263650; }
+        .btn-primary { background: #1d493c; border-color: #28644f; color: var(--accent); }
+        .btn-primary:hover { background: #245b49; }
+        .btn-danger { background: #49212b; border-color: #66303b; color: #ffa1ad; }
+        .btn-danger:hover { background: #5a2935; }
+        .btn-block { width: 100%; }
+        .divider { height: 1px; border: 0; margin: 18px 0; background: var(--line); }
+        .inventory-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+        .inventory-slot { position: relative; display: grid; min-width: 0; aspect-ratio: 1; place-items: center; border: 1px solid #2a374c; border-radius: 7px; background: #0c1320; color: #9eacc2; font-size: .58rem; }
+        .inventory-slot.filled { border-color: #384960; background: linear-gradient(145deg, #1b2939, #121c2b); color: #edf2ff; }
+        .slot-count { position: absolute; right: 4px; bottom: 3px; color: white; font-size: .65rem; font-weight: 700; text-shadow: 0 1px 2px #000; }
+        .slot-name { overflow: hidden; max-width: 90%; text-overflow: ellipsis; white-space: nowrap; }
+        .inventory-caption { margin: 9px 0 0; color: var(--muted); font-size: .7rem; }
+        .main-card { display: flex; min-height: 620px; flex-direction: column; }
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); margin: -2px 0 16px; padding-bottom: 12px; }
+        .tab-btn { border: 1px solid transparent; border-radius: 8px; padding: 8px 11px; background: transparent; color: var(--muted); font-size: .78rem; font-weight: 650; }
+        .tab-btn:hover { color: #e8eef8; background: #1a2537; }
+        .tab-btn.active { border-color: #2c624f; background: #17352c; color: var(--accent); }
+        .tab-content { display: none; min-height: 0; flex: 1; flex-direction: column; }
+        .tab-content.active { display: flex; }
+        .log-box { min-height: 280px; flex: 1; overflow: auto; border: 1px solid #243149; border-radius: 11px; background: #080d15; padding: 12px; color: #a9eacb; font: .76rem/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+        .log-line { padding: 2px 0; border-bottom: 1px solid #ffffff08; white-space: pre-wrap; }
+        .input-row { display: flex; gap: 8px; margin-top: 10px; }
+        .input-group { display: grid; gap: 8px; margin-top: 12px; }
+        input { width: 100%; min-width: 0; border: 1px solid #2b3850; border-radius: 9px; outline: none; padding: 10px 11px; background: #0b1220; color: #edf2ff; font-size: .8rem; }
+        input:focus { border-color: #4c9c80; box-shadow: 0 0 0 3px #78e3bd18; }
+        input::placeholder { color: #64728a; }
+        .button-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .tab-title { margin: 2px 0 9px; color: #dce5f4; font-size: .85rem; }
+        .hint { margin: 0 0 10px; color: var(--muted); font-size: .74rem; line-height: 1.5; }
+        .triple-input { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+        .poi-list { display: grid; gap: 7px; }
+        .poi-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; background: #0d1522; font-size: .8rem; }
+        .settings-row { display: flex; align-items: center; gap: 9px; color: #c3cee0; font-size: .8rem; }
+        .settings-row input { width: auto; accent-color: #78e3bd; }
+        .build-buttons { display: grid; gap: 7px; }
+        .file-input { padding: 7px; }
+        .right-card { display: flex; flex-direction: column; gap: 16px; }
+        .equipment-list { display: grid; gap: 7px; }
+        .equipment-row { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .76rem; }
+        .equipment-row strong { overflow: hidden; color: #dce5f4; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+        .empty-state { color: var(--muted); font-size: .78rem; padding: 8px 0; }
+        @keyframes pulse { 50% { opacity: .45; } }
+        @media (max-width: 1050px) {
+            .layout { grid-template-columns: minmax(220px, .85fr) minmax(0, 1.6fr); }
+            .right-card { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
-        .container {
-            display: grid;
-            grid-template-columns: 250px 1fr 300px;
-            flex: 1;
-            gap: 10px;
-            padding: 10px;
-            overflow: hidden;
+        @media (max-width: 700px) {
+            .app-shell { padding: 14px; }
+            header { align-items: flex-start; flex-direction: column; }
+            .header-right { width: 100%; justify-content: space-between; }
+            .layout { grid-template-columns: minmax(0, 1fr); }
+            .right-card { grid-column: auto; grid-template-columns: minmax(0, 1fr); }
+            .main-card { min-height: 560px; }
+            .inventory-grid { grid-template-columns: repeat(9, minmax(0, 1fr)); }
         }
-        .card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 8px;
-            padding: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            flex-direction: column;
-        }
-        .tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 10px;
-        }
-        .tab-btn {
-            background: none;
-            border: 1px solid #4ecca3;
-            color: #4ecca3;
-            padding: 8px 15px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-        .tab-btn.active {
-            background: #4ecca3;
-            color: #1a1a2e;
-        }
-        .tab-content {
-            display: none;
-            flex: 1;
-            overflow-y: auto;
-        }
-        .tab-content.active { display: flex; flex-direction: column; }
-        
-        .log-box {
-            background: #000;
-            font-family: monospace;
-            padding: 10px;
-            border-radius: 4px;
-            height: 200px;
-            overflow-y: scroll;
-            font-size: 0.85rem;
-            color: #00ff00;
-        }
-        .btn-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-        button {
-            padding: 10px;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-        .btn-action { background: #4ecca3; color: #1a1a2e; }
-        .btn-danger { background: #e94560; color: white; }
-        .input-group { margin: 10px 0; }
-        input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid #444;
-            color: white;
-            border-radius: 4px;
-        }
-        .poi-item {
-            padding: 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            display: flex;
-            justify-content: space-between;
+        @media (max-width: 420px) {
+            .inventory-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+            .tab-btn { padding: 7px 9px; }
+            .coords { font-size: .7rem; }
         }
     </style>
 </head>
 <body>
-    <header>
-        <div>
-            <h2 style="margin:0">Airi OS Dashboard</h2>
-            <small id="bot-status">Status: Connecting...</small>
-        </div>
-        <div id="coords">X: 0, Y: 0, Z: 0</div>
-    </header>
-
-    <div class="container">
-        <!-- Sidebar: Stats & Inventory -->
-        <div class="card">
-            <h3>Bot Vitals</h3>
-            <p>❤️ Health: <span id="health">20</span></p>
-            <p>🍗 Food: <span id="food">20</span></p>
-            <button class="btn-action" onclick="sendCommand('force_eat')" style="width:100%; margin-top:5px">Force Eat Best Food</button>
-            <hr>
-            <h3>Inventory</h3>
-            <div id="inventory-list" style="font-size: 0.9rem"></div>
-        </div>
-
-        <!-- Main View: Console and Tabs -->
-        <div class="card">
-            <div class="tabs">
-                <button class="tab-btn active" onclick="showTab('console')">Console</button>
-                <button class="tab-btn" onclick="showTab('commands')">Commands</button>
-                <button class="tab-btn" onclick="showTab('favorites')">Favorites</button>
-                <button class="tab-btn" onclick="showTab('build')">Build</button>
-            </div>
-
-            <div id="console" class="tab-content active">
-                <div class="log-box" id="logs"></div>
-                <div class="input-group">
-                    <input type="text" id="chat-input" placeholder="Send server command or chat...">
-                    <button class="btn-action" onclick="sendCommand('servercmd', document.getElementById('chat-input').value)" style="margin-top:5px">Send</button>
+    <div class="app-shell">
+        <header>
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">A</div>
+                <div>
+                    <h1>Airi OS Dashboard</h1>
+                    <p class="subtitle">Minecraft bot control center</p>
                 </div>
             </div>
+            <div class="header-right">
+                <div id="bot-status" class="status-pill" role="status" aria-live="polite">
+                    <span class="status-dot"></span><span id="status-text">Connecting...</span>
+                </div>
+                <div id="coords" class="coords" aria-label="Bot coordinates">X: 0, Y: 0, Z: 0</div>
+            </div>
+        </header>
 
-            <div id="commands" class="tab-content">
-                <div class="btn-grid">
-                    <button class="btn-action" onclick="sendCommand('roam')">Start Roaming</button>
-                    <button class="btn-danger" onclick="sendCommand('stop')">Stop All</button>
-                    <button class="btn-action" onclick="sendCommand('scout')">Toggle Scout Mode</button>
-                    <button class="btn-action" onclick="sendCommand('beat_game')">Start Speedrun</button>
-                    <button class="btn-action" onclick="sendCommand('guard')">Guard Position</button>
-                    <button class="btn-action" onclick="sendCommand('refuel')">Refuel (Coal)</button>
+        <main class="layout">
+            <aside class="card">
+                <div class="section-heading"><span>Bot vitals</span><span class="section-kicker">Live</span></div>
+                <div class="vital">
+                    <div class="vital-label"><span>Health</span><span class="vital-value"><span id="health">20</span> / 20</span></div>
+                    <div class="meter"><div id="health-bar" class="meter-fill health-fill" style="width:100%"></div></div>
                 </div>
-                <hr>
-                <h4>Mining Operations</h4>
-                <p style="font-size:0.8rem">Mine area from current pos to relative offset:</p>
-                <div style="display:flex; gap:5px">
-                    <input type="number" id="mine-x" placeholder="X offset">
-                    <input type="number" id="mine-y" placeholder="Y offset">
-                    <input type="number" id="mine-z" placeholder="Z offset">
+                <div class="vital">
+                    <div class="vital-label"><span>Food</span><span class="vital-value"><span id="food">20</span> / 20</span></div>
+                    <div class="meter"><div id="food-bar" class="meter-fill food-fill" style="width:100%"></div></div>
                 </div>
-                <button class="btn-action" onclick="triggerMineArea()" style="width:100%; margin-top:5px">Execute Mine Area</button>
-            </div>
+                <button class="btn btn-primary btn-block" onclick="sendCommand('force_eat')">🍗 Force Eat Best Food</button>
 
-            <div id="favorites" class="tab-content">
-                <div id="fav-list"></div>
-                <hr>
-                <div class="input-group">
-                    <input type="text" id="fav-name" placeholder="Favorite name">
-                    <button class="btn-action" onclick="saveCurrentLoc()" style="margin-top:5px; width:100%">Save Current Location</button>
-                </div>
-            </div>
+                <hr class="divider">
+                <div class="section-heading"><span>Inventory</span><span id="inventory-count" class="section-kicker">0 stacks</span></div>
+                <div id="inventory-list" class="inventory-grid" aria-label="Inventory slots"></div>
+                <p class="inventory-caption">Hover over a slot to see the full item name.</p>
+            </aside>
 
-            <div id="build" class="tab-content">
-                <h4>Pre-defined Structures</h4>
-                <div class="btn-grid">
-                    <button class="tab-btn" onclick="sendCommand('build', {type: 'shelter'})">Simple Shelter (3x3)</button>
-                    <button class="tab-btn" onclick="sendCommand('build', {type: 'house'})">Small House (5x5)</button>
-                </div>
-                <hr>
-                <h4>Custom Schematic (.json)</h4>
-                <p style="font-size:0.7rem; color:#ccc">Upload a simple JSON block list schematic:</p>
-                <div class="input-group">
-                    <input type="file" id="schematic-file" accept=".json" style="font-size: 0.8rem; padding: 5px;">
-                    <button class="btn-action" onclick="loadSchematic()" style="margin-top:5px; width:100%">Build Custom JSON</button>
-                </div>
-                <p style="font-size:0.8rem; margin-top:10px; color:#aaa">Note: Ensure bot has blocks like Cobblestone or Dirt in inventory.</p>
-            </div>
-        </div>
+            <section class="card main-card">
+                <nav class="tabs" aria-label="Dashboard sections">
+                    <button class="tab-btn active" onclick="showTab('console', this)">Console</button>
+                    <button class="tab-btn" onclick="showTab('commands', this)">Commands</button>
+                    <button class="tab-btn" onclick="showTab('favorites', this)">Favorites</button>
+                    <button class="tab-btn" onclick="showTab('build', this)">Build</button>
+                    <button class="tab-btn" onclick="showTab('settings', this)">Settings</button>
+                </nav>
 
-        <!-- Settings Panel -->
-        <div class="card">
-            <h3>Settings</h3>
-            <div class="input-group">
-                <label><input type="checkbox" onchange="sendCommand('toggle_stealth')" id="set-stealth"> Stealth Mode</label>
-            </div>
-            <div class="input-group">
-                <label><input type="checkbox" checked id="set-defense"> Auto-Defense</label>
-            </div>
-            <div class="input-group">
-                <label><input type="checkbox" checked id="set-armor"> Auto-Armor</label>
-            </div>
-            <hr>
-            <h3>Manual Navigation</h3>
-            <input type="text" id="goto-coords" placeholder="X Y Z">
-            <button class="btn-action" onclick="sendCommand('goto', document.getElementById('goto-coords').value)" style="width:100%; margin-top:5px">Go to Location</button>
-        </div>
+                <div id="console" class="tab-content active">
+                    <div id="logs" class="log-box" role="log" aria-live="polite" aria-relevant="additions"></div>
+                    <div class="input-row">
+                        <input type="text" id="chat-input" placeholder="Send server command or chat..." aria-label="Chat or server command">
+                        <button class="btn btn-primary" onclick="sendChat()">Send</button>
+                    </div>
+                </div>
+
+                <div id="commands" class="tab-content">
+                    <div class="button-grid">
+                        <button class="btn btn-primary" onclick="sendCommand('roam')">Start Roaming</button>
+                        <button class="btn btn-danger" onclick="sendCommand('stop')">Stop All</button>
+                        <button class="btn" onclick="sendCommand('scout')">Toggle Scout Mode</button>
+                        <button class="btn" onclick="sendCommand('beat_game')">Start Speedrun</button>
+                        <button class="btn" onclick="sendCommand('guard')">Guard Position</button>
+                        <button class="btn" onclick="sendCommand('refuel')">Refuel (Coal)</button>
+                    </div>
+                    <hr class="divider">
+                    <h2 class="tab-title">Mining operations</h2>
+                    <p class="hint">Mine an area using offsets relative to the bot's current position.</p>
+                    <div class="triple-input">
+                        <input type="number" id="mine-x" placeholder="X offset" aria-label="X offset">
+                        <input type="number" id="mine-y" placeholder="Y offset" aria-label="Y offset">
+                        <input type="number" id="mine-z" placeholder="Z offset" aria-label="Z offset">
+                    </div>
+                    <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="triggerMineArea()">Execute Mine Area</button>
+                    <hr class="divider">
+                    <h2 class="tab-title">Manual navigation</h2>
+                    <p class="hint">Enter target block coordinates to send the bot there.</p>
+                    <div class="input-row">
+                        <input type="text" id="goto-coords" placeholder="X Y Z" aria-label="Target coordinates">
+                        <button class="btn btn-primary" onclick="goToCoordinates()">Go</button>
+                    </div>
+                </div>
+
+                <div id="favorites" class="tab-content">
+                    <div id="fav-list" class="poi-list"></div>
+                    <div class="input-group">
+                        <input type="text" id="fav-name" placeholder="Favorite location name" aria-label="Favorite location name">
+                        <button class="btn btn-primary btn-block" onclick="saveCurrentLoc()">Save Current Location</button>
+                    </div>
+                </div>
+
+                <div id="build" class="tab-content">
+                    <h2 class="tab-title">Pre-defined structures</h2>
+                    <div class="build-buttons">
+                        <button class="btn" onclick="sendCommand('build', {type: 'shelter'})">Simple Shelter (3×3)</button>
+                        <button class="btn" onclick="sendCommand('build', {type: 'house'})">Small House (5×5)</button>
+                    </div>
+                    <hr class="divider">
+                    <h2 class="tab-title">Custom schematic (.json)</h2>
+                    <p class="hint">Upload a JSON block list containing relative x, y, z offsets.</p>
+                    <input type="file" id="schematic-file" class="file-input" accept=".json" aria-label="Schematic JSON file">
+                    <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="loadSchematic()">Build Custom JSON</button>
+                    <p class="hint" style="margin-top:12px">Make sure the bot has building blocks in its inventory.</p>
+                </div>
+
+                <div id="settings" class="tab-content">
+                    <h2 class="tab-title">Bot settings</h2>
+                    <label class="settings-row"><input type="checkbox" onchange="sendCommand('toggle_stealth')" id="set-stealth"> Stealth mode</label>
+                    <hr class="divider">
+                    <label class="settings-row"><input type="checkbox" checked id="set-defense"> Auto-defense (status display)</label>
+                    <label class="settings-row" style="margin-top:12px"><input type="checkbox" checked id="set-armor"> Auto-armor (status display)</label>
+                    <p class="hint" style="margin-top:14px">Auto-defense and auto-armor are configured in the bot process.</p>
+                </div>
+            </section>
+
+            <aside class="right-card">
+                <section class="card">
+                    <div class="section-heading"><span>Equipment</span><span class="section-kicker">Worn</span></div>
+                    <div id="equipment-list" class="equipment-list">
+                        <div class="empty-state">Waiting for bot data...</div>
+                    </div>
+                </section>
+                <section class="card">
+                    <div class="section-heading"><span>Connection</span><span class="section-kicker">Mineflayer</span></div>
+                    <p id="connection-detail" class="hint">Waiting for connection status...</p>
+                    <button class="btn btn-primary btn-block" onclick="sendCommand('force_eat')">Force Eat Best Food</button>
+                </section>
+            </aside>
+        </main>
     </div>
 
     <script>
         const socket = io();
         let currentPos = { x: 0, y: 0, z: 0 };
+        const maxLogLines = 500;
+        let retryCountdownTimer = null;
 
         socket.on('bulk_update', (data) => {
-            const { botData, inventory, favorites } = data;
-            if (botData) {
-                document.getElementById('health').innerText = botData.health;
-                document.getElementById('food').innerText = botData.food;
-                document.getElementById('coords').innerText = `X: ${Math.floor(botData.pos.x)}, Y: ${Math.floor(botData.pos.y)}, Z: ${Math.floor(botData.pos.z)}`;
-                currentPos = botData.pos;
+            if (data.botData) {
+                const { health, food, pos } = data.botData;
+                const healthValue = Number.isFinite(Number(health)) ? Number(health) : 0;
+                const foodValue = Number.isFinite(Number(food)) ? Number(food) : 0;
+                document.getElementById('health').textContent = healthValue;
+                document.getElementById('food').textContent = foodValue;
+                document.getElementById('health-bar').style.width = `${Math.max(0, Math.min(100, healthValue / 20 * 100))}%`;
+                document.getElementById('food-bar').style.width = `${Math.max(0, Math.min(100, foodValue / 20 * 100))}%`;
+                if (pos) {
+                    currentPos = pos;
+                    document.getElementById('coords').textContent =
+                        `X: ${Math.floor(pos.x)}, Y: ${Math.floor(pos.y)}, Z: ${Math.floor(pos.z)}`;
+                }
             }
 
-            if (inventory) {
-                const list = document.getElementById('inventory-list');
-                list.innerHTML = inventory.map(i => `<div>${i.count}x ${i.name}</div>`).join('');
-            }
-
-            if (favorites) {
-                const list = document.getElementById('fav-list');
-                list.innerHTML = Object.keys(favorites).map(name => `
-                    <div class="poi-item">
-                        <span>${name}</span>
-                        <button class="btn-action" onclick="gotoFav('${name}')" style="padding:2px 8px">Go</button>
-                    </div>
-                `).join('');
-            }
+            if (Array.isArray(data.inventory)) renderInventory(data.inventory);
+            if (data.favorites) renderFavorites(data.favorites);
+            if (data.equipment) renderEquipment(data.equipment);
         });
 
-        socket.on('log', (msg) => {
+        socket.on('log', (message) => {
             const box = document.getElementById('logs');
-            box.innerHTML += `<div>${msg}</div>`;
-            box.scrollTop = box.scrollHeight;
+            const shouldScroll = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.textContent = String(message);
+            box.appendChild(line);
+            while (box.childElementCount > maxLogLines) box.firstElementChild.remove();
+            if (shouldScroll) box.scrollTop = box.scrollHeight;
         });
 
         socket.on('bot_status', (data) => {
-            document.getElementById('bot-status').innerText = `Status: ${data.online ? 'Online' : 'Offline'} (${data.username})`;
+            const pill = document.getElementById('bot-status');
+            const statusText = document.getElementById('status-text');
+            const connectionDetail = document.getElementById('connection-detail');
+            const online = Boolean(data.online);
+            const status = data.status || (online ? 'Online' : 'Offline');
+            pill.classList.toggle('online', online);
+            pill.classList.toggle('connecting', !online && status.toLowerCase() === 'connecting');
+            pill.classList.toggle('reconnecting', !online && status.toLowerCase().includes('reconnect'));
+            pill.classList.toggle('error', !online && status.toLowerCase() === 'error');
+            statusText.textContent = `${status} · ${data.username || 'Airi'}`;
+            clearInterval(retryCountdownTimer);
+            if (data.retryAt) {
+                const updateCountdown = () => {
+                    const seconds = Math.ceil(Math.max(0, Number(data.retryAt) - Date.now()) / 1000);
+                    connectionDetail.textContent =
+                        `${data.error || data.reason || 'Connection lost'}. Retrying in ${seconds} seconds.`;
+                };
+                updateCountdown();
+                retryCountdownTimer = setInterval(updateCountdown, 250);
+            } else {
+                connectionDetail.textContent = online
+                    ? 'Connected to the Minecraft server.'
+                    : data.error || data.reason || (status === 'Connecting'
+                        ? 'Connecting to the Minecraft server...'
+                        : 'Waiting for the Minecraft bot to connect.');
+            }
         });
+
+        socket.on('connect', () => appendLocalLog('Dashboard connected.'));
+        socket.on('disconnect', () => appendLocalLog('Dashboard connection lost.'));
+
+        function appendLocalLog(message) {
+            const box = document.getElementById('logs');
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.textContent = `[WEB] ${message}`;
+            box.appendChild(line);
+            while (box.childElementCount > maxLogLines) box.firstElementChild.remove();
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function renderInventory(inventory) {
+            const grid = document.getElementById('inventory-list');
+            const filled = inventory.filter(item => item && item.name !== 'air' && item.count > 0);
+            document.getElementById('inventory-count').textContent = `${filled.length} stacks`;
+            grid.replaceChildren();
+            inventory.forEach((item) => {
+                const slot = document.createElement('div');
+                slot.className = `inventory-slot${item && item.name !== 'air' && item.count > 0 ? ' filled' : ''}`;
+                slot.title = item && item.name !== 'air' ? `${item.displayName || item.name} ×${item.count} (slot ${item.slot})` : `Empty (slot ${item.slot})`;
+                const name = document.createElement('span');
+                name.className = 'slot-name';
+                name.textContent = item && item.name !== 'air' ? shortItemName(item.name) : '';
+                slot.appendChild(name);
+                if (item && item.name !== 'air' && item.count > 0) {
+                    const count = document.createElement('span');
+                    count.className = 'slot-count';
+                    count.textContent = item.count;
+                    slot.appendChild(count);
+                }
+                grid.appendChild(slot);
+            });
+        }
+
+        function shortItemName(name) {
+            return String(name).replaceAll('_', ' ').replace(/^(minecraft:)/, '');
+        }
+
+        function renderFavorites(favorites) {
+            const list = document.getElementById('fav-list');
+            list.replaceChildren();
+            const entries = Object.entries(favorites);
+            if (!entries.length) {
+                list.innerHTML = '<div class="empty-state">No saved locations yet.</div>';
+                return;
+            }
+            entries.forEach(([name, position]) => {
+                const item = document.createElement('div');
+                item.className = 'poi-item';
+                const label = document.createElement('span');
+                label.textContent = name;
+                const go = document.createElement('button');
+                go.className = 'btn btn-primary';
+                go.textContent = 'Go';
+                go.addEventListener('click', () => sendCommand('goto', position));
+                item.append(label, go);
+                list.appendChild(item);
+            });
+        }
+
+        function renderEquipment(equipment) {
+            const list = document.getElementById('equipment-list');
+            list.replaceChildren();
+            Object.entries({ head: 'Head', chest: 'Chest', legs: 'Legs', feet: 'Feet', hand: 'Main hand', offhand: 'Off hand' })
+                .forEach(([key, label]) => {
+                    const row = document.createElement('div');
+                    row.className = 'equipment-row';
+                    const slot = document.createElement('span');
+                    slot.textContent = label;
+                    const item = document.createElement('strong');
+                    item.textContent = equipment[key] || 'Empty';
+                    row.append(slot, item);
+                    list.appendChild(row);
+                });
+        }
 
         function sendCommand(command, args = null) {
             socket.emit('send_command', { command, args });
         }
 
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            if (!input.value.trim()) return;
+            sendCommand('servercmd', input.value.trim());
+            input.value = '';
+        }
+
+        function showTab(tabId, button) {
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(tab => tab.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
+            button.classList.add('active');
         }
 
         function triggerMineArea() {
-            const x = parseFloat(document.getElementById('mine-x').value) || 0;
-            const y = parseFloat(document.getElementById('mine-y').value) || 0;
-            const z = parseFloat(document.getElementById('mine-z').value) || 0;
-            
+            const offset = (id) => Number.parseFloat(document.getElementById(id).value) || 0;
             const pos1 = { ...currentPos };
-            const pos2 = { x: currentPos.x + x, y: currentPos.y + y, z: currentPos.z + z };
-            
+            const pos2 = { x: currentPos.x + offset('mine-x'), y: currentPos.y + offset('mine-y'), z: currentPos.z + offset('mine-z') };
             sendCommand('mine_area', { pos1, pos2 });
         }
 
-        function saveCurrentLoc() {
-            const name = document.getElementById('fav-name').value;
-            if (!name) return alert("Enter a name!");
-            socket.emit('save_location', { name });
-            document.getElementById('fav-name').value = '';
+        function goToCoordinates() {
+            const coords = document.getElementById('goto-coords').value.trim();
+            const values = coords.split(/[ ,]+/).map(Number);
+            if (values.length !== 3 || values.some(value => !Number.isFinite(value))) {
+                appendLocalLog('Enter three valid coordinates: X Y Z.');
+                return;
+            }
+            sendCommand('goto', { x: values[0], y: values[1], z: values[2] });
         }
 
-        function gotoFav(name) {
-            // Use the goto command logic already in bot.js
-            // Since favorites is on state, we just need to pass the coords
-            fetch('/api/state')
-                .then(r => r.json())
-                .then(state => {
-                    const pos = state.favorites[name];
-                    sendCommand('goto', pos);
-                });
+        function saveCurrentLoc() {
+            const input = document.getElementById('fav-name');
+            const name = input.value.trim();
+            if (!name) {
+                appendLocalLog('Enter a name for the favorite location.');
+                return;
+            }
+            socket.emit('save_location', { name });
+            input.value = '';
         }
 
         function loadSchematic() {
             const fileInput = document.getElementById('schematic-file');
-            if (!fileInput.files.length) return alert("Select a JSON schematic file!");
-            
+            if (!fileInput.files.length) {
+                appendLocalLog('Select a JSON schematic file first.');
+                return;
+            }
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = (event) => {
                 try {
-                    const data = JSON.parse(e.target.result);
-                    sendCommand('build', { type: 'schematic', data: data });
-                } catch (err) {
-                    alert("Invalid JSON format. Schematic should be an array of {x,y,z} offsets.");
+                    const data = JSON.parse(event.target.result);
+                    sendCommand('build', { type: 'schematic', data });
+                } catch {
+                    appendLocalLog('Invalid JSON. Schematic should be an array of {x, y, z} offsets.');
                 }
             };
             reader.readAsText(fileInput.files[0]);
         }
+
+        document.getElementById('chat-input').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') sendChat();
+        });
+        document.getElementById('goto-coords').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') goToCoordinates();
+        });
     </script>
 </body>
 </html>

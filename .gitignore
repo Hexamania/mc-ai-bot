@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+dist/
 
 # Log files
 bot_logs.txt

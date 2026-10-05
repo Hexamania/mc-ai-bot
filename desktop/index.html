@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; frame-src http://127.0.0.1:*; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Airi OS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon">A</span><div><strong>Airi OS</strong><small>Minecraft bot desktop</small></div></div>
+    <div class="connection"><span id="status-dot" class="dot"></span><span id="status">Stopped</span></div>
+  </header>
+  <main class="workspace">
+    <aside class="settings-panel">
+      <section class="intro">
+        <p class="eyebrow">LOCAL CONFIGURATION</p>
+        <h1>Connection settings</h1>
+        <p>Settings are stored in your Windows user profile. No manual <code>.env</code> editing required.</p>
+      </section>
+      <form id="settings-form">
+        <label>Server address<input name="host" required autocomplete="off" placeholder="play.example.net"></label>
+        <div class="split">
+          <label>Server port<input name="port" type="number" min="1" max="65535" required></label>
+          <label>Bot username<input name="username" required autocomplete="off"></label>
+        </div>
+        <label>Minecraft client version<input name="version" required placeholder="1.21.1"></label>
+        <label>OpenAI API key <span class="optional">optional</span><input name="openaiKey" type="password" autocomplete="new-password" placeholder="Used only for the :chat command"></label>
+        <label>Dashboard port<input name="webPort" type="number" min="1" max="65535" required></label>
+        <label class="check"><input name="enableMemory" type="checkbox"> Enable persistent memory</label>
+        <button class="button secondary" type="submit">Save settings</button>
+      </form>
+      <div class="actions">
+        <button class="button primary" id="start">Save &amp; start bot</button>
+        <button class="button stop" id="stop" disabled>Stop bot</button>
+        <button class="button secondary" id="open-dashboard" disabled>Open dashboard</button>
+      </div>
+      <p id="notice" class="notice" role="status"></p>
+      <div class="storage-note"><span class="lock">●</span> <span id="storage-note">API key encrypted with Windows secure storage.</span></div>
+    </aside>
+    <section class="main-panel">
+      <div class="panel-heading"><div><p class="eyebrow">LIVE CONTROL ROOM</p><h2>Dashboard</h2></div><span id="bot-state" class="state-label">Waiting to start</span></div>
+      <div class="dashboard-frame"><iframe id="dashboard" title="Airi OS live dashboard"></iframe><div id="dashboard-placeholder" class="placeholder"><div class="placeholder-icon">A</div><h3>Your dashboard is ready</h3><p>Save your server settings, then start the bot to see live status, inventory, logs, and controls here.</p></div></div>
+      <section class="logs-panel"><div class="logs-heading"><h3>Application output</h3><button id="clear-logs" class="text-button">Clear</button></div><pre id="logs" aria-live="polite"></pre></section>
+    </section>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

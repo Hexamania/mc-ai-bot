@@ -1,7 +1,7 @@
 const fs = require("node:fs")
 const path = require("node:path")
 
-const MEMORY_FILE = path.join(__dirname, "memory.json")
+const MEMORY_FILE = process.env.MEMORY_FILE || path.join(__dirname, "memory.json")
 
 function createDefaultMemory() {
   return {

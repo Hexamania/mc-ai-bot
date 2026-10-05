@@ -1,123 +1,132 @@
-# ⚠️ AI-Assisted Code Notice: Parts of this project were built using generative AI. Also, heads up: this hasn't been fully tested on Windows yet, so expect some bugs or path/dependency quirks, Web Server Isnt Finished
+# Airi OS
 
-# Mineflayer AI Bot & Web Dashboard
+**A configurable Minecraft bot with a live dashboard and a Windows desktop app.**
 
-An autonomous, feature-packed Minecraft bot built with [Mineflayer](https://github.com/PrismarineJS/mineflayer) and [OpenAI](https://platform.openai.com/). It comes equipped with pathfinding, combat automation, resource gathering, an automated speedrun/progression sequence, and a real-time web dashboard.
+<p align="center">
+  <img src="assets/preview.png" alt="Airi OS desktop app showing connection settings and its live dashboard area" width="960">
+</p>
 
----
+The desktop app brings server configuration, connection status, application output, and the existing web dashboard together in one window. You can also run the bot directly with Node.js.
 
 ## Features
 
-- **Interactive Web Dashboard**: Real-time web UI on port `3000` showing bot health, hunger, coordinates, inventory, 2D radar, and controls (kill aura, building, mining, item management).
-- **AI In-Game Chat**: Chat with the bot in-game via OpenAI (`:chat <message>`).
-- **Progression Automation**: Automates basic tech progression up to nether and stronghold prep.
-- **Combat & Survival**:
-  - Auto-defense and retaliatory attacks.
-  - Water-bucket MLG and lava safety management.
-  - Smart shield blocking against incoming projectiles.
-  - Auto-armor equip system based on best gear tier in inventory.
-  - Emergency panic mode and safe mode against creepers.
-- **Utilities**:
-  - Tunnel mining (`:miner`) and tree logging (`:lumberjack`).
-  - Container auto-sorting (`:sort`) and dumping (`:deposit`).
-  - Base waypoint management (`:sbase`, `:home`).
-  - Medical rescue missions and companion protection (`:rescue`, `:medic`).
+- **Windows desktop app** with server address, port, username, Minecraft client version, dashboard port, memory toggle, and optional OpenAI key settings.
+- **Installer mode selection:** install normally with shortcuts and an uninstall entry, or use portable mode in a folder of your choice.
+- **Live dashboard** for connection state, vitals, coordinates, inventory, equipment, logs, and bot controls.
+- **Bot automation** for navigation, mining, gathering, crafting, survival, and combat.
+- **Persistent memory** for locations, recognized players, the current task, rules, and learned facts.
+- **Optional AI chat** through OpenAI.
 
----
+## Windows desktop app
 
-## Prerequisites
+### Use the installer
 
-- Node.js (v18 or higher recommended)
-- A Minecraft server running version `1.21.1` (or compatible Java version)
-- An OpenAI API Key (for the `:chat` command)
+Download or build the installer, run it, and choose one of the two modes:
 
----
+- **Install normally** creates Windows shortcuts and an uninstall entry. Settings and memory are stored in the current Windows user's application-data folder.
+- **Portable mode** keeps the app in the selected folder, creates `portable.txt` beside `Airi OS.exe`, and stores settings and memory in `portable-data` beside the executable. It does not create Windows shortcuts or an uninstall entry.
 
-## Installation
+The optional OpenAI key is encrypted using Windows secure storage. It is tied to the Windows user account, so it is not automatically portable between different accounts or computers.
 
-1. **Clone the repository:**
-   ```bash
-   https://github.com/Hexamania/mc-ai-bot.git
-   cd mc-ai-bot
-   ```
+Build the x64 installer from source:
 
-2. **Install dependencies:**
-   ```bash
-   npm install dotenv mineflayer mineflayer-pathfinder minecraft-data openai express socket.io vec3
-   ```
-
-3. **Configure environment variables:**
-   Create a `.env` file in the root directory:
-   ```env
-   MC_HOST=localhost
-   MC_PORT=25565
-   MC_USERNAME=Airi
-   MC_VERSION=1.21.1
-   ENABLE_MEMORY=true
-   OPENAI_KEY=your_openai_api_key_here
-   ```
-
-   Set `ENABLE_MEMORY=false` to disable all reads and writes to `memory.json`. When enabled, that file stores saved locations, recognized players, the current task, behavioral rules, and learned facts.
-
----
-
-## Usage
-
-1. **Start the bot:**
-   ```bash
-   node bot.js
-   ```
-
-   For development with automatic restarts when files change:
-   ```bash
-   npm run dev
-   ```
-
-2. **Access the Web Dashboard:**
-   Open your browser and navigate to:
-   ```
-   http://localhost:3000
-   ```
-
----
-
-## Command Reference
-
-### Public Commands (`:` Prefix)
-| Command | Description |
-|---|---|
-| `:ping` | Check bot responsiveness (replies with "pong"). |
-| `:status` | View current progression objective and missing materials. |
-| `:coords` | Outputs bot's current XYZ coordinates. |
-| `:chat <msg>` | Queries OpenAI GPT-4 and responds in chat. |
-| `:sbase [x y z]` | Sets home base coordinates (defaults to current position). |
-| `:home` | Commands the bot to navigate back to the home base. |
-| `:basechest` | Inspects the contents of a chest located at base. |
-| `:miner <dir> [len]` | Digs a 1x2 tunnel (`north`, `south`, `east`, `west`). |
-| `:lumberjack [radius]` | Cuts down logs in the specified radius. |
-| `:roof [radius]` | Constructs a slab roof over the base location. |
-| `:rescue` | Locates the nearest injured player and delivers food. |
-| `:medic <player>` | Follows and guards a specific player. |
-| `:sort` | Organizes nearby chest contents by item category. |
-| `:deposit` | Deposits non-essential items into a nearby chest. |
-| `:refuel` | Gathers nearby coal ore or smelts logs into charcoal. |
-| `:remember <key>=<fact>` | Saves a short learned fact when persistent memory is enabled. |
-| `:forget <key>` | Removes a saved learned fact when persistent memory is enabled. |
-| `:help` | Displays available command list. |
-
-### Admin Commands (`$` Prefix)
-To authenticate as an admin, send a private message to the bot:
-```
-/msg Airi $loginadmin <ADMIN_PASSWORD>
+```bash
+npm install
+npm run desktop:dist
 ```
 
-Once authenticated, you gain access to admin actions:
-| Command | Description |
-|---|---|
-| `$panic` | Equips shield, consumes golden apple (if available), and retreats to base. |
-| `$stealth` | Toggles sneak mode to conceal the bot's nametag. |
-| `$guard` | Holds position and defends the immediate area. |
-| `$pvp <player>` | Aggressively pursues and attacks the specified player. |
-| `$stoppvp` | Cancels ongoing PVP combat. |
-| `$mine <block>` | Finds and mines the specified block type. |
-| `$servercmd <cmd>` | Executes a server slash command through the bot. |
+The installer is created in `dist/`. To run the desktop app from source during development:
+
+```bash
+npm run desktop
+```
+
+### Run an unpacked portable copy
+
+Place an empty `portable.txt` beside `Airi OS.exe` and launch it. The app will create `portable-data` beside the executable for settings and memory.
+
+## Configure and start
+
+In Airi OS, enter:
+
+| Setting | Purpose |
+| --- | --- |
+| Server address and port | Minecraft server to connect to |
+| Bot username | In-game username used by the bot |
+| Minecraft client version | Mineflayer-supported client version; choose one compatible with the server |
+| Dashboard port | Local port used by the embedded dashboard |
+| Persistent memory | Enables or disables reading and writing the memory file |
+| OpenAI API key | Optional; used for the in-game `:chat` command |
+
+Save settings, then select **Save & start bot**. The local dashboard server listens on loopback when launched by the desktop app. Use **Stop bot** to stop the child bot process.
+
+## Run with Node.js
+
+Requirements: Node.js 18 or newer and a Minecraft server reachable by the machine running the bot.
+
+```bash
+npm install
+```
+
+Create a `.env` file in the project root:
+
+```env
+MC_HOST=localhost
+MC_PORT=25565
+MC_USERNAME=Airi
+MC_VERSION=1.21.1
+WEB_PORT=3000
+ENABLE_MEMORY=true
+OPENAI_KEY=your_openai_api_key
+```
+
+Start the bot or run it with Node's watch mode:
+
+```bash
+node bot.js
+npm run dev
+```
+
+Then open `http://localhost:3000` in a browser. Do not commit `.env` or publish API keys.
+
+## Persistent memory
+
+With `ENABLE_MEMORY=true`, Airi stores structured data in `memory.json`: saved locations, recognized players, the current task, behavioral rules, and learned facts. Set `ENABLE_MEMORY=false` to disable memory file reads and writes.
+
+In the desktop app, memory is stored alongside the desktop settings: in Windows application data for a normal installation, or in `portable-data` for portable mode.
+
+In-game, use `:remember <key>=<fact>` to save a fact and `:forget <key>` to remove one.
+
+## In-game commands
+
+Commands use `:` for public actions. Admin actions use `$` after authenticating in a private message with `$loginadmin <password>`.
+
+| Command | Action |
+| --- | --- |
+| `:ping`, `:status`, `:coords` | Check responsiveness, task status, or location |
+| `:chat <message>` | Ask the configured AI assistant |
+| `:sbase [x y z]`, `:home` | Save a home location or return to it |
+| `:sminebase`, `:minebase` | Save or return to a mining base |
+| `:miner <north\|south\|east\|west> [length]` | Dig a tunnel |
+| `:lumberjack [radius]` | Gather nearby logs |
+| `:rescue`, `:medic <player>` | Provide nearby player support |
+| `:sort`, `:deposit`, `:refuel` | Manage nearby storage and resources |
+| `:remember <key>=<fact>`, `:forget <key>` | Manage persistent learned facts |
+| `$guard`, `$pvp <player>`, `$stoppvp` | Admin defense and combat controls |
+| `$mine <block>`, `$servercmd <command>` | Admin mining or server command |
+
+Use `:help` in game for the bot's current command list.
+
+## Project structure
+
+- `bot.js` — Mineflayer bot, reconnect handling, web server, and Socket.IO updates.
+- `index.html` — Browser dashboard.
+- `desktop/` — Electron desktop app, settings form, and renderer.
+- `build/installer.nsh` — Windows installer mode selection.
+- `memory.js` / `memory.json` — Persistent memory support and initial schema.
+
+## Notes
+
+- A version accepted by Mineflayer is not necessarily identical to the server's version; select a compatible client version when connecting through ViaVersion.
+- The installer is currently configured for Windows x64.
+- Bot actions that mine, build, or interact with other players can change a shared world. Test those actions in a safe area or server.

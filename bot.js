@@ -56,9 +56,8 @@ let minerProgress = 0
 let minerTotal = 0
 
 /* ================= OPENAI ================= */
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY || process.env.OPENAI_API_KEY
-})
+const openaiApiKey = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY
+const openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null
 
 /* ================= BOT ================= */
 let client = null
@@ -398,7 +397,11 @@ app.use(express.static(path.join(__dirname)));
 
 app.get('/api/state', (req, res) => res.json(state));
 
-server.listen(3000, () => log("WEB", "Dashboard running at http://localhost:3000"))
+const WEB_PORT = Number(process.env.WEB_PORT) || 3000
+const WEB_HOST = process.env.WEB_HOST || undefined
+const onWebServerListening = () => log("WEB", `Dashboard running at http://127.0.0.1:${WEB_PORT}`)
+if (WEB_HOST) server.listen(WEB_PORT, WEB_HOST, onWebServerListening)
+else server.listen(WEB_PORT, onWebServerListening)
 
 /* ================= UTILS ================= */
 const log = (t, m) => {
@@ -2172,6 +2175,7 @@ bot.on("message", async (msg) => {
       case "chat": {
         const msgContent = args.join(" ")
         if (!msgContent) return pm(user, "❌ Usage: :chat <msg>")
+        if (!openai) return pm(user, "❌ AI chat is unavailable. Configure an OpenAI API key in the desktop settings.")
         try {
           const response = await openai.chat.completions.create({
             model: "gpt-4",

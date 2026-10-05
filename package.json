@@ -1,10 +1,12 @@
 {
   "name": "mc-ai-bot",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Mineflayer Minecraft bot with an Airi OS Windows desktop dashboard",
+  "main": "desktop/main.js",
   "scripts": {
     "dev": "node --watch bot.js",
+    "desktop": "electron .",
+    "desktop:dist": "electron-builder --win nsis",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -21,5 +23,39 @@
     "mineflayer-pathfinder": "^2.4.5",
     "openai": "^6.15.0",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.hexamania.mc-ai-bot",
+    "productName": "Airi OS",
+    "files": [
+      "desktop/**/*",
+      "bot.js",
+      "memory.js",
+      "memory.json",
+      "index.html",
+      "users.json",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "include": "build/installer.nsh"
+    }
   }
 }

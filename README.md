@@ -8,6 +8,10 @@
 
 The desktop app brings server configuration, connection status, application output, and the existing web dashboard together in one window. You can also run the bot directly with Node.js.
 
+> **AI-assisted project:** AI tools were used to help create parts of Airi OS. Generated code and Minecraft actions can be imperfect; review settings and actions before use.
+
+**Created by [Hexamania](https://github.com/Hexamania).**
+
 ## Features
 
 - **Windows desktop app** with server address, port, username, Minecraft client version, dashboard port, memory toggle, and optional OpenAI key settings.
@@ -16,6 +20,7 @@ The desktop app brings server configuration, connection status, application outp
 - **Bot automation** for navigation, mining, gathering, crafting, survival, and combat.
 - **Persistent memory** for locations, recognized players, the current task, rules, and learned facts.
 - **Optional AI chat** through OpenAI.
+- **Persistent application output** with separate bot stdout and error streams, startup diagnostics, log history, filtering, and copy controls.
 
 ## Windows desktop app
 
@@ -59,6 +64,8 @@ In Airi OS, enter:
 | OpenAI API key | Optional; used for the in-game `:chat` command |
 
 Save settings, then select **Save & start bot**. The local dashboard server listens on loopback when launched by the desktop app. Use **Stop bot** to stop the child bot process.
+
+If startup fails, check the **Application output** panel. Recent logs are saved as `airi-os.log` beside the desktop settings, including in the `portable-data` folder for portable mode.
 
 ## Run with Node.js
 

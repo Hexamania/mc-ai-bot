@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require("electron")
 
 contextBridge.exposeInMainWorld("airiDesktop", {
   getSettings: () => ipcRenderer.invoke("settings:get"),
+  getLogs: () => ipcRenderer.invoke("logs:get"),
+  clearLogs: () => ipcRenderer.invoke("logs:clear"),
+  copyLogs: text => ipcRenderer.invoke("logs:copy", text),
   saveSettings: settings => ipcRenderer.invoke("settings:save", settings),
   startBot: () => ipcRenderer.invoke("bot:start"),
   stopBot: () => ipcRenderer.invoke("bot:stop"),

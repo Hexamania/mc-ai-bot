@@ -3,10 +3,15 @@ const notice = document.getElementById("notice")
 const startButton = document.getElementById("start")
 const stopButton = document.getElementById("stop")
 const dashboardButton = document.getElementById("open-dashboard")
+const refreshDashboardButton = document.getElementById("refresh-dashboard")
 const iframe = document.getElementById("dashboard")
 const placeholder = document.getElementById("dashboard-placeholder")
-const logs = document.getElementById("logs")
+const logContainer = document.getElementById("logs")
 const fields = Object.fromEntries([...form.elements].filter(element => element.name).map(element => [element.name, element]))
+const logEntries = []
+const pendingLogs = []
+let historyLoaded = false
+let activeFilter = "all"
 
 function showNotice(message, isError = false) {
   notice.textContent = message
@@ -35,34 +40,92 @@ function fillForm(config) {
   fields.enableMemory.checked = config.enableMemory !== false
   if (config.portableMode) {
     document.getElementById("storage-note").textContent =
-      `Portable mode: settings and memory are stored beside the app in ${config.dataDirectory}. The API key remains Windows-user encrypted.`
+      `Portable settings and memory: ${config.dataDirectory}. API key encryption is tied to this Windows account.`
+  } else {
+    document.getElementById("storage-note").textContent =
+      "Settings and memory are stored in your Windows profile. API key uses Windows secure storage."
   }
 }
 
 async function saveSettings() {
   const config = await window.airiDesktop.saveSettings(readForm())
   fillForm(config)
-  showNotice("Settings saved securely on this computer.")
+  showNotice("Settings saved on this device.")
   return config
 }
 
-function appendLog({ stream, line }) {
-  const prefix = stream === "stderr" ? "[ERROR]" : "[BOT]"
-  logs.textContent += `${prefix} ${line}\n`
-  const lines = logs.textContent.split("\n")
-  if (lines.length > 500) logs.textContent = lines.slice(-501).join("\n")
-  logs.scrollTop = logs.scrollHeight
+function renderLogs() {
+  const shouldStickToBottom = logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < 36
+  logContainer.replaceChildren()
+  const filtered = logEntries.filter(entry => activeFilter === "all" ||
+    entry.stream === "error" || entry.stream === "stderr")
+  if (filtered.length === 0) {
+    const empty = document.createElement("div")
+    empty.className = "empty-logs"
+    const glyph = document.createElement("span")
+    glyph.className = "empty-glyph"
+    glyph.textContent = "⌁"
+    const message = document.createElement("span")
+    message.textContent = activeFilter === "error" ? "No errors recorded." : "Waiting for application output…"
+    empty.append(glyph, message)
+    logContainer.appendChild(empty)
+  }
+  for (const entry of filtered) {
+    const row = document.createElement("div")
+    row.className = "log-entry"
+    row.dataset.stream = entry.stream
+    const time = document.createElement("span")
+    time.className = "log-time"
+    time.textContent = new Date(entry.time).toLocaleTimeString([], { hour12: false })
+    const tag = document.createElement("span")
+    tag.className = "log-tag"
+    tag.textContent = entry.stream === "stdout" ? "BOT" :
+      entry.stream === "stderr" || entry.stream === "error" ? "ERROR" :
+        entry.stream.toUpperCase()
+    const message = document.createElement("span")
+    message.className = "log-text"
+    message.textContent = entry.line
+    row.append(time, tag, message)
+    logContainer.appendChild(row)
+  }
+  const errors = logEntries.filter(entry => entry.stream === "error" || entry.stream === "stderr").length
+  document.getElementById("log-summary").textContent = logEntries.length
+    ? `${logEntries.length} recent events${errors ? ` · ${errors} ${errors === 1 ? "error" : "errors"}` : ""}`
+    : "Startup and bot events appear here"
+  if (shouldStickToBottom) logContainer.scrollTop = logContainer.scrollHeight
 }
 
-function setLifecycle({ status, detail }) {
-  document.getElementById("status").textContent = detail || status
+function appendLog(entry) {
+  if (!entry || typeof entry.line !== "string") return
+  if (!historyLoaded) {
+    pendingLogs.push(entry)
+    return
+  }
+  const key = entry.id || `${entry.time}|${entry.stream}|${entry.line}`
+  if (logEntries.some(existing => (existing.id || `${existing.time}|${existing.stream}|${existing.line}`) === key)) return
+  logEntries.push(entry)
+  if (logEntries.length > 500) logEntries.splice(0, logEntries.length - 500)
+  renderLogs()
+}
+
+function setLifecycle({ status, detail, running: processRunning }) {
+  const title = status === "online" ? "Online" :
+    status === "connecting" || status === "starting" ? "Connecting" :
+      status === "reconnecting" ? "Reconnecting" :
+        status === "stopping" ? "Stopping" :
+          status === "error" ? "Needs attention" : "Stopped"
+  document.getElementById("status").textContent = title
+  document.getElementById("connection-caption").textContent = detail || "Ready when you are"
   document.getElementById("bot-state").textContent = status === "online"
-    ? "Minecraft bot online"
-    : status === "connecting" || status === "starting"
-      ? "Connecting"
-      : status === "error" ? "Needs attention" : "Waiting to start"
-  document.getElementById("status-dot").className = `dot ${status}`
-  const running = ["online", "connecting", "starting", "reconnecting", "stopping"].includes(status)
+    ? "Minecraft connection active"
+    : status === "error" ? "Check application output for details" :
+      status === "reconnecting" ? "Retrying connection" :
+        status === "starting" || status === "connecting" ? "Starting services" : "Standing by"
+  document.getElementById("status-dot").className = `connection-led ${status}`
+  document.querySelector(".live-pulse").className = `live-pulse ${status}`
+  const running = typeof processRunning === "boolean"
+    ? processRunning
+    : ["online", "connecting", "starting", "reconnecting", "stopping"].includes(status)
   stopButton.disabled = !running
   startButton.disabled = running
 }
@@ -80,43 +143,103 @@ startButton.addEventListener("click", async () => {
   try {
     await saveSettings()
     await window.airiDesktop.startBot()
-    showNotice("Bot process started. Connecting to Minecraft…")
+    showNotice("Bot process started. Follow connection details in Application output.")
   } catch (error) {
     showNotice(error.message, true)
+    appendLog({ time: new Date().toISOString(), stream: "error", line: error.message })
   }
 })
 
 stopButton.addEventListener("click", async () => {
   try {
     await window.airiDesktop.stopBot()
-    showNotice("Bot stopped.")
+    showNotice("Bot stop requested.")
   } catch (error) {
     showNotice(error.message, true)
   }
 })
 
-dashboardButton.addEventListener("click", async () => {
+dashboardButton.addEventListener("click", () => {
+  if (iframe.src) iframe.contentWindow.location.reload()
+})
+
+refreshDashboardButton.addEventListener("click", () => {
+  if (iframe.src) iframe.contentWindow.location.reload()
+  refreshDashboardButton.classList.add("spinning")
+  setTimeout(() => refreshDashboardButton.classList.remove("spinning"), 450)
+})
+
+iframe.addEventListener("load", () => {
+  if (!iframe.src || iframe.src === "about:blank") return
+  iframe.classList.add("loaded")
+  placeholder.hidden = true
+})
+
+document.querySelectorAll(".filter-button").forEach(button => {
+  button.addEventListener("click", () => {
+    activeFilter = button.dataset.filter
+    document.querySelectorAll(".filter-button").forEach(item => item.classList.toggle("selected", item === button))
+    renderLogs()
+  })
+})
+
+document.getElementById("clear-logs").addEventListener("click", async () => {
   try {
-    const { url } = await window.airiDesktop.openDashboard()
-    iframe.src = url
+    await window.airiDesktop.clearLogs()
+    logEntries.length = 0
+    pendingLogs.length = 0
+    renderLogs()
   } catch (error) {
     showNotice(error.message, true)
   }
 })
 
-document.getElementById("clear-logs").addEventListener("click", () => { logs.textContent = "" })
+document.getElementById("copy-logs").addEventListener("click", async () => {
+  try {
+    await window.airiDesktop.copyLogs(logEntries.map(entry =>
+      `${new Date(entry.time).toLocaleTimeString([], { hour12: false })} [${entry.stream}] ${entry.line}`
+    ).join("\n"))
+    showNotice("Application output copied.")
+  } catch (error) {
+    showNotice(`Could not copy logs: ${error.message}`, true)
+  }
+})
 
 window.airiDesktop.onLifecycle(setLifecycle)
 window.airiDesktop.onLog(appendLog)
 window.airiDesktop.onDashboardReady(({ url }) => {
-  if (iframe.src !== url) iframe.src = url
-  placeholder.hidden = true
+  document.getElementById("dashboard-url").textContent = `LOCAL DASHBOARD · ${url.replace(/^https?:\/\//, "")}`
   dashboardButton.disabled = false
+  const currentUrl = iframe.getAttribute("src")
+  if (!currentUrl || new URL(currentUrl, window.location.href).href !== new URL(url, window.location.href).href) {
+    iframe.src = url
+  }
 })
 window.airiDesktop.onBotState(state => {
-  document.getElementById("bot-state").textContent = state.status || "Connecting"
+  const status = String(state.status || "").toLowerCase()
+  if (status === "online") setLifecycle({ status: "online", detail: "Minecraft session connected" })
+  else if (status === "error") setLifecycle({ status: "error", detail: state.error || state.reason || "Bot reported an error" })
 })
 
-window.airiDesktop.getSettings()
-  .then(fillForm)
-  .catch(error => showNotice(error.message, true))
+Promise.all([window.airiDesktop.getSettings(), window.airiDesktop.getLogs()])
+  .then(([config, savedLogs]) => {
+    fillForm(config)
+    const existingKeys = new Set()
+    for (const entry of [...savedLogs, ...pendingLogs]) {
+      if (!entry || typeof entry.line !== "string") continue
+      const key = entry.id || `${entry.time}|${entry.stream}|${entry.line}`
+      if (existingKeys.has(key)) continue
+      existingKeys.add(key)
+      logEntries.push(entry)
+    }
+    pendingLogs.length = 0
+    while (logEntries.length > 500) logEntries.shift()
+    historyLoaded = true
+    renderLogs()
+  })
+  .catch(error => {
+    historyLoaded = true
+    showNotice(error.message, true)
+    appendLog({ time: new Date().toISOString(), stream: "error", line: error.message })
+    for (const entry of pendingLogs.splice(0)) appendLog(entry)
+  })

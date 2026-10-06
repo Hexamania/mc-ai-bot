@@ -4,47 +4,107 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; frame-src http://127.0.0.1:*; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b12">
   <title>Airi OS</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
   <header class="topbar">
-    <div class="brand"><span class="brand-icon">A</span><div><strong>Airi OS</strong><small>Minecraft bot desktop</small></div></div>
-    <div class="connection"><span id="status-dot" class="dot"></span><span id="status">Stopped</span></div>
+    <a class="brand" href="#" aria-label="Airi OS home">
+      <span class="brand-mark"><span>A</span></span>
+      <span class="brand-copy"><strong>Airi OS</strong><small>MINECRAFT AUTOMATION</small></span>
+    </a>
+    <div class="topbar-center"><span class="connection-led" id="status-dot"></span><span id="status">Stopped</span><span class="topbar-divider"></span><span class="topbar-caption" id="connection-caption">Ready when you are</span></div>
+    <a class="repo-link" href="https://github.com/Hexamania/mc-ai-bot" target="_blank" rel="noreferrer"><span class="repo-glyph">↗</span><span>Project</span></a>
   </header>
-  <main class="workspace">
-    <aside class="settings-panel">
+
+  <main class="app-shell">
+    <aside class="settings-rail">
+      <div class="section-label"><span class="section-index">01</span> CONNECTION</div>
       <section class="intro">
-        <p class="eyebrow">LOCAL CONFIGURATION</p>
-        <h1>Connection settings</h1>
-        <p>Settings are stored in your Windows user profile. No manual <code>.env</code> editing required.</p>
+        <p class="eyebrow">YOUR WORLD, YOUR RULES</p>
+        <h1>Set up your<br><span>connection.</span></h1>
+        <p>Configure Airi once. Your settings stay on this device.</p>
       </section>
-      <form id="settings-form">
-        <label>Server address<input name="host" required autocomplete="off" placeholder="play.example.net"></label>
-        <div class="split">
-          <label>Server port<input name="port" type="number" min="1" max="65535" required></label>
-          <label>Bot username<input name="username" required autocomplete="off"></label>
+
+      <form id="settings-form" autocomplete="off">
+        <label class="field">
+          <span>Server address</span>
+          <span class="input-wrap"><span class="input-icon">⌁</span><input name="host" required spellcheck="false" placeholder="play.example.net"></span>
+        </label>
+        <div class="field-row">
+          <label class="field"><span>Port</span><input name="port" type="number" min="1" max="65535" required></label>
+          <label class="field"><span>Bot username</span><input name="username" required spellcheck="false"></label>
         </div>
-        <label>Minecraft client version<input name="version" required placeholder="1.21.1"></label>
-        <label>OpenAI API key <span class="optional">optional</span><input name="openaiKey" type="password" autocomplete="new-password" placeholder="Used only for the :chat command"></label>
-        <label>Dashboard port<input name="webPort" type="number" min="1" max="65535" required></label>
-        <label class="check"><input name="enableMemory" type="checkbox"> Enable persistent memory</label>
-        <button class="button secondary" type="submit">Save settings</button>
+        <label class="field">
+          <span>Minecraft version</span>
+          <span class="input-wrap"><span class="input-icon version-icon">◇</span><input name="version" required spellcheck="false" placeholder="1.21.1"></span>
+        </label>
+        <label class="field">
+          <span>OpenAI API key <span class="field-optional">OPTIONAL</span></span>
+          <input name="openaiKey" type="password" autocomplete="new-password" placeholder="Only needed for :chat">
+        </label>
+        <label class="field">
+          <span>Dashboard port</span>
+          <input name="webPort" type="number" min="1" max="65535" required>
+        </label>
+        <label class="memory-switch">
+          <input name="enableMemory" type="checkbox">
+          <span class="switch-track"><span></span></span>
+          <span class="switch-copy"><strong>Persistent memory</strong><small>Remember locations and facts</small></span>
+        </label>
+        <button class="button save-button" type="submit"><span>Save settings</span><span class="button-arrow">↗</span></button>
       </form>
-      <div class="actions">
-        <button class="button primary" id="start">Save &amp; start bot</button>
-        <button class="button stop" id="stop" disabled>Stop bot</button>
-        <button class="button secondary" id="open-dashboard" disabled>Open dashboard</button>
+
+      <div class="rail-actions">
+        <button class="button launch-button" id="start"><span class="launch-icon">▶</span><span>Save &amp; start bot</span><span class="button-arrow">↗</span></button>
+        <div class="secondary-actions">
+          <button class="button stop-button" id="stop" disabled>Stop</button>
+          <button class="button dashboard-button" id="open-dashboard" disabled>Dashboard ↗</button>
+        </div>
       </div>
-      <p id="notice" class="notice" role="status"></p>
-      <div class="storage-note"><span class="lock">●</span> <span id="storage-note">API key encrypted with Windows secure storage.</span></div>
+      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+      <div class="rail-footer">
+        <div class="storage-note"><span class="secure-icon">◆</span><span id="storage-note">API key protected with Windows secure storage.</span></div>
+        <div class="maker-note"><span>CRAFTED BY <strong>HEXAMANIA</strong></span><span class="maker-dot">·</span><span>AI-ASSISTED PROJECT</span></div>
+      </div>
     </aside>
-    <section class="main-panel">
-      <div class="panel-heading"><div><p class="eyebrow">LIVE CONTROL ROOM</p><h2>Dashboard</h2></div><span id="bot-state" class="state-label">Waiting to start</span></div>
-      <div class="dashboard-frame"><iframe id="dashboard" title="Airi OS live dashboard"></iframe><div id="dashboard-placeholder" class="placeholder"><div class="placeholder-icon">A</div><h3>Your dashboard is ready</h3><p>Save your server settings, then start the bot to see live status, inventory, logs, and controls here.</p></div></div>
-      <section class="logs-panel"><div class="logs-heading"><h3>Application output</h3><button id="clear-logs" class="text-button">Clear</button></div><pre id="logs" aria-live="polite"></pre></section>
+
+    <section class="workspace">
+      <div class="workspace-heading">
+        <div><div class="section-label"><span class="section-index">02</span> LIVE WORKSPACE</div><h2>Command center<span class="heading-period">.</span></h2></div>
+        <div class="workspace-meta"><span class="live-pulse"></span><span id="bot-state">Standing by</span></div>
+      </div>
+
+      <section class="dashboard-card" aria-label="Live bot dashboard">
+        <div class="card-topline"><span><span class="window-dot mint"></span><span class="window-dot blue"></span><span class="window-dot lilac"></span></span><span class="card-url" id="dashboard-url">LOCAL DASHBOARD <span>·</span> 127.0.0.1</span><button class="icon-button" id="refresh-dashboard" title="Reload dashboard" aria-label="Reload dashboard">↻</button></div>
+        <div class="dashboard-content">
+          <iframe id="dashboard" title="Airi OS live Minecraft dashboard"></iframe>
+          <div id="dashboard-placeholder" class="placeholder">
+            <div class="placeholder-orbit orbit-outer"></div><div class="placeholder-orbit orbit-inner"></div>
+            <div class="placeholder-core"><span>A</span></div>
+            <p class="eyebrow">SYSTEM IDLE</p>
+            <h3>Your next world<br>is <span>one click away.</span></h3>
+            <p>Save your server settings and start Airi to bring the live dashboard online.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="logs-card" aria-label="Application logs">
+        <div class="logs-toolbar">
+          <div class="logs-title"><span class="logs-icon">⌘</span><div><h3>Application output</h3><p id="log-summary">Startup and bot events appear here</p></div></div>
+          <div class="logs-controls"><div class="filter-group" role="group" aria-label="Log filter"><button class="filter-button selected" data-filter="all">All</button><button class="filter-button" data-filter="error">Errors</button></div><button id="copy-logs" class="quiet-button">Copy</button><button id="clear-logs" class="quiet-button">Clear</button></div>
+        </div>
+        <div id="logs" class="log-stream" role="log" aria-live="polite" aria-relevant="additions text">
+          <div id="empty-logs" class="empty-logs"><span class="empty-glyph">⌁</span><span>Waiting for application output…</span></div>
+        </div>
+      </section>
+      <footer class="workspace-footer"><span><span class="footer-dot"></span> Local-first desktop app</span><span>AI was used in the creation of this project. Review automated actions before use.</span></footer>
     </section>
   </main>
+
   <script src="renderer.js"></script>
 </body>
 </html>

@@ -2280,8 +2280,13 @@ function medicLoop() {
 }
 
 /* ================= WEB CONTROL ================= */
+let dashboardConnectionLogged = false
+
 io.on("connection", (socket) => {
-  log("WEB", "Dashboard session established")
+  if (!dashboardConnectionLogged) {
+    dashboardConnectionLogged = true
+    log("WEB", "Dashboard connected")
+  }
   socket.emit("bot_status", getBotStatus())
   socket.emit("state", state);
   socket.emit("bulk_update", state)

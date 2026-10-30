@@ -1,0 +1,507 @@
+/**
+ * Movement/Navigation Feature
+ * Wraps mineflayer-pathfinder for pathfinding, movement, and navigation utilities
+ */
+
+import { Bot, Player } from 'mineflayer';
+import type { Entity } from 'prismarine-entity';
+import { Vec3 } from 'vec3';
+import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
+import type { FeaturePluginConfig } from './BaseFeature.js';
+import { BaseFeature } from './BaseFeature.js';
+import { FeatureRegistry } from '../../types/index.js';
+
+/**
+ * Movement feature configuration
+ */
+export type MovementFeatureConfig = FeaturePluginConfig;
+
+/**
+ * Movement feature options
+ */
+export interface MovementFeatureOptions {
+  /** Enable auto-jump when walking */
+  autoJump?: boolean;
+  /** Enable sprinting when possible */
+  sprint?: boolean;
+  /** Enable swimming */
+  swim?: boolean;
+  /** Enable parkour (climb up blocks) */
+  parkour?: boolean;
+  /** Avoid water when pathfinding */
+  avoidWater?: boolean;
+  /** Avoid lava when pathfinding */
+  avoidLava?: boolean;
+  /** Avoid dangerous blocks (cactus, sweet berries, etc.) */
+  avoidDangerous?: boolean;
+  /** Maximum fall distance without taking damage */
+  maxFallDistance?: number;
+  /** Timeout for pathfinding in ms */
+  pathfindingTimeout?: number;
+  /** Movement speed multiplier */
+  speedMultiplier?: number;
+}
+
+/**
+ * Goal types for movement
+ */
+export type MovementGoal =
+  | { type: 'block'; x: number; y: number; z: number; range?: number }
+  | { type: 'entity'; entityId: number; range?: number }
+  | { type: 'position'; x: number; y: number; z: number; range?: number }
+  | { type: 'follow'; entity: Entity; range: number }
+  | { type: 'wander'; radius: number; center?: Vec3 }
+  | { type: 'stop' };
+
+/**
+ * Movement status
+ */
+export interface MovementStatus {
+  moving: boolean;
+  goal: MovementGoal | null;
+  path: Vec3[] | null;
+  progress: number;
+  speed: number;
+}
+
+/**
+ * Movement Feature Class
+ */
+export class MovementFeature extends BaseFeature {
+  public readonly name = 'movement';
+  public readonly version = '1.0.0';
+  public readonly description = 'Pathfinding, movement, and navigation utilities';
+  public readonly dependencies = ['core'];
+
+  private movements: Movements | null = null;
+  private currentGoal: MovementGoal | null = null;
+  private path: Vec3[] | null = null;
+  private pathIndex = 0;
+  private isMoving = false;
+  private moveTimeout: NodeJS.Timeout | null = null;
+  private statusListeners: ((status: MovementStatus) => void)[] = [];
+
+  constructor() {
+    super('movement', '1.0.0', 'Pathfinding, movement, and navigation utilities', ['core']);
+  }
+
+  /**
+   * Initialize the movement feature
+   */
+  protected async onEnable(): Promise<void> {
+    const bot = this.getBot();
+
+    // Load pathfinder plugin if not already loaded
+    if (!bot.pathfinder) {
+      bot.loadPlugin(pathfinder);
+    }
+
+    // Create movements instance
+    this.movements = new Movements(bot);
+
+    // Configure movements from options
+    this.configureMovements();
+
+    // Set up event listeners
+    this.setupEventListeners();
+
+    // Register movement commands
+    this.registerCommands();
+
+    console.log('[MovementFeature] Movement feature enabled');
+  }
+
+  /**
+   * Disable the movement feature
+   */
+  protected async onDisable(): Promise<void> {
+    // Stop any current movement
+    await this.stop();
+
+    // Clear timeout
+    if (this.moveTimeout) {
+      clearTimeout(this.moveTimeout);
+      this.moveTimeout = null;
+    }
+
+    // Remove event listeners
+    this.removeAllListeners();
+
+    // Clear movements
+    this.movements = null;
+
+    console.log('[MovementFeature] Movement feature disabled');
+  }
+
+  /**
+   * Configure movements based on options
+   */
+  private configureMovements(): void {
+    if (!this.movements) return;
+
+    const options = this.config.options as MovementFeatureOptions | undefined;
+    if (!options) return;
+
+    this.movements.allowSprint = options.sprint ?? true;
+    this.movements.allowSwimming = options.swim ?? true;
+    this.movements.allowParkour = options.parkour ?? true;
+    this.movements.canDig = false; // Don't dig by default
+    this.movements.avoidWater = options.avoidWater ?? false;
+    this.movements.avoidLava = options.avoidLava ?? true;
+    this.movements.avoidDangerous = options.avoidDangerous ?? true;
+    this.movements.maxFallDistance = options.maxFallDistance ?? 3;
+  }
+
+  /**
+   * Set up event listeners for pathfinding
+   */
+  private setupEventListeners(): void {
+    const bot = this.getBot();
+
+    // Path update event
+    bot.on('path_update', (results: any) => {
+      this.path = results.path;
+      this.pathIndex = 0;
+      this.emitStatus();
+    });
+
+    // Goal reached event
+    bot.on('goal_reached', () => {
+      this.isMoving = false;
+      this.currentGoal = null;
+      this.path = null;
+      this.pathIndex = 0;
+      this.emitStatus();
+    });
+
+    // Physics tick for progress tracking
+    bot.on('physicsTick', () => {
+      if (this.isMoving && this.path && this.path.length > 0) {
+        this.updateProgress();
+      }
+    });
+
+    // Death event - stop movement
+    bot.on('death', () => {
+      this.stop();
+    });
+  }
+
+  /**
+   * Register movement-related commands
+   */
+  private registerCommands(): void {
+    const manager = this.getManager();
+
+    // Commands will be registered via the command system
+    // This is a placeholder for command registration
+  }
+
+  /**
+   * Move to a block position
+   */
+  async moveToBlock(x: number, y: number, z: number, range = 1): Promise<boolean> {
+    return this.setGoal({ type: 'block', x, y, z, range });
+  }
+
+  /**
+   * Move to an entity
+   */
+  async moveToEntity(entity: Entity, range = 2): Promise<boolean> {
+    return this.setGoal({ type: 'entity', entityId: entity.id, range });
+  }
+
+  /**
+   * Move to a position
+   */
+  async moveToPosition(x: number, y: number, z: number, range = 1): Promise<boolean> {
+    return this.setGoal({ type: 'position', x, y, z, range });
+  }
+
+  /**
+   * Follow an entity
+   */
+  async followEntity(entity: Entity, range = 2): Promise<boolean> {
+    return this.setGoal({ type: 'follow', entity, range });
+  }
+
+  /**
+   * Wander around a center point
+   */
+  async wander(radius: number, center?: Vec3): Promise<boolean> {
+    return this.setGoal({ type: 'wander', radius, center });
+  }
+
+  /**
+   * Stop current movement
+   */
+  async stop(): Promise<void> {
+    const bot = this.getBot();
+
+    if (this.moveTimeout) {
+      clearTimeout(this.moveTimeout);
+      this.moveTimeout = null;
+    }
+
+    bot.pathfinder.stop();
+    this.isMoving = false;
+    this.currentGoal = null;
+    this.path = null;
+    this.pathIndex = 0;
+    this.emitStatus();
+  }
+
+  /**
+   * Set a movement goal
+   */
+  private async setGoal(goal: MovementGoal): Promise<boolean> {
+    const bot = this.getBot();
+
+    if (!this.movements) {
+      throw new Error('Movements not initialized');
+    }
+
+    // Stop current movement
+    await this.stop();
+
+    try {
+      this.currentGoal = goal;
+      this.isMoving = true;
+
+      let pathfinderGoal: goals.Goal;
+
+      switch (goal.type) {
+        case 'block':
+          pathfinderGoal = new goals.GoalBlock(goal.x, goal.y, goal.z, goal.range ?? 1);
+          break;
+        case 'entity':
+          pathfinderGoal = new goals.GoalFollow(goal.entityId, goal.range ?? 2);
+          break;
+        case 'position':
+          pathfinderGoal = new goals.GoalNear(goal.x, goal.y, goal.z, goal.range ?? 1);
+          break;
+        case 'follow':
+          pathfinderGoal = new goals.GoalFollow(goal.entity.id, goal.range);
+          break;
+        case 'wander':
+          const center = goal.center ?? bot.entity.position;
+          pathfinderGoal = new goals.GoalRandom(center, goal.radius);
+          break;
+        case 'stop':
+          await this.stop();
+          return true;
+        default:
+          throw new Error(`Unknown goal type: ${(goal as any).type}`);
+      }
+
+      // Set timeout
+      const timeout = this.getOption('pathfindingTimeout', 30000);
+      this.moveTimeout = setTimeout(() => {
+        if (this.isMoving) {
+          console.warn('[MovementFeature] Pathfinding timeout');
+          this.stop();
+        }
+      }, timeout);
+
+      // Start pathfinding
+      const result = await bot.pathfinder.goto(pathfinderGoal);
+      return result === 'success';
+    } catch (error) {
+      this.isMoving = false;
+      this.currentGoal = null;
+      console.error('[MovementFeature] Movement error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update movement progress
+   */
+  private updateProgress(): void {
+    if (!this.path || this.path.length === 0) return;
+
+    const bot = this.getBot();
+    const currentPos = bot.entity.position;
+
+    // Find closest path point
+    let closestIndex = this.pathIndex;
+    let closestDist = Infinity;
+
+    for (let i = this.pathIndex; i < this.path.length; i++) {
+      const dist = currentPos.distanceTo(this.path[i]);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIndex = i;
+      }
+    }
+
+    this.pathIndex = closestIndex;
+    const progress = this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 1;
+    this.emitStatus(progress);
+  }
+
+  /**
+   * Emit movement status to listeners
+   */
+  private emitStatus(progress?: number): void {
+    const bot = this.getBot();
+    const status: MovementStatus = {
+      moving: this.isMoving,
+      goal: this.currentGoal,
+      path: this.path,
+      progress: progress ?? (this.path && this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 0),
+      speed: bot.entity.velocity.length()
+    };
+
+    for (const listener of this.statusListeners) {
+      try {
+        listener(status);
+      } catch (error) {
+        console.error('[MovementFeature] Status listener error:', error);
+      }
+    }
+  }
+
+  /**
+   * Subscribe to movement status updates
+   */
+  onStatusChange(listener: (status: MovementStatus) => void): () => void {
+    this.statusListeners.push(listener);
+    return () => {
+      const index = this.statusListeners.indexOf(listener);
+      if (index !== -1) {
+        this.statusListeners.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Get current movement status
+   */
+  getStatus(): MovementStatus {
+    return {
+      moving: this.isMoving,
+      goal: this.currentGoal,
+      path: this.path,
+      progress: this.path && this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 0,
+      speed: this.getBot().entity.velocity.length()
+    };
+  }
+
+  /**
+   * Check if currently moving
+   */
+  isMovingNow(): boolean {
+    return this.isMoving;
+  }
+
+  /**
+   * Get current goal
+   */
+  getCurrentGoal(): MovementGoal | null {
+    return this.currentGoal;
+  }
+
+  /**
+   * Get current path
+   */
+  getPath(): Vec3[] | null {
+    return this.path;
+  }
+
+  /**
+   * Move to a specific location by name (from memory)
+   */
+  async moveToNamedLocation(name: string): Promise<boolean> {
+    const memoryFeature = this.getFeature('memory');
+    if (!memoryFeature) {
+      console.warn('[MovementFeature] Memory feature not available');
+      return false;
+    }
+
+    // This would integrate with the memory feature to get named locations
+    // For now, return false
+    return false;
+  }
+
+  /**
+   * Look at a position while moving
+   */
+  lookAt(x: number, y: number, z: number): void {
+    const bot = this.getBot();
+    bot.lookAt(new Vec3(x, y, z), true);
+  }
+
+  /**
+   * Look at an entity while moving
+   */
+  lookAtEntity(entity: Entity): void {
+    const bot = this.getBot();
+    bot.lookAt(entity.position.offset(0, 1.6, 0), true);
+  }
+
+  /**
+   * Set auto-jump
+   */
+  setAutoJump(enabled: boolean): void {
+    if (this.movements) {
+      this.movements.allowJump = enabled;
+      this.setOption('autoJump', enabled);
+    }
+  }
+
+  /**
+   * Set sprint enabled
+   */
+  setSprint(enabled: boolean): void {
+    if (this.movements) {
+      this.movements.allowSprint = enabled;
+      this.setOption('sprint', enabled);
+    }
+  }
+
+  /**
+   * Set speed multiplier
+   */
+  setSpeedMultiplier(multiplier: number): void {
+    this.setOption('speedMultiplier', multiplier);
+  }
+
+  /**
+   * Get distance to a position
+   */
+  distanceTo(x: number, y: number, z: number): number {
+    const bot = this.getBot();
+    return bot.entity.position.distanceTo(new Vec3(x, y, z));
+  }
+
+  /**
+   * Get distance to an entity
+   */
+  distanceToEntity(entity: Entity): number {
+    const bot = this.getBot();
+    return bot.entity.position.distanceTo(entity.position);
+  }
+
+  /**
+   * Check if position is reachable
+   */
+  async isReachable(x: number, y: number, z: number, range = 1): Promise<boolean> {
+    const bot = this.getBot();
+
+    if (!this.movements) return false;
+
+    const goal = new goals.GoalBlock(x, y, z, range);
+    const result = await bot.pathfinder.goto(goal);
+    return result === 'success';
+  }
+
+  /**
+   * Get movements instance for advanced usage
+   */
+  getMovements(): Movements | null {
+    return this.movements;
+  }
+}
+
+export default MovementFeature;

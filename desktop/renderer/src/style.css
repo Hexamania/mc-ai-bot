@@ -1,0 +1,124 @@
+/* Global styles for Airi OS renderer */
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  background: #080b12;
+  color: #edf2fa;
+  --muted: #7c879b;
+  --soft: #a9b4c7;
+  --line: rgba(149, 166, 197, 0.13);
+  --panel: rgba(15, 21, 33, 0.82);
+  --mint: #73ebc2;
+  --blue: #7aa8ff;
+  --lilac: #c19bff;
+  --red: #ff858f;
+  --mono: "Cascadia Code", Consolas, monospace;
+  --display: "Segoe UI Variable Display", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  min-width: 760px;
+  min-height: 520px;
+  background: radial-gradient(ellipse at 77% -20%, rgba(81, 87, 159, 0.15), transparent 45%), #080b12;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(115, 235, 194, 0.3);
+  color: #080b12;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #303c4e;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #404d63;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Focus visible styles */
+*:focus-visible {
+  outline: 2px solid #73ebc2;
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Vue transition classes */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.slide-enter-from {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.slide-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}

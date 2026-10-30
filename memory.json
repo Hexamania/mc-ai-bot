@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
   "locations": {},
-  "players": {},
+  "players": {
+    "PVP": {
+      "username": "PVP",
+      "role": "guest",
+      "preferences": {},
+      "firstSeen": "2026-10-30T13:00:59.370Z",
+      "lastSeen": "2026-10-30T13:00:59.370Z"
+    }
+  },
   "currentTask": null,
   "rules": [],
   "learnedFacts": {}

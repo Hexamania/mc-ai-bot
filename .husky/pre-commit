@@ -1,0 +1,21 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Airi OS pre-commit hook
+# Runs lint-staged on changed files
+
+echo "[Husky] Running pre-commit checks..."
+
+# Check if lint-staged is available, otherwise run basic checks
+if command -v npx >/dev/null 2>&1 && npx --version >/dev/null 2>&1; then
+  npx lint-staged 2>/dev/null || {
+    echo "[Husky] lint-staged not found, running basic checks..."
+    npm run lint:fix --if-present
+    npm run format --if-present
+  }
+else
+  echo "[Husky] npx not available, skipping automated checks"
+  echo "[Husky] Please run 'npm run lint:fix && npm run format' manually"
+fi
+
+echo "[Husky] Pre-commit checks complete"

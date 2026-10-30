@@ -1,0 +1,94 @@
+# Airi OS Docker Compose
+# Use for development and production deployments
+
+version: '3.8'
+
+services:
+  # Main bot service
+  airi-bot:
+    build:
+      context: .
+      target: production
+    container_name: airi-bot
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - MC_HOST=${MC_HOST:-localhost}
+      - MC_PORT=${MC_PORT:-25565}
+      - MC_USERNAME=${MC_USERNAME:-Airi}
+      - MC_PASSWORD=${MC_PASSWORD:-}
+      - MC_VERSION=${MC_VERSION:-1.21.1}
+      - WEB_PORT=${WEB_PORT:-3000}
+      - WEB_HOST=0.0.0.0
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      - ENABLE_MEMORY=${ENABLE_MEMORY:-true}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - ADMIN_PREFIX=${ADMIN_PREFIX:-\$}
+      - PREFIX=${PREFIX:-:}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - airi-memory:/app/memory.json
+      - airi-users:/app/users.json
+      - airi-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Development service with hot reload
+  airi-dev:
+    build:
+      context: .
+      target: development
+    container_name: airi-dev
+    environment:
+      - NODE_ENV=development
+      - MC_HOST=${MC_HOST:-localhost}
+      - MC_PORT=${MC_PORT:-25565}
+      - MC_USERNAME=${MC_USERNAME:-Airi}
+      - MC_PASSWORD=${MC_PASSWORD:-}
+      - MC_VERSION=${MC_VERSION:-1.21.1}
+      - WEB_PORT=${WEB_PORT:-3000}
+      - WEB_HOST=0.0.0.0
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ENABLE_MEMORY=${ENABLE_MEMORY:-true}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - airi-memory:/app/memory.json
+      - airi-users:/app/users.json
+    command: npm run dev
+    profiles:
+      - dev
+
+  # Desktop app builder (for CI/CD)
+  airi-builder:
+    build:
+      context: .
+      target: builder
+    container_name: airi-builder
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./dist:/app/dist
+    command: echo "Build complete - artifacts in ./dist"
+    profiles:
+      - build
+
+volumes:
+  airi-memory:
+  airi-users:
+  airi-logs:
+
+# Networks
+networks:
+  default:
+    name: airi-network

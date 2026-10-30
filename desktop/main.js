@@ -208,7 +208,6 @@ async function startBot() {
   const buffers = { stdout: "", stderr: "" }
   appendAppLog("system", `Starting bot worker for ${config.host}:${config.port} (Minecraft ${config.version}).`)
   botProcess = utilityProcess.fork(entry, [], {
-    // app.getAppPath() is usually inside app.asar and cannot be used as a process cwd.
     cwd: app.getPath("userData"),
     env: childEnv,
     stdio: "pipe",

@@ -15,5 +15,13 @@ npm-debug.log*
 .DS_Store
 .vscode/
 
+# Backup directories
+backup_*/
+backup_full_*
+
+# Build artifacts
+*.cjs
+
 # others
 chat.json
+.claude/

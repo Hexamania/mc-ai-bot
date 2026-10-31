@@ -37,12 +37,7 @@ export abstract class BaseFeature extends BasePlugin implements Feature {
   protected registry: FeatureRegistry | null = null;
   protected config: FeaturePluginConfig = { name: '', enabled: true };
 
-  constructor(
-    name: string,
-    version: string,
-    description: string,
-    dependencies: string[] = []
-  ) {
+  constructor(name: string, version: string, description: string, dependencies: string[] = []) {
     super(name, version, description, dependencies);
     this.description = description;
     this.dependencies = dependencies;
@@ -245,14 +240,20 @@ export abstract class BaseFeature extends BasePlugin implements Feature {
   /**
    * Listen for an event from the bot manager
    */
-  protected on<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  protected on<K extends keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     return super.on(event, listener);
   }
 
   /**
    * Listen for an event once from the bot manager
    */
-  protected once<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  protected once<K extends keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     return super.once(event, listener);
   }
 
@@ -277,7 +278,9 @@ export abstract class BaseFeature extends BasePlugin implements Feature {
    */
   removeAllListeners(event?: string | symbol): this {
     if (this.manager) {
-      const emitter = this.manager as unknown as { removeAllListeners: (event?: string | symbol) => void };
+      const emitter = this.manager as unknown as {
+        removeAllListeners: (event?: string | symbol) => void;
+      };
       if (event) {
         emitter.removeAllListeners(event);
       } else {

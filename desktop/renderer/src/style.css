@@ -1,7 +1,7 @@
 /* Global styles for Airi OS renderer */
 :root {
   color-scheme: dark;
-  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   background: #080b12;
@@ -14,15 +14,17 @@
   --blue: #7aa8ff;
   --lilac: #c19bff;
   --red: #ff858f;
-  --mono: "Cascadia Code", Consolas, monospace;
-  --display: "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  --mono: 'Cascadia Code', Consolas, monospace;
+  --display: 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html, body, #app {
+html,
+body,
+#app {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -33,10 +35,14 @@ html, body, #app {
 body {
   min-width: 760px;
   min-height: 520px;
-  background: radial-gradient(ellipse at 77% -20%, rgba(81, 87, 159, 0.15), transparent 45%), #080b12;
+  background:
+    radial-gradient(ellipse at 77% -20%, rgba(81, 87, 159, 0.15), transparent 45%), #080b12;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -89,7 +95,9 @@ a {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

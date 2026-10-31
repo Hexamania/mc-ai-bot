@@ -10,7 +10,11 @@ export { BaseFeature } from './BaseFeature';
 export { MovementFeature, MovementFeatureConfig, MovementFeatureOptions } from './MovementFeature';
 
 // Inventory management
-export { InventoryFeature, InventoryFeatureConfig, InventoryFeatureOptions } from './InventoryFeature';
+export {
+  InventoryFeature,
+  InventoryFeatureConfig,
+  InventoryFeatureOptions,
+} from './InventoryFeature';
 
 // Combat/PVP system
 export { CombatFeature, CombatFeatureConfig, CombatFeatureOptions } from './CombatFeature';

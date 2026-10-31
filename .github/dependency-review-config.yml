@@ -30,4 +30,4 @@ allow-licenses:
 #   - production
 
 # Comment on PR with summary
-comment-summary-in-pr: 'always'
+comment-summary-in-pr: "always"

@@ -79,7 +79,11 @@ function saveMemory(): void {
 }
 
 // Add memory entry
-function addMemory(type: MemoryEntry['type'], content: string, metadata?: Record<string, any>): void {
+function addMemory(
+  type: MemoryEntry['type'],
+  content: string,
+  metadata?: Record<string, any>
+): void {
   if (!config.enableMemory) return;
 
   const entry: MemoryEntry = {
@@ -117,7 +121,8 @@ function broadcast(type: string, data: any): void {
   const message = JSON.stringify({ type, data, timestamp: Date.now() });
 
   wsServer.clients.forEach((client) => {
-    if (client.readyState === 1) { // WebSocket.OPEN
+    if (client.readyState === 1) {
+      // WebSocket.OPEN
       client.send(message);
     }
   });
@@ -258,11 +263,13 @@ function createBot(): void {
       status: 'connected',
       health: bot.health,
       food: bot.food,
-      position: bot.entity.position ? {
-        x: Math.floor(bot.entity.position.x),
-        y: Math.floor(bot.entity.position.y),
-        z: Math.floor(bot.entity.position.z),
-      } : null,
+      position: bot.entity.position
+        ? {
+            x: Math.floor(bot.entity.position.x),
+            y: Math.floor(bot.entity.position.y),
+            z: Math.floor(bot.entity.position.z),
+          }
+        : null,
       dimension: bot.game.dimension,
     });
     addMemory('event', `Joined server ${config.host}:${config.port}`);
@@ -375,7 +382,7 @@ function createBot(): void {
 
 function updatePlayersList(): void {
   if (!bot) return;
-  const players = Object.values(bot.players).map(p => p.username);
+  const players = Object.values(bot.players).map((p) => p.username);
   updateState({ players });
 }
 

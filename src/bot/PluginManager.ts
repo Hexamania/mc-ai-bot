@@ -4,7 +4,13 @@
 
 import { EventEmitter } from 'events';
 import type { Bot } from 'mineflayer';
-import type { Plugin, PluginManager as PluginManagerInterface, PluginConfig, BotManager, BotEvents } from './types';
+import type {
+  Plugin,
+  PluginManager as PluginManagerInterface,
+  PluginConfig,
+  BotManager,
+  BotEvents,
+} from './types';
 
 export class PluginManager extends EventEmitter implements PluginManagerInterface {
   private plugins = new Map<string, Plugin>();
@@ -82,7 +88,7 @@ export class PluginManager extends EventEmitter implements PluginManagerInterfac
    * Resolve plugin load order based on dependencies
    */
   private resolveLoadOrder(plugins: Plugin[]): Plugin[] {
-    const pluginMap = new Map(plugins.map(p => [p.name, p]));
+    const pluginMap = new Map(plugins.map((p) => [p.name, p]));
     const visited = new Set<string>();
     const visiting = new Set<string>();
     const result: Plugin[] = [];
@@ -122,7 +128,7 @@ export class PluginManager extends EventEmitter implements PluginManagerInterfac
     }
 
     // Check if other plugins depend on this one
-    const dependents = this.loadOrder.filter(n => {
+    const dependents = this.loadOrder.filter((n) => {
       const p = this.plugins.get(n);
       return p?.dependencies?.includes(name);
     });
@@ -137,7 +143,7 @@ export class PluginManager extends EventEmitter implements PluginManagerInterfac
 
       // Remove from registry
       this.plugins.delete(name);
-      this.loadOrder = this.loadOrder.filter(n => n !== name);
+      this.loadOrder = this.loadOrder.filter((n) => n !== name);
 
       // Emit unload event
       this.emit('pluginUnload', name);
@@ -331,12 +337,18 @@ export abstract class BasePlugin implements Plugin {
     return this.manager?.emit(event, ...args) ?? false;
   }
 
-  protected on<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  protected on<K extends keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.manager?.on(event, listener);
     return this;
   }
 
-  protected once<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  protected once<K extends keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.manager?.once(event, listener);
     return this;
   }

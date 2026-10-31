@@ -1,16 +1,17 @@
-const { contextBridge, ipcRenderer } = require("electron")
+const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld("airiDesktop", {
-  getSettings: () => ipcRenderer.invoke("settings:get"),
-  getLogs: () => ipcRenderer.invoke("logs:get"),
-  clearLogs: () => ipcRenderer.invoke("logs:clear"),
-  copyLogs: text => ipcRenderer.invoke("logs:copy", text),
-  saveSettings: settings => ipcRenderer.invoke("settings:save", settings),
-  startBot: () => ipcRenderer.invoke("bot:start"),
-  stopBot: () => ipcRenderer.invoke("bot:stop"),
-  openDashboard: () => ipcRenderer.invoke("dashboard:open"),
-  onLifecycle: callback => ipcRenderer.on("app:lifecycle", (_event, data) => callback(data)),
-  onLog: callback => ipcRenderer.on("app:log", (_event, data) => callback(data)),
-  onBotState: callback => ipcRenderer.on("app:bot-state", (_event, data) => callback(data)),
-  onDashboardReady: callback => ipcRenderer.on("app:dashboard-ready", (_event, data) => callback(data))
-})
+contextBridge.exposeInMainWorld('airiDesktop', {
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  getLogs: () => ipcRenderer.invoke('logs:get'),
+  clearLogs: () => ipcRenderer.invoke('logs:clear'),
+  copyLogs: (text) => ipcRenderer.invoke('logs:copy', text),
+  saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
+  startBot: () => ipcRenderer.invoke('bot:start'),
+  stopBot: () => ipcRenderer.invoke('bot:stop'),
+  openDashboard: () => ipcRenderer.invoke('dashboard:open'),
+  onLifecycle: (callback) => ipcRenderer.on('app:lifecycle', (_event, data) => callback(data)),
+  onLog: (callback) => ipcRenderer.on('app:log', (_event, data) => callback(data)),
+  onBotState: (callback) => ipcRenderer.on('app:bot-state', (_event, data) => callback(data)),
+  onDashboardReady: (callback) =>
+    ipcRenderer.on('app:dashboard-ready', (_event, data) => callback(data)),
+});

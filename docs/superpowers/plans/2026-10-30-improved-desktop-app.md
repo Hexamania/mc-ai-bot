@@ -1,14 +1,26 @@
 # Improved Desktop App Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
+> (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a production-ready Electron desktop app for Airi OS Minecraft bot with modern architecture, reactive UI, encrypted settings, advanced logging, bot process management, auto-updater, system tray, and native notifications.
+**Goal:** Build a production-ready Electron desktop app for Airi OS Minecraft bot with modern
+architecture, reactive UI, encrypted settings, advanced logging, bot process management,
+auto-updater, system tray, and native notifications.
 
-**Architecture:** Merge the new TypeScript src/ architecture (BotManager, WebServer, PluginManager, ConfigLoader) with Electron main process. Renderer uses TypeScript with reactive state management (signals/observables). IPC bridges main and renderer securely via contextBridge. Bot runs in utilityProcess for isolation. Auto-updater, system tray, and notifications integrated at main process level.
+**Architecture:** Merge the new TypeScript src/ architecture (BotManager, WebServer, PluginManager,
+ConfigLoader) with Electron main process. Renderer uses TypeScript with reactive state management
+(signals/observables). IPC bridges main and renderer securely via contextBridge. Bot runs in
+utilityProcess for isolation. Auto-updater, system tray, and notifications integrated at main
+process level.
 
-**Tech Stack:** Electron 28+, TypeScript 5.9, mineflayer 4.39, express 4.19, socket.io 4.7, electron-updater, electron-store (encrypted), node-notifier (native notifications), Vite for renderer bundling.
+**Tech Stack:** Electron 28+, TypeScript 5.9, mineflayer 4.39, express 4.19, socket.io 4.7,
+electron-updater, electron-store (encrypted), node-notifier (native notifications), Vite for
+renderer bundling.
 
-**Spec:** This plan implements the 10 features requested: better main process, reactive renderer, encrypted settings, log viewer, bot process management, dashboard embedding, auto-updater, portable mode, system tray, native notifications.
+**Spec:** This plan implements the 10 features requested: better main process, reactive renderer,
+encrypted settings, log viewer, bot process management, dashboard embedding, auto-updater, portable
+mode, system tray, native notifications.
 
 ## Global Constraints
 
@@ -24,7 +36,8 @@
 
 1. **IPC security** - Renderer cannot access Node APIs directly; all main<->renderer via typed IPC
 2. **Bot process crashes** - utilityProcess should auto-restart with backoff, not crash main
-3. **Settings encryption** - API key never in plaintext on disk; safeStorage unavailable handled gracefully
+3. **Settings encryption** - API key never in plaintext on disk; safeStorage unavailable handled
+   gracefully
 4. **Log viewer performance** - Search/filter/export on 500+ entries without UI blocking
 5. **Auto-updater race conditions** - Download doesn't corrupt running app; portable mode handled
 
@@ -33,12 +46,14 @@
 ### Task 1: Project Setup & TypeScript Configuration
 
 **Files:**
+
 - Create: `tsconfig.json` (root, extends from src/tsconfig.json)
 - Create: `desktop/tsconfig.json` (main process)
 - Create: `desktop/renderer/tsconfig.json` (renderer)
 - Modify: `package.json` (scripts, dependencies)
 
 **Interfaces:**
+
 - Consumes: existing package.json, src/tsconfig.json
 - Produces: Build system ready for main + renderer TypeScript
 
@@ -82,6 +97,7 @@
 ### Task 2: Main Process Architecture (Better Architecture)
 
 **Files:**
+
 - Create: `desktop/main.ts` (new main process entry)
 - Create: `desktop/services/BotProcessManager.ts` (spawn, monitor, restart)
 - Create: `desktop/services/SettingsService.ts` (encrypted settings)
@@ -95,10 +111,12 @@
 - Modify: `desktop/preload.ts` (contextBridge API)
 
 **Interfaces:**
+
 - Consumes: src/bot/BotManager, src/web/WebServer, src/config/ConfigLoader
 - Produces: Main process services, IPC API for renderer
 
 - [ ] **Step 1: Create typed IPC channel definitions**
+
 ```typescript
 // desktop/ipc/channels.ts
 export const IPC_CHANNELS = {
@@ -142,6 +160,7 @@ export const IPC_CHANNELS = {
 ### Task 3: Renderer with Reactive State Management
 
 **Files:**
+
 - Create: `desktop/renderer/src/main.ts` (renderer entry)
 - Create: `desktop/renderer/src/App.vue` (root component)
 - Create: `desktop/renderer/src/stores/botStore.ts` (bot state + actions)
@@ -159,6 +178,7 @@ export const IPC_CHANNELS = {
 - Create: `desktop/renderer/style.css` (global styles)
 
 **Interfaces:**
+
 - Consumes: preload.ts exposed `window.api`
 - Produces: Reactive UI components, stores
 
@@ -180,11 +200,13 @@ export const IPC_CHANNELS = {
 ### Task 4: Settings Persistence with Encryption
 
 **Files:**
+
 - Modify: `desktop/services/SettingsService.ts` (from Task 2)
 - Create: `desktop/services/EncryptionService.ts` (safeStorage wrapper)
 - Create: `desktop/types/settings.ts` (settings schema + validation)
 
 **Interfaces:**
+
 - Consumes: Electron safeStorage, ConfigLoader from src/
 - Produces: Encrypted settings API
 
@@ -200,11 +222,13 @@ export const IPC_CHANNELS = {
 ### Task 5: Log Viewer with Search/Filter/Export
 
 **Files:**
+
 - Modify: `desktop/services/LogService.ts` (from Task 2)
 - Create: `desktop/renderer/src/components/LogViewer.vue` (from Task 3)
 - Create: `desktop/renderer/src/composables/useLogSearch.ts`
 
 **Interfaces:**
+
 - Consumes: LogService IPC, bot process stdout/stderr
 - Produces: Searchable, filterable, exportable log viewer
 
@@ -221,11 +245,13 @@ export const IPC_CHANNELS = {
 ### Task 6: Bot Process Management
 
 **Files:**
+
 - Modify: `desktop/services/BotProcessManager.ts` (from Task 2)
 - Create: `desktop/bot-worker/main.ts` (utilityProcess entry)
 - Create: `desktop/bot-worker/ipc.ts` (worker<->main communication)
 
 **Interfaces:**
+
 - Consumes: src/bot/BotManager, src/web/WebServer
 - Produces: Managed bot process with health monitoring
 
@@ -242,11 +268,13 @@ export const IPC_CHANNELS = {
 ### Task 7: Dashboard Embedding with Communication
 
 **Files:**
+
 - Create: `desktop/renderer/src/components/DashboardEmbed.vue`
 - Create: `desktop/renderer/src/composables/useDashboard.ts`
 - Modify: `desktop/services/BotProcessManager.ts` (expose dashboard URL)
 
 **Interfaces:**
+
 - Consumes: WebServer from src/, Socket.io client
 - Produces: Embedded dashboard with bi-directional communication
 
@@ -262,11 +290,13 @@ export const IPC_CHANNELS = {
 ### Task 8: Auto-Updater Integration
 
 **Files:**
+
 - Modify: `desktop/services/AutoUpdaterService.ts` (from Task 2)
 - Create: `desktop/renderer/src/components/UpdateBanner.vue`
 - Modify: `package.json` build config for electron-builder
 
 **Interfaces:**
+
 - Consumes: electron-updater, GitHub releases
 - Produces: Automatic update check, download, install
 
@@ -283,12 +313,14 @@ export const IPC_CHANNELS = {
 ### Task 9: Portable Mode Improvements
 
 **Files:**
+
 - Modify: `desktop/services/PortableService.ts` (from Task 2)
 - Modify: `desktop/services/SettingsService.ts` (portable data path)
 - Modify: `desktop/services/LogService.ts` (portable log path)
 - Modify: `desktop/main.ts` (portable detection)
 
 **Interfaces:**
+
 - Consumes: Portable detection logic
 - Produces: Self-contained portable app
 
@@ -303,11 +335,13 @@ export const IPC_CHANNELS = {
 ### Task 10: System Tray Support
 
 **Files:**
+
 - Modify: `desktop/services/SystemTrayService.ts` (from Task 2)
 - Create: `desktop/assets/tray-icon.png` (tray icon)
 - Create: `desktop/assets/tray-icon.ico` (Windows tray icon)
 
 **Interfaces:**
+
 - Consumes: Electron Tray, BrowserWindow
 - Produces: System tray with context menu
 
@@ -323,10 +357,12 @@ export const IPC_CHANNELS = {
 ### Task 11: Native Notifications
 
 **Files:**
+
 - Modify: `desktop/services/NotificationService.ts` (from Task 2)
 - Create: `desktop/renderer/src/composables/useNotifications.ts`
 
 **Interfaces:**
+
 - Consumes: node-notifier, Electron Notification API
 - Produces: Cross-platform native notifications
 
@@ -342,12 +378,14 @@ export const IPC_CHANNELS = {
 ### Task 12: Integration Testing & Polish
 
 **Files:**
+
 - Create: `desktop/renderer/src/views/DashboardView.vue`
 - Create: `desktop/renderer/src/views/SettingsView.vue`
 - Create: `desktop/renderer/src/views/LogsView.vue`
 - Modify: All previous files for integration
 
 **Interfaces:**
+
 - Consumes: All previous tasks
 - Produces: Complete working desktop app
 
@@ -363,16 +401,16 @@ export const IPC_CHANNELS = {
 ## Task Dependencies
 
 ```
-Task 1 (Setup) 
-    → Task 2 (Main Process) 
-        → Task 3 (Renderer) 
-            → Task 4 (Settings) 
-            → Task 5 (Logs) 
-            → Task 6 (Bot Process) 
-            → Task 7 (Dashboard) 
-            → Task 8 (Updater) 
-            → Task 9 (Portable) 
-            → Task 10 (Tray) 
+Task 1 (Setup)
+    → Task 2 (Main Process)
+        → Task 3 (Renderer)
+            → Task 4 (Settings)
+            → Task 5 (Logs)
+            → Task 6 (Bot Process)
+            → Task 7 (Dashboard)
+            → Task 8 (Updater)
+            → Task 9 (Portable)
+            → Task 10 (Tray)
             → Task 11 (Notifications)
                 → Task 12 (Integration)
 ```

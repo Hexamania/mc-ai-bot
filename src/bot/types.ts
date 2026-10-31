@@ -13,7 +13,7 @@ export enum BotState {
   RECONNECTING = 'reconnecting',
   ERROR = 'error',
   SHUTTING_DOWN = 'shutting_down',
-  SHUTDOWN = 'shutdown'
+  SHUTDOWN = 'shutdown',
 }
 
 // Configuration types

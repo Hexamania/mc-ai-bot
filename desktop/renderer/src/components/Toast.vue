@@ -32,19 +32,10 @@ const typeIcons = {
 </script>
 
 <template>
-  <div
-    class="toast"
-    :class="typeClasses"
-  >
+  <div class="toast" :class="typeClasses">
     <span class="toast-icon">{{ typeIcons[props.toast.type] }}</span>
     <span class="toast-message">{{ props.toast.message }}</span>
-    <button
-      class="toast-close"
-      aria-label="Dismiss"
-      @click="remove"
-    >
-      ×
-    </button>
+    <button class="toast-close" aria-label="Dismiss" @click="remove">×</button>
   </div>
 </template>
 

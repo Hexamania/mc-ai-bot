@@ -26,7 +26,9 @@ export const useBotStore = defineStore('bot', () => {
 
   // Computed
   const isOnline = computed(() => status.value.online);
-  const isRunning = computed(() => ['starting', 'connecting', 'reconnecting', 'online'].includes(status.value.status));
+  const isRunning = computed(() =>
+    ['starting', 'connecting', 'reconnecting', 'online'].includes(status.value.status)
+  );
   const canStart = computed(() => !isRunning.value && !isConnecting.value);
   const canStop = computed(() => isRunning.value && !isStopping.value);
   const displayStatus = computed(() => {
@@ -39,7 +41,9 @@ export const useBotStore = defineStore('bot', () => {
     return 'Stopped';
   });
 
-  const displayDetail = computed(() => status.value.reason || status.value.error || 'Ready when you are');
+  const displayDetail = computed(
+    () => status.value.reason || status.value.error || 'Ready when you are'
+  );
 
   // Actions
   async function fetchStatus() {

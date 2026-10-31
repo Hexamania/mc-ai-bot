@@ -23,14 +23,8 @@ const pulseClasses = computed(() => ({
 <template>
   <div class="bot-status">
     <div class="status-indicator">
-      <div
-        class="connection-led"
-        :class="['connection-led', statusClasses]"
-      >
-        <div
-          class="live-pulse"
-          :class="pulseClasses"
-        />
+      <div class="connection-led" :class="['connection-led', statusClasses]">
+        <div class="live-pulse" :class="pulseClasses" />
       </div>
       <div class="status-info">
         <div class="status-title">
@@ -42,28 +36,13 @@ const pulseClasses = computed(() => ({
       </div>
     </div>
 
-    <div
-      v-if="botStore.isRunning"
-      class="status-actions"
-    >
+    <div v-if="botStore.isRunning" class="status-actions">
       <div class="status-meta">
-        <span
-          v-if="botStore.state?.botData"
-          class="meta-item"
-        >
-          ❤️ {{ botStore.state.botData.health }}/20
-        </span>
-        <span
-          v-if="botStore.state?.botData"
-          class="meta-item"
-        >
-          🍖 {{ botStore.state.botData.food }}/20
-        </span>
-        <span
-          v-if="botStore.state?.botData?.pos"
-          class="meta-item"
-        >
-          📍 {{ Math.floor(botStore.state.botData.pos.x) }}, {{ Math.floor(botStore.state.botData.pos.y) }}, {{ Math.floor(botStore.state.botData.pos.z) }}
+        <span v-if="botStore.state?.botData" class="meta-item"> ❤️ {{ botStore.state.botData.health }}/20 </span>
+        <span v-if="botStore.state?.botData" class="meta-item"> 🍖 {{ botStore.state.botData.food }}/20 </span>
+        <span v-if="botStore.state?.botData?.pos" class="meta-item">
+          📍 {{ Math.floor(botStore.state.botData.pos.x) }}, {{ Math.floor(botStore.state.botData.pos.y) }},
+          {{ Math.floor(botStore.state.botData.pos.z) }}
         </span>
       </div>
     </div>
@@ -138,9 +117,18 @@ const pulseClasses = computed(() => ({
 }
 
 @keyframes pulse {
-  0% { transform: scale(0.8); opacity: 0.6; }
-  70% { transform: scale(1.5); opacity: 0; }
-  100% { transform: scale(1.5); opacity: 0; }
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
 }
 
 .status-info {
@@ -177,7 +165,7 @@ const pulseClasses = computed(() => ({
   flex-wrap: wrap;
   gap: 12px;
   font-size: 11px;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: 'Cascadia Code', Consolas, monospace;
   color: #a9b4c7;
 }
 

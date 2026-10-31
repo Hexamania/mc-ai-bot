@@ -14,7 +14,7 @@ export const useUIStore = defineStore('ui', () => {
   const doNotDisturb = ref(false);
 
   // Computed
-  const visibleToasts = computed(() => toasts.value.filter(t => !t.duration || t.duration > 0));
+  const visibleToasts = computed(() => toasts.value.filter((t) => !t.duration || t.duration > 0));
 
   // Actions
   function showToast(message: string, type: Toast['type'] = 'info', duration = 5000) {
@@ -32,7 +32,7 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   function removeToast(id: string) {
-    const index = toasts.value.findIndex(t => t.id === id);
+    const index = toasts.value.findIndex((t) => t.id === id);
     if (index !== -1) {
       toasts.value.splice(index, 1);
     }

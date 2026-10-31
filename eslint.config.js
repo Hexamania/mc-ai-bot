@@ -32,6 +32,8 @@ export default tseslint.config(
       'users.json',
       'coverage/**',
       '.nyc_output/**',
+      // Config files (JSON)
+      '**/tsconfig*.json',
       // Legacy JavaScript files (not TypeScript)
       'bot.js',
       'backup_bot.js',
@@ -129,9 +131,28 @@ export default tseslint.config(
     },
   },
 
-  // Config files (allow any for config flexibility)
+  // Config files (allow any for config flexibility) - must come after project-specific configs to override
   {
-    files: ['*.config.*', '*.config.ts', '*.config.js'],
+    files: ['*.config.*', '*.config.ts', '*.config.js', 'vite.config.ts', 'vitest.config.ts'],
+    languageOptions: {
+      parserOptions: {
+        project: null,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
+
+  // Renderer config files (vite.config.ts, tsconfig.node.json) - disable project to avoid reference issues
+  {
+    files: ['desktop/renderer/vite.config.ts', 'desktop/renderer/tsconfig.node.json'],
+    languageOptions: {
+      parserOptions: {
+        project: null,
+      },
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'off',

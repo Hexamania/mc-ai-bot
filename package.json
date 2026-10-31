@@ -37,7 +37,7 @@
   ],
   "author": "Hexamania",
   "license": "ISC",
-    "dependencies": {
+  "dependencies": {
     "bcryptjs": "^3.0.3",
     "chalk": "^5.3.0",
     "compression": "^1.8.2",

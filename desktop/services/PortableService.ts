@@ -26,8 +26,10 @@ export class PortableService {
 
   private detectPortableMode(): void {
     // Detect portable mode
-    const executableDirectory = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
-    const isPortable = process.env.AIRIOS_PORTABLE === '1' ||
+    const executableDirectory =
+      process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+    const isPortable =
+      process.env.AIRIOS_PORTABLE === '1' ||
       Boolean(process.env.PORTABLE_EXECUTABLE_DIR) ||
       fs.existsSync(path.join(executableDirectory, 'portable.txt'));
 
@@ -92,21 +94,30 @@ export class PortableService {
 
   // Create portable marker file
   async createPortableMarker(): Promise<void> {
-    const executableDirectory = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+    const executableDirectory =
+      process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
     const markerPath = path.join(executableDirectory, 'portable.txt');
 
     try {
-      fs.writeFileSync(markerPath, `Airi OS Portable Mode\nCreated: ${new Date().toISOString()}\n`, 'utf8');
+      fs.writeFileSync(
+        markerPath,
+        `Airi OS Portable Mode\nCreated: ${new Date().toISOString()}\n`,
+        'utf8'
+      );
       this.logService.appendLog('system', 'Portable marker created');
     } catch (error) {
-      this.logService.appendLog('error', `Failed to create portable marker: ${(error as Error).message}`);
+      this.logService.appendLog(
+        'error',
+        `Failed to create portable marker: ${(error as Error).message}`
+      );
       throw error;
     }
   }
 
   // Remove portable marker file
   async removePortableMarker(): Promise<void> {
-    const executableDirectory = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+    const executableDirectory =
+      process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
     const markerPath = path.join(executableDirectory, 'portable.txt');
 
     try {
@@ -115,7 +126,10 @@ export class PortableService {
         this.logService.appendLog('system', 'Portable marker removed');
       }
     } catch (error) {
-      this.logService.appendLog('error', `Failed to remove portable marker: ${(error as Error).message}`);
+      this.logService.appendLog(
+        'error',
+        `Failed to remove portable marker: ${(error as Error).message}`
+      );
       throw error;
     }
   }

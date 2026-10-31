@@ -51,7 +51,11 @@ export class LogService {
       fs.mkdirSync(path.dirname(file), { recursive: true });
 
       if (fs.existsSync(file) && fs.statSync(file).size > MAX_LOG_FILE_BYTES) {
-        const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).slice(-MAX_LOG_HISTORY / 2);
+        const lines = fs
+          .readFileSync(file, 'utf8')
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .slice(-MAX_LOG_HISTORY / 2);
         fs.writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
       }
 
@@ -82,9 +86,9 @@ export class LogService {
     let logs = [...this.logHistory];
 
     if (filter === 'errors') {
-      logs = logs.filter(e => e.stream === 'error' || e.stream === 'stderr');
+      logs = logs.filter((e) => e.stream === 'error' || e.stream === 'stderr');
     } else if (filter === 'system') {
-      logs = logs.filter(e => e.stream === 'system');
+      logs = logs.filter((e) => e.stream === 'system');
     }
 
     return logs.slice(offset, offset + limit);
@@ -96,15 +100,15 @@ export class LogService {
     let logs = [...this.logHistory];
 
     if (filter === 'errors') {
-      logs = logs.filter(e => e.stream === 'error' || e.stream === 'stderr');
+      logs = logs.filter((e) => e.stream === 'error' || e.stream === 'stderr');
     } else if (filter === 'system') {
-      logs = logs.filter(e => e.stream === 'system');
+      logs = logs.filter((e) => e.stream === 'system');
     }
 
     if (timeRange) {
       const start = new Date(timeRange.start).getTime();
       const end = new Date(timeRange.end).getTime();
-      logs = logs.filter(e => {
+      logs = logs.filter((e) => {
         const time = new Date(e.time).getTime();
         return time >= start && time <= end;
       });
@@ -112,9 +116,8 @@ export class LogService {
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      logs = logs.filter(e =>
-        e.line.toLowerCase().includes(q) ||
-        e.stream.toLowerCase().includes(q)
+      logs = logs.filter(
+        (e) => e.line.toLowerCase().includes(q) || e.stream.toLowerCase().includes(q)
       );
     }
 
@@ -127,15 +130,15 @@ export class LogService {
     let logs = [...this.logHistory];
 
     if (filter === 'errors') {
-      logs = logs.filter(e => e.stream === 'error' || e.stream === 'stderr');
+      logs = logs.filter((e) => e.stream === 'error' || e.stream === 'stderr');
     } else if (filter === 'system') {
-      logs = logs.filter(e => e.stream === 'system');
+      logs = logs.filter((e) => e.stream === 'system');
     }
 
     if (timeRange) {
       const start = new Date(timeRange.start).getTime();
       const end = new Date(timeRange.end).getTime();
-      logs = logs.filter(e => {
+      logs = logs.filter((e) => {
         const time = new Date(e.time).getTime();
         return time >= start && time <= end;
       });
@@ -152,14 +155,20 @@ export class LogService {
         content = JSON.stringify(logs, null, 2);
         break;
       case 'csv':
-        content = 'id,time,stream,line\n' +
-          logs.map(e => `"${e.id}","${e.time}","${e.stream}","${e.line.replace(/"/g, '""')}"`).join('\n');
+        content =
+          'id,time,stream,line\n' +
+          logs
+            .map((e) => `"${e.id}","${e.time}","${e.stream}","${e.line.replace(/"/g, '""')}"`)
+            .join('\n');
         break;
       case 'txt':
       default:
-        content = logs.map(e =>
-          `${new Date(e.time).toLocaleTimeString([], { hour12: false })} [${e.stream.toUpperCase()}] ${e.line}`
-        ).join('\n');
+        content = logs
+          .map(
+            (e) =>
+              `${new Date(e.time).toLocaleTimeString([], { hour12: false })} [${e.stream.toUpperCase()}] ${e.line}`
+          )
+          .join('\n');
         break;
     }
 
@@ -184,8 +193,12 @@ export class LogService {
       const file = this.getLogFilePath();
       if (!fs.existsSync(file)) return [];
 
-      const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).slice(-MAX_LOG_HISTORY);
-      return lines.flatMap(line => {
+      const lines = fs
+        .readFileSync(file, 'utf8')
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .slice(-MAX_LOG_HISTORY);
+      return lines.flatMap((line) => {
         try {
           return [JSON.parse(line) as LogEntry];
         } catch {

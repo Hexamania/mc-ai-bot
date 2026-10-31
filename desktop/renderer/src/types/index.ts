@@ -125,7 +125,9 @@ export interface ElectronAPI {
   quitApp: () => Promise<void>;
   openExternal: (url: string) => Promise<void>;
   // Events
-  onLifecycle: (callback: (data: { status: string; detail: string; running: boolean }) => void) => void;
+  onLifecycle: (
+    callback: (data: { status: string; detail: string; running: boolean }) => void
+  ) => void;
   onLog: (callback: (entry: LogEntry) => void) => void;
   onBotState: (callback: (state: BotState) => void) => void;
   onDashboardReady: (callback: (data: { url: string }) => void) => void;

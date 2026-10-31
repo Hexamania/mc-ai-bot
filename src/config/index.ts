@@ -3,7 +3,15 @@
  * Loads configuration from environment variables with validation
  */
 
-import type { AppConfig, BotConfig, WebConfig, OpenAIConfig, MemoryConfig, AdminConfig, BotPrefixConfig } from '../types';
+import type {
+  AppConfig,
+  BotConfig,
+  WebConfig,
+  OpenAIConfig,
+  MemoryConfig,
+  AdminConfig,
+  BotPrefixConfig,
+} from '../types';
 
 /**
  * Load and validate configuration from environment variables
@@ -101,7 +109,7 @@ export function getConfig(): AppConfig {
     const errors = validateConfig(configInstance);
     if (errors.length > 0) {
       console.error('[CONFIG] Configuration errors:');
-      errors.forEach(err => console.error(`  - ${err}`));
+      errors.forEach((err) => console.error(`  - ${err}`));
     }
   }
   return configInstance;

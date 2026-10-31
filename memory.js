@@ -1,7 +1,7 @@
-const fs = require("node:fs")
-const path = require("node:path")
+const fs = require('node:fs');
+const path = require('node:path');
 
-const MEMORY_FILE = process.env.MEMORY_FILE || path.join(__dirname, "memory.json")
+const MEMORY_FILE = process.env.MEMORY_FILE || path.join(__dirname, 'memory.json');
 
 function createDefaultMemory() {
   return {
@@ -10,63 +10,61 @@ function createDefaultMemory() {
     players: {},
     currentTask: null,
     rules: [],
-    learnedFacts: {}
-  }
+    learnedFacts: {},
+  };
 }
 
 function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function normalizeMemory(value) {
-  if (!isRecord(value)) return createDefaultMemory()
+  if (!isRecord(value)) return createDefaultMemory();
 
   return {
     schemaVersion: 1,
     locations: isRecord(value.locations) ? value.locations : {},
     players: isRecord(value.players) ? value.players : {},
     currentTask: isRecord(value.currentTask) ? value.currentTask : null,
-    rules: Array.isArray(value.rules)
-      ? value.rules.filter(rule => typeof rule === "string")
-      : [],
-    learnedFacts: isRecord(value.learnedFacts) ? value.learnedFacts : {}
-  }
+    rules: Array.isArray(value.rules) ? value.rules.filter((rule) => typeof rule === 'string') : [],
+    learnedFacts: isRecord(value.learnedFacts) ? value.learnedFacts : {},
+  };
 }
 
 function loadMemory(filePath = MEMORY_FILE) {
-  if (process.env.ENABLE_MEMORY !== "true") return createDefaultMemory()
+  if (process.env.ENABLE_MEMORY !== 'true') return createDefaultMemory();
 
   try {
-    if (!fs.existsSync(filePath)) return createDefaultMemory()
-    return normalizeMemory(JSON.parse(fs.readFileSync(filePath, "utf8")))
+    if (!fs.existsSync(filePath)) return createDefaultMemory();
+    return normalizeMemory(JSON.parse(fs.readFileSync(filePath, 'utf8')));
   } catch (error) {
-    console.error(`[MEMORY-ERR] Could not load memory file: ${error.message}`)
-    return createDefaultMemory()
+    console.error(`[MEMORY-ERR] Could not load memory file: ${error.message}`);
+    return createDefaultMemory();
   }
 }
 
 function saveMemory(data, filePath = MEMORY_FILE) {
-  if (process.env.ENABLE_MEMORY !== "true") return false
-  if (!isRecord(data)) throw new TypeError("Memory data must be an object")
+  if (process.env.ENABLE_MEMORY !== 'true') return false;
+  if (!isRecord(data)) throw new TypeError('Memory data must be an object');
 
-  const normalized = normalizeMemory(data)
-  const temporaryPath = `${filePath}.${process.pid}.tmp`
+  const normalized = normalizeMemory(data);
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(temporaryPath, `${JSON.stringify(normalized, null, 2)}\n`, "utf8")
-    fs.renameSync(temporaryPath, filePath)
+    fs.writeFileSync(temporaryPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+    fs.renameSync(temporaryPath, filePath);
   } catch (error) {
     try {
-      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath)
+      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
     } catch (cleanupError) {
-      console.error(`[MEMORY-ERR] Could not remove temporary memory file: ${cleanupError.message}`)
+      console.error(`[MEMORY-ERR] Could not remove temporary memory file: ${cleanupError.message}`);
     }
-    throw error
+    throw error;
   }
-  return true
+  return true;
 }
 
 module.exports = {
   createDefaultMemory,
   loadMemory,
-  saveMemory
-}
+  saveMemory,
+};

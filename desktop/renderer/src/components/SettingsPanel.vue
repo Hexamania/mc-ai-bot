@@ -33,14 +33,9 @@ function getStorageNote() {
 </script>
 
 <template>
-  <form
-    class="settings-form"
-    @submit="handleSubmit"
-  >
+  <form class="settings-form" @submit="handleSubmit">
     <div class="form-section">
-      <h3 class="section-title">
-        Server Connection
-      </h3>
+      <h3 class="section-title">Server Connection</h3>
 
       <div class="form-field">
         <label for="host">Server Address <span class="required">*</span></label>
@@ -51,7 +46,7 @@ function getStorageNote() {
           placeholder="mc.example.com"
           autocomplete="off"
           @blur="settingsStore.clearError"
-        >
+        />
       </div>
 
       <div class="form-row">
@@ -65,7 +60,7 @@ function getStorageNote() {
             max="65535"
             placeholder="25565"
             @blur="settingsStore.clearError"
-          >
+          />
         </div>
 
         <div class="form-field">
@@ -78,7 +73,7 @@ function getStorageNote() {
             placeholder="Airi"
             autocomplete="off"
             @blur="settingsStore.clearError"
-          >
+          />
         </div>
       </div>
 
@@ -91,14 +86,12 @@ function getStorageNote() {
           placeholder="1.21.1"
           autocomplete="off"
           @blur="settingsStore.clearError"
-        >
+        />
       </div>
     </div>
 
     <div class="form-section">
-      <h3 class="section-title">
-        Dashboard & AI
-      </h3>
+      <h3 class="section-title">Dashboard & AI</h3>
 
       <div class="form-field">
         <label for="webPort">Dashboard Port <span class="optional">Local only</span></label>
@@ -110,7 +103,7 @@ function getStorageNote() {
           max="65535"
           placeholder="3000"
           @blur="settingsStore.clearError"
-        >
+        />
       </div>
 
       <div class="form-field">
@@ -122,20 +115,15 @@ function getStorageNote() {
           placeholder="sk-..."
           autocomplete="new-password"
           @blur="settingsStore.clearError"
-        >
+        />
       </div>
     </div>
 
     <div class="form-section">
-      <h3 class="section-title">
-        Features
-      </h3>
+      <h3 class="section-title">Features</h3>
 
       <label class="toggle-field">
-        <input
-          v-model="form.enableMemory"
-          type="checkbox"
-        >
+        <input v-model="form.enableMemory" type="checkbox" />
         <div class="toggle-track">
           <span class="toggle-thumb" />
         </div>
@@ -146,25 +134,15 @@ function getStorageNote() {
       </label>
     </div>
 
-    <div
-      v-if="validationErrors.length > 0"
-      class="form-errors"
-    >
+    <div v-if="validationErrors.length > 0" class="form-errors">
       <ul>
-        <li
-          v-for="error in validationErrors"
-          :key="error"
-        >
+        <li v-for="error in validationErrors" :key="error">
           {{ error }}
         </li>
       </ul>
     </div>
 
-    <button
-      type="submit"
-      class="btn btn--primary btn--save"
-      :disabled="!isValid || isSaving"
-    >
+    <button type="submit" class="btn btn--primary btn--save" :disabled="!isValid || isSaving">
       <span>{{ isSaving ? 'Saving...' : 'Save Settings' }}</span>
       <span class="btn-arrow">→</span>
     </button>
@@ -226,7 +204,10 @@ function getStorageNote() {
 
 .optional {
   color: #67768d;
-  font: 8px "Cascadia Code", Consolas, monospace;
+  font:
+    8px 'Cascadia Code',
+    Consolas,
+    monospace;
   letter-spacing: 0.08em;
   font-weight: normal;
 }
@@ -242,7 +223,10 @@ function getStorageNote() {
   color: #e6edf7;
   font-size: 12px;
   font-family: inherit;
-  transition: border 0.2s, box-shadow 0.2s, background 0.2s;
+  transition:
+    border 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
 }
 
 .form-field input:focus {
@@ -279,7 +263,9 @@ function getStorageNote() {
   border: 1px solid #38445a;
   border-radius: 22px;
   background: #151d2a;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
   flex-shrink: 0;
 }
 
@@ -288,7 +274,9 @@ function getStorageNote() {
   height: 12px;
   border-radius: 50%;
   background: #7c8797;
-  transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.2s;
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1),
+    background 0.2s;
 }
 
 .toggle-field > input:checked + .toggle-track {
@@ -356,7 +344,12 @@ function getStorageNote() {
   font-size: 11px;
   font-weight: 700;
   font-family: inherit;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
+  transition:
+    transform 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s,
+    opacity 0.15s;
 }
 
 .btn:hover:not(:disabled) {
@@ -374,13 +367,17 @@ function getStorageNote() {
 
 .btn--primary {
   background: linear-gradient(105deg, #87f0cd, #77cfe7);
-  box-shadow: 0 6px 20px rgba(98, 219, 186, 0.22), inset 0 1px rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 6px 20px rgba(98, 219, 186, 0.22),
+    inset 0 1px rgba(255, 255, 255, 0.4);
   color: #081610;
   border-color: transparent;
 }
 
 .btn--primary:hover:not(:disabled) {
-  box-shadow: 0 8px 24px rgba(98, 219, 186, 0.35), inset 0 1px rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 8px 24px rgba(98, 219, 186, 0.35),
+    inset 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .btn-arrow {

@@ -1,7 +1,7 @@
 # Airi OS Docker Compose
 # Use for development and production deployments
 
-version: '3.8'
+version: "3.8"
 
 services:
   # Main bot service

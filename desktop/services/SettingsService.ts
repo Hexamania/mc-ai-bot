@@ -35,8 +35,10 @@ export class SettingsService {
 
   constructor() {
     // Detect portable mode
-    const executableDirectory = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
-    this.portableMode = process.env.AIRIOS_PORTABLE === '1' ||
+    const executableDirectory =
+      process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+    this.portableMode =
+      process.env.AIRIOS_PORTABLE === '1' ||
       Boolean(process.env.PORTABLE_EXECUTABLE_DIR) ||
       fs.existsSync(path.join(executableDirectory, 'portable.txt'));
 
@@ -88,9 +90,12 @@ export class SettingsService {
     if (!Number.isInteger(config.webPort) || config.webPort < 1 || config.webPort > 65535) {
       throw new Error('Dashboard port must be between 1 and 65535.');
     }
-    if (config.port === config.webPort) throw new Error('Minecraft and dashboard ports must be different.');
+    if (config.port === config.webPort)
+      throw new Error('Minecraft and dashboard ports must be different.');
     if (config.openaiKey && !safeStorage.isEncryptionAvailable()) {
-      throw new Error('Secure Windows storage is unavailable, so the API key cannot be saved safely.');
+      throw new Error(
+        'Secure Windows storage is unavailable, so the API key cannot be saved safely.'
+      );
     }
 
     return config;
@@ -111,7 +116,9 @@ export class SettingsService {
       this.userConfig = { ...DEFAULTS, ...stored, openaiKey };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(`Could not read desktop settings: ${(error as Error).stack || (error as Error).message}`);
+        console.error(
+          `Could not read desktop settings: ${(error as Error).stack || (error as Error).message}`
+        );
       }
       this.userConfig = { ...DEFAULTS };
     }

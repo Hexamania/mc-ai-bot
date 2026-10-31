@@ -1,256 +1,429 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#090d16">
-    <meta name="description" content="Airi OS Dashboard - Minecraft Bot Control Center">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090d16" />
+    <meta name="description" content="Airi OS Dashboard - Minecraft Bot Control Center" />
     <title>Airi OS Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
     <div class="app-shell" id="app">
-        <!-- Error Boundary Fallback -->
-        <div id="error-boundary" class="error-boundary hidden" role="alert" aria-live="assertive">
-            <div class="error-content">
-                <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <h2>Something went wrong</h2>
-                <p id="error-message">An unexpected error occurred.</p>
-                <div class="error-actions">
-                    <button class="btn btn-primary" onclick="location.reload()">Reload Dashboard</button>
-                    <button class="btn btn-secondary" id="error-details-btn">Show Details</button>
-                </div>
-                <details id="error-details" class="error-details hidden">
-                    <summary>Error Details</summary>
-                    <pre id="error-stack"></pre>
-                </details>
-            </div>
+      <!-- Error Boundary Fallback -->
+      <div id="error-boundary" class="error-boundary hidden" role="alert" aria-live="assertive">
+        <div class="error-content">
+          <svg
+            class="error-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <h2>Something went wrong</h2>
+          <p id="error-message">An unexpected error occurred.</p>
+          <div class="error-actions">
+            <button class="btn btn-primary" onclick="location.reload()">Reload Dashboard</button>
+            <button class="btn btn-secondary" id="error-details-btn">Show Details</button>
+          </div>
+          <details id="error-details" class="error-details hidden">
+            <summary>Error Details</summary>
+            <pre id="error-stack"></pre>
+          </details>
         </div>
+      </div>
 
-        <!-- Loading State -->
-        <div id="loading-overlay" class="loading-overlay" role="status" aria-live="polite">
-            <div class="loading-spinner" aria-hidden="true"></div>
-            <p>Initializing Dashboard...</p>
+      <!-- Loading State -->
+      <div id="loading-overlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <p>Initializing Dashboard...</p>
+      </div>
+
+      <header class="header" role="banner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="48" height="48" rx="12" fill="url(#brandGradient)" />
+              <path
+                d="M16 14L24 22L32 14"
+                stroke="white"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <defs>
+                <linearGradient id="brandGradient" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#78e3bd" />
+                  <stop offset="100%" stop-color="#4cb896" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>Airi OS Dashboard</h1>
+            <p class="subtitle">Minecraft Bot Control Center</p>
+          </div>
         </div>
+        <div class="header-right">
+          <div
+            id="bot-status"
+            class="status-pill connecting"
+            role="status"
+            aria-live="polite"
+            aria-label="Bot connection status"
+          >
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-text">Connecting...</span>
+          </div>
+          <div id="coords" class="coords" aria-label="Bot coordinates">X: 0, Y: 0, Z: 0</div>
+          <div id="connection-indicator" class="connection-indicator" aria-label="WebSocket connection status">
+            <span class="ws-dot" aria-hidden="true"></span>
+            <span class="ws-text">WS: Connecting</span>
+          </div>
+        </div>
+      </header>
 
-        <header class="header" role="banner">
-            <div class="brand">
-                <div class="brand-mark" aria-hidden="true">
-                    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="48" height="48" rx="12" fill="url(#brandGradient)"/>
-                        <path d="M16 14L24 22L32 14" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                        <defs>
-                            <linearGradient id="brandGradient" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-                                <stop offset="0%" stop-color="#78e3bd"/>
-                                <stop offset="100%" stop-color="#4cb896"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
-                </div>
-                <div class="brand-text">
-                    <h1>Airi OS Dashboard</h1>
-                    <p class="subtitle">Minecraft Bot Control Center</p>
-                </div>
+      <main class="layout" role="main">
+        <!-- Left Panel: Vitals & Inventory -->
+        <aside class="panel panel-left" aria-label="Bot vitals and inventory">
+          <section class="card" id="vitals-card" aria-labelledby="vitals-heading">
+            <header class="card-header">
+              <h2 id="vitals-heading" class="section-heading">Bot Vitals <span class="section-kicker">Live</span></h2>
+            </header>
+            <div class="card-content" id="vitals-content">
+              <!-- Vitals component will render here -->
             </div>
-            <div class="header-right">
-                <div id="bot-status" class="status-pill connecting" role="status" aria-live="polite" aria-label="Bot connection status">
-                    <span class="status-dot" aria-hidden="true"></span>
-                    <span id="status-text">Connecting...</span>
-                </div>
-                <div id="coords" class="coords" aria-label="Bot coordinates">X: 0, Y: 0, Z: 0</div>
-                <div id="connection-indicator" class="connection-indicator" aria-label="WebSocket connection status">
-                    <span class="ws-dot" aria-hidden="true"></span>
-                    <span class="ws-text">WS: Connecting</span>
-                </div>
+          </section>
+
+          <section class="card" id="inventory-card" aria-labelledby="inventory-heading">
+            <header class="card-header">
+              <h2 id="inventory-heading" class="section-heading">
+                Inventory <span id="inventory-count" class="section-kicker">0 stacks</span>
+              </h2>
+            </header>
+            <div class="card-content" id="inventory-content">
+              <!-- Inventory component will render here -->
             </div>
-        </header>
+            <p class="inventory-caption">Hover over a slot to see the full item name and count.</p>
+          </section>
+        </aside>
 
-        <main class="layout" role="main">
-            <!-- Left Panel: Vitals & Inventory -->
-            <aside class="panel panel-left" aria-label="Bot vitals and inventory">
-                <section class="card" id="vitals-card" aria-labelledby="vitals-heading">
-                    <header class="card-header">
-                        <h2 id="vitals-heading" class="section-heading">Bot Vitals <span class="section-kicker">Live</span></h2>
-                    </header>
-                    <div class="card-content" id="vitals-content">
-                        <!-- Vitals component will render here -->
-                    </div>
-                </section>
+        <!-- Center Panel: Console, Commands, Favorites, Build, Settings -->
+        <section class="panel panel-center" aria-label="Main dashboard controls">
+          <div class="card main-card" id="main-card">
+            <nav class="tabs" id="main-tabs" aria-label="Dashboard sections" role="tablist">
+              <button
+                class="tab-btn active"
+                role="tab"
+                aria-selected="true"
+                aria-controls="console-panel"
+                id="tab-console"
+                data-tab="console"
+              >
+                Console
+              </button>
+              <button
+                class="tab-btn"
+                role="tab"
+                aria-selected="false"
+                aria-controls="commands-panel"
+                id="tab-commands"
+                data-tab="commands"
+              >
+                Commands
+              </button>
+              <button
+                class="tab-btn"
+                role="tab"
+                aria-selected="false"
+                aria-controls="favorites-panel"
+                id="tab-favorites"
+                data-tab="favorites"
+              >
+                Favorites
+              </button>
+              <button
+                class="tab-btn"
+                role="tab"
+                aria-selected="false"
+                aria-controls="build-panel"
+                id="tab-build"
+                data-tab="build"
+              >
+                Build
+              </button>
+              <button
+                class="tab-btn"
+                role="tab"
+                aria-selected="false"
+                aria-controls="settings-panel"
+                id="tab-settings"
+                data-tab="settings"
+              >
+                Settings
+              </button>
+            </nav>
 
-                <section class="card" id="inventory-card" aria-labelledby="inventory-heading">
-                    <header class="card-header">
-                        <h2 id="inventory-heading" class="section-heading">Inventory <span id="inventory-count" class="section-kicker">0 stacks</span></h2>
-                    </header>
-                    <div class="card-content" id="inventory-content">
-                        <!-- Inventory component will render here -->
-                    </div>
-                    <p class="inventory-caption">Hover over a slot to see the full item name and count.</p>
-                </section>
-            </aside>
+            <!-- Console Tab -->
+            <div
+              class="tab-content active"
+              id="console-panel"
+              role="tabpanel"
+              aria-labelledby="tab-console"
+              hidden="false"
+            >
+              <div
+                id="logs"
+                class="log-box"
+                role="log"
+                aria-live="polite"
+                aria-relevant="additions"
+                aria-label="Console output"
+              ></div>
+              <div class="console-toolbar">
+                <button class="btn btn-secondary btn-sm" id="clear-logs" aria-label="Clear console logs">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    width="16"
+                    height="16"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                    ></path>
+                  </svg>
+                  Clear
+                </button>
+                <button
+                  class="btn btn-secondary btn-sm"
+                  id="toggle-auto-scroll"
+                  aria-label="Toggle auto-scroll"
+                  aria-pressed="true"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    width="16"
+                    height="16"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                  Auto-scroll: On
+                </button>
+                <span class="log-stats" aria-live="polite"> <span id="log-count">0</span> lines </span>
+              </div>
+              <div class="input-row">
+                <input
+                  type="text"
+                  id="chat-input"
+                  placeholder="Send server command or chat..."
+                  aria-label="Chat or server command"
+                  autocomplete="off"
+                />
+                <button class="btn btn-primary" id="send-chat" aria-label="Send message">Send</button>
+              </div>
+            </div>
 
-            <!-- Center Panel: Console, Commands, Favorites, Build, Settings -->
-            <section class="panel panel-center" aria-label="Main dashboard controls">
-                <div class="card main-card" id="main-card">
-                    <nav class="tabs" id="main-tabs" aria-label="Dashboard sections" role="tablist">
-                        <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="console-panel" id="tab-console" data-tab="console">Console</button>
-                        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="commands-panel" id="tab-commands" data-tab="commands">Commands</button>
-                        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="favorites-panel" id="tab-favorites" data-tab="favorites">Favorites</button>
-                        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="build-panel" id="tab-build" data-tab="build">Build</button>
-                        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="settings-panel" id="tab-settings" data-tab="settings">Settings</button>
-                    </nav>
-
-                    <!-- Console Tab -->
-                    <div class="tab-content active" id="console-panel" role="tabpanel" aria-labelledby="tab-console" hidden="false">
-                        <div id="logs" class="log-box" role="log" aria-live="polite" aria-relevant="additions" aria-label="Console output"></div>
-                        <div class="console-toolbar">
-                            <button class="btn btn-secondary btn-sm" id="clear-logs" aria-label="Clear console logs">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                Clear
-                            </button>
-                            <button class="btn btn-secondary btn-sm" id="toggle-auto-scroll" aria-label="Toggle auto-scroll" aria-pressed="true">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                                Auto-scroll: On
-                            </button>
-                            <span class="log-stats" aria-live="polite">
-                                <span id="log-count">0</span> lines
-                            </span>
-                        </div>
-                        <div class="input-row">
-                            <input type="text" id="chat-input" placeholder="Send server command or chat..." aria-label="Chat or server command" autocomplete="off">
-                            <button class="btn btn-primary" id="send-chat" aria-label="Send message">Send</button>
-                        </div>
-                    </div>
-
-                    <!-- Commands Tab -->
-                    <div class="tab-content" id="commands-panel" role="tabpanel" aria-labelledby="tab-commands" hidden="true">
-                        <section class="command-section">
-                            <h3 class="tab-title">Movement & Navigation</h3>
-                            <div class="button-grid" id="movement-commands"></div>
-                        </section>
-                        <hr class="divider">
-                        <section class="command-section">
-                            <h3 class="tab-title">Mining Operations</h3>
-                            <p class="hint">Mine up to 512 blocks using offsets relative to the bot's current position.</p>
-                            <div class="triple-input">
-                                <input type="number" id="mine-x" placeholder="X offset" aria-label="X offset" step="1" min="-256" max="256">
-                                <input type="number" id="mine-y" placeholder="Y offset" aria-label="Y offset" step="1" min="-256" max="256">
-                                <input type="number" id="mine-z" placeholder="Z offset" aria-label="Z offset" step="1" min="-256" max="256">
-                            </div>
-                            <button class="btn btn-primary btn-block" style="margin-top:8px" id="execute-mine-area">Execute Mine Area</button>
-                        </section>
-                        <hr class="divider">
-                        <section class="command-section">
-                            <h3 class="tab-title">Manual Navigation</h3>
-                            <p class="hint">Enter target block coordinates to send the bot there.</p>
-                            <div class="input-row">
-                                <input type="text" id="goto-coords" placeholder="X Y Z" aria-label="Target coordinates" autocomplete="off">
-                                <button class="btn btn-primary" id="go-to-coords">Go</button>
-                            </div>
-                        </section>
-                        <hr class="divider">
-                        <section class="command-section">
-                            <h3 class="tab-title">Quick Actions</h3>
-                            <div class="button-grid" id="quick-commands"></div>
-                        </section>
-                        <hr class="divider">
-                        <section class="command-section">
-                            <h3 class="tab-title">Custom Command</h3>
-                            <p class="hint">Execute any registered bot command with arguments.</p>
-                            <div class="input-row">
-                                <input type="text" id="custom-command" placeholder="Command name" aria-label="Command name" autocomplete="off">
-                                <input type="text" id="custom-args" placeholder="Arguments (space separated)" aria-label="Command arguments" autocomplete="off">
-                                <button class="btn btn-primary" id="execute-custom">Execute</button>
-                            </div>
-                        </section>
-                    </div>
-
-                    <!-- Favorites Tab -->
-                    <div class="tab-content" id="favorites-panel" role="tabpanel" aria-labelledby="tab-favorites" hidden="true">
-                        <div id="fav-list" class="poi-list" aria-label="Saved locations"></div>
-                        <div class="input-group">
-                            <input type="text" id="fav-name" placeholder="Favorite location name" aria-label="Favorite location name" autocomplete="off">
-                            <button class="btn btn-primary btn-block" id="save-current-loc">Save Current Location</button>
-                        </div>
-                    </div>
-
-                    <!-- Build Tab -->
-                    <div class="tab-content" id="build-panel" role="tabpanel" aria-labelledby="tab-build" hidden="true">
-                        <section class="command-section">
-                            <h3 class="tab-title">Pre-defined Structures</h3>
-                            <div class="build-buttons" id="structure-buttons"></div>
-                        </section>
-                        <hr class="divider">
-                        <section class="command-section">
-                            <h3 class="tab-title">Custom Schematic (.json)</h3>
-                            <p class="hint">Upload a JSON block list containing relative x, y, z offsets and block types.</p>
-                            <input type="file" id="schematic-file" class="file-input" accept=".json" aria-label="Schematic JSON file">
-                            <button class="btn btn-primary btn-block" style="margin-top:8px" id="load-schematic">Build Custom JSON</button>
-                            <p class="hint" style="margin-top:12px">Make sure the bot has building blocks in its inventory.</p>
-                        </section>
-                    </div>
-
-                    <!-- Settings Tab -->
-                    <div class="tab-content" id="settings-panel" role="tabpanel" aria-labelledby="tab-settings" hidden="true">
-                        <section class="command-section">
-                            <h3 class="tab-title">Bot Behavior</h3>
-                            <div class="settings-grid" id="bot-settings"></div>
-                        </section>
-                        <hr class="divider">
-                        <section class="command-section">
-                            <h3 class="tab-title">Display</h3>
-                            <div class="settings-grid" id="display-settings"></div>
-                        </section>
-                        <hr class="divider">
-                        <section class="command-section">
-                            <h3 class="tab-title">Dashboard</h3>
-                            <div class="settings-grid" id="dashboard-settings"></div>
-                        </section>
-                    </div>
+            <!-- Commands Tab -->
+            <div class="tab-content" id="commands-panel" role="tabpanel" aria-labelledby="tab-commands" hidden="true">
+              <section class="command-section">
+                <h3 class="tab-title">Movement & Navigation</h3>
+                <div class="button-grid" id="movement-commands"></div>
+              </section>
+              <hr class="divider" />
+              <section class="command-section">
+                <h3 class="tab-title">Mining Operations</h3>
+                <p class="hint">Mine up to 512 blocks using offsets relative to the bot's current position.</p>
+                <div class="triple-input">
+                  <input
+                    type="number"
+                    id="mine-x"
+                    placeholder="X offset"
+                    aria-label="X offset"
+                    step="1"
+                    min="-256"
+                    max="256"
+                  />
+                  <input
+                    type="number"
+                    id="mine-y"
+                    placeholder="Y offset"
+                    aria-label="Y offset"
+                    step="1"
+                    min="-256"
+                    max="256"
+                  />
+                  <input
+                    type="number"
+                    id="mine-z"
+                    placeholder="Z offset"
+                    aria-label="Z offset"
+                    step="1"
+                    min="-256"
+                    max="256"
+                  />
                 </div>
-            </section>
+                <button class="btn btn-primary btn-block" style="margin-top: 8px" id="execute-mine-area">
+                  Execute Mine Area
+                </button>
+              </section>
+              <hr class="divider" />
+              <section class="command-section">
+                <h3 class="tab-title">Manual Navigation</h3>
+                <p class="hint">Enter target block coordinates to send the bot there.</p>
+                <div class="input-row">
+                  <input
+                    type="text"
+                    id="goto-coords"
+                    placeholder="X Y Z"
+                    aria-label="Target coordinates"
+                    autocomplete="off"
+                  />
+                  <button class="btn btn-primary" id="go-to-coords">Go</button>
+                </div>
+              </section>
+              <hr class="divider" />
+              <section class="command-section">
+                <h3 class="tab-title">Quick Actions</h3>
+                <div class="button-grid" id="quick-commands"></div>
+              </section>
+              <hr class="divider" />
+              <section class="command-section">
+                <h3 class="tab-title">Custom Command</h3>
+                <p class="hint">Execute any registered bot command with arguments.</p>
+                <div class="input-row">
+                  <input
+                    type="text"
+                    id="custom-command"
+                    placeholder="Command name"
+                    aria-label="Command name"
+                    autocomplete="off"
+                  />
+                  <input
+                    type="text"
+                    id="custom-args"
+                    placeholder="Arguments (space separated)"
+                    aria-label="Command arguments"
+                    autocomplete="off"
+                  />
+                  <button class="btn btn-primary" id="execute-custom">Execute</button>
+                </div>
+              </section>
+            </div>
 
-            <!-- Right Panel: Equipment, Connection, Stats -->
-            <aside class="panel panel-right" aria-label="Equipment and connection info">
-                <section class="card" id="equipment-card" aria-labelledby="equipment-heading">
-                    <header class="card-header">
-                        <h2 id="equipment-heading" class="section-heading">Equipment <span class="section-kicker">Worn</span></h2>
-                    </header>
-                    <div class="card-content" id="equipment-content">
-                        <!-- Equipment component will render here -->
-                    </div>
-                </section>
+            <!-- Favorites Tab -->
+            <div class="tab-content" id="favorites-panel" role="tabpanel" aria-labelledby="tab-favorites" hidden="true">
+              <div id="fav-list" class="poi-list" aria-label="Saved locations"></div>
+              <div class="input-group">
+                <input
+                  type="text"
+                  id="fav-name"
+                  placeholder="Favorite location name"
+                  aria-label="Favorite location name"
+                  autocomplete="off"
+                />
+                <button class="btn btn-primary btn-block" id="save-current-loc">Save Current Location</button>
+              </div>
+            </div>
 
-                <section class="card" id="connection-card" aria-labelledby="connection-heading">
-                    <header class="card-header">
-                        <h2 id="connection-heading" class="section-heading">Connection <span class="section-kicker">Status</span></h2>
-                    </header>
-                    <div class="card-content" id="connection-content">
-                        <!-- Connection component will render here -->
-                    </div>
-                </section>
+            <!-- Build Tab -->
+            <div class="tab-content" id="build-panel" role="tabpanel" aria-labelledby="tab-build" hidden="true">
+              <section class="command-section">
+                <h3 class="tab-title">Pre-defined Structures</h3>
+                <div class="build-buttons" id="structure-buttons"></div>
+              </section>
+              <hr class="divider" />
+              <section class="command-section">
+                <h3 class="tab-title">Custom Schematic (.json)</h3>
+                <p class="hint">Upload a JSON block list containing relative x, y, z offsets and block types.</p>
+                <input
+                  type="file"
+                  id="schematic-file"
+                  class="file-input"
+                  accept=".json"
+                  aria-label="Schematic JSON file"
+                />
+                <button class="btn btn-primary btn-block" style="margin-top: 8px" id="load-schematic">
+                  Build Custom JSON
+                </button>
+                <p class="hint" style="margin-top: 12px">Make sure the bot has building blocks in its inventory.</p>
+              </section>
+            </div>
 
-                <section class="card" id="stats-card" aria-labelledby="stats-heading">
-                    <header class="card-header">
-                        <h2 id="stats-heading" class="section-heading">Statistics <span class="section-kicker">Session</span></h2>
-                    </header>
-                    <div class="card-content" id="stats-content">
-                        <!-- Stats component will render here -->
-                    </div>
-                </section>
-            </aside>
-        </main>
+            <!-- Settings Tab -->
+            <div class="tab-content" id="settings-panel" role="tabpanel" aria-labelledby="tab-settings" hidden="true">
+              <section class="command-section">
+                <h3 class="tab-title">Bot Behavior</h3>
+                <div class="settings-grid" id="bot-settings"></div>
+              </section>
+              <hr class="divider" />
+              <section class="command-section">
+                <h3 class="tab-title">Display</h3>
+                <div class="settings-grid" id="display-settings"></div>
+              </section>
+              <hr class="divider" />
+              <section class="command-section">
+                <h3 class="tab-title">Dashboard</h3>
+                <div class="settings-grid" id="dashboard-settings"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right Panel: Equipment, Connection, Stats -->
+        <aside class="panel panel-right" aria-label="Equipment and connection info">
+          <section class="card" id="equipment-card" aria-labelledby="equipment-heading">
+            <header class="card-header">
+              <h2 id="equipment-heading" class="section-heading">Equipment <span class="section-kicker">Worn</span></h2>
+            </header>
+            <div class="card-content" id="equipment-content">
+              <!-- Equipment component will render here -->
+            </div>
+          </section>
+
+          <section class="card" id="connection-card" aria-labelledby="connection-heading">
+            <header class="card-header">
+              <h2 id="connection-heading" class="section-heading">
+                Connection <span class="section-kicker">Status</span>
+              </h2>
+            </header>
+            <div class="card-content" id="connection-content">
+              <!-- Connection component will render here -->
+            </div>
+          </section>
+
+          <section class="card" id="stats-card" aria-labelledby="stats-heading">
+            <header class="card-header">
+              <h2 id="stats-heading" class="section-heading">Statistics <span class="section-kicker">Session</span></h2>
+            </header>
+            <div class="card-content" id="stats-content">
+              <!-- Stats component will render here -->
+            </div>
+          </section>
+        </aside>
+      </main>
     </div>
 
     <!-- Socket.io client -->
     <script src="/socket.io/socket.io.js"></script>
     <!-- Main entry point -->
     <script type="module" src="main.js"></script>
-</body>
+  </body>
 </html>

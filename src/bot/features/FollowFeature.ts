@@ -4,12 +4,10 @@
  */
 
 import type { Player } from 'mineflayer';
-import { Bot } from 'mineflayer';
 import type { Entity } from 'prismarine-entity';
 import { goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
 
 /**
  * Follow feature configuration
@@ -65,8 +63,6 @@ export class FollowFeature extends BaseFeature {
    * Initialize the follow feature
    */
   protected async onEnable(): Promise<void> {
-    const bot = this.getBot();
-
     // Set up event listeners
     this.setupEventListeners();
 
@@ -105,7 +101,7 @@ export class FollowFeature extends BaseFeature {
     bot.on('entityGone', (entity: Entity) => {
       if (this.targetEntity && entity.id === this.targetEntity.id) {
         console.log(`[FollowFeature] Target entity ${this.followTarget} gone, stopping follow`);
-        this.stopFollowing();
+        void this.stopFollowing();
       }
     });
 
@@ -113,13 +109,13 @@ export class FollowFeature extends BaseFeature {
     bot.on('playerLeft', (player: Player) => {
       if (this.followTarget && player.username === this.followTarget) {
         console.log(`[FollowFeature] Target player ${this.followTarget} left, stopping follow`);
-        this.stopFollowing();
+        void this.stopFollowing();
       }
     });
 
     // Death event - stop following
     bot.on('death', () => {
-      this.stopFollowing();
+      void this.stopFollowing();
     });
 
     // Physics tick to monitor distance
@@ -152,7 +148,7 @@ export class FollowFeature extends BaseFeature {
     }
 
     // Find the target player
-    const player = Object.values(bot.players).find(p => p.username === target);
+    const player = Object.values(bot.players).find((p) => p.username === target);
     if (!player?.entity) {
       console.warn(`[FollowFeature] Player ${target} not found or not loaded`);
       return false;
@@ -255,7 +251,9 @@ export class FollowFeature extends BaseFeature {
       const distance = bot.entity.position.distanceTo(this.targetEntity.position);
 
       if (distance > maxDistance) {
-        console.log(`[FollowFeature] Target too far (${distance.toFixed(1)} blocks), stopping follow`);
+        console.log(
+          `[FollowFeature] Target too far (${distance.toFixed(1)} blocks), stopping follow`
+        );
         if (this.getOption('stopOnOutOfRange', true)) {
           await this.stopFollowing();
           return;
@@ -264,8 +262,8 @@ export class FollowFeature extends BaseFeature {
 
       try {
         // Use movement feature to follow entity
-        if (movementFeature && typeof (movementFeature as any).followEntity === 'function') {
-          await (movementFeature as any).followEntity(this.targetEntity, range);
+        if (movementFeature && typeof movementFeature.followEntity === 'function') {
+          await movementFeature.followEntity(this.targetEntity, range);
         } else {
           // Fallback: use pathfinder directly with GoalFollow
           const goal = new goals.GoalFollow(this.targetEntity.id, range);
@@ -300,7 +298,9 @@ export class FollowFeature extends BaseFeature {
    */
   private emitStatus(distance?: number, range?: number): void {
     const bot = this.getBot();
-    const dist = distance ?? (this.targetEntity ? bot.entity.position.distanceTo(this.targetEntity.position) : 0);
+    const dist =
+      distance ??
+      (this.targetEntity ? bot.entity.position.distanceTo(this.targetEntity.position) : 0);
     const rng = range ?? this.getOption('defaultRange', 2);
 
     const status: FollowStatus = {
@@ -308,7 +308,7 @@ export class FollowFeature extends BaseFeature {
       target: this.followTarget,
       targetEntity: this.targetEntity,
       distance: dist,
-      range: rng
+      range: rng,
     };
 
     for (const listener of this.statusListeners) {
@@ -338,14 +338,16 @@ export class FollowFeature extends BaseFeature {
    */
   getStatus(): FollowStatus {
     const bot = this.getBot();
-    const distance = this.targetEntity ? bot.entity.position.distanceTo(this.targetEntity.position) : 0;
+    const distance = this.targetEntity
+      ? bot.entity.position.distanceTo(this.targetEntity.position)
+      : 0;
 
     return {
       following: this.isFollowing,
       target: this.followTarget,
       targetEntity: this.targetEntity,
       distance,
-      range: this.getOption('defaultRange', 2)
+      range: this.getOption('defaultRange', 2),
     };
   }
 

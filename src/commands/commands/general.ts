@@ -4,7 +4,6 @@
  */
 
 import type { CommandDefinition } from '../types';
-import { Bot } from 'mineflayer';
 
 /**
  * Ping command - check bot responsiveness
@@ -35,7 +34,9 @@ export const testCommand: CommandDefinition = {
   permission: { level: 'guest' },
   execute: async (context) => {
     context.reply('✅ Bot is active and connected.');
-    context.privateReply(`Bot: ${context.bot.username}\nHealth: ${context.bot.health}/20\nFood: ${context.bot.food}/20`);
+    context.privateReply(
+      `Bot: ${context.bot.username}\nHealth: ${context.bot.health}/20\nFood: ${context.bot.food}/20`
+    );
   },
 };
 
@@ -103,7 +104,9 @@ export const coordsCommand: CommandDefinition = {
       return;
     }
     const { x, y, z } = bot.entity.position;
-    context.reply(`📍 Current Location: X: ${Math.floor(x)}, Y: ${Math.floor(y)}, Z: ${Math.floor(z)}`);
+    context.reply(
+      `📍 Current Location: X: ${Math.floor(x)}, Y: ${Math.floor(y)}, Z: ${Math.floor(z)}`
+    );
   },
 };
 
@@ -121,12 +124,12 @@ export const versionCommand: CommandDefinition = {
     const bot = context.bot;
     context.privateReply(
       `🤖 **Airi Bot Version Info**\n` +
-      `Version: 1.0.0\n` +
-      `Minecraft: ${bot.game?.version || 'Unknown'}\n` +
-      `Protocol: ${bot._client?.protocolVersion || 'Unknown'}\n` +
-      `Node: ${process.version}\n` +
-      `Platform: ${process.platform}\n` +
-      `Uptime: ${Math.floor(process.uptime())}s`
+        `Version: 1.0.0\n` +
+        `Minecraft: ${bot.game?.version || 'Unknown'}\n` +
+        `Protocol: ${bot._client?.protocolVersion || 'Unknown'}\n` +
+        `Node: ${process.version}\n` +
+        `Platform: ${process.platform}\n` +
+        `Uptime: ${Math.floor(process.uptime())}s`
     );
   },
 };
@@ -142,9 +145,10 @@ export const uptimeCommand: CommandDefinition = {
   category: 'General',
   permission: { level: 'guest' },
   execute: async (context) => {
-    const bot = context.bot;
     // This would need to be tracked from spawn time
-    context.privateReply(`⏱️ Bot uptime tracking not implemented yet. Process uptime: ${Math.floor(process.uptime())}s`);
+    context.privateReply(
+      `⏱️ Bot uptime tracking not implemented yet. Process uptime: ${Math.floor(process.uptime())}s`
+    );
   },
 };
 
@@ -180,19 +184,27 @@ export const listCommand: CommandDefinition = {
           return;
         }
         const playerList = players
-          .map(p => `${p.username}${p.entity ? ` (${Math.floor(p.entity.position.distanceTo(bot.entity?.position || { x: 0, y: 0, z: 0 }))}m)` : ''}`)
+          .map(
+            (p) =>
+              `${p.username}${p.entity ? ` (${Math.floor(p.entity.position.distanceTo(bot.entity?.position || { x: 0, y: 0, z: 0 }))}m)` : ''}`
+          )
           .join('\n');
         context.privateReply(`👥 **Online Players (${players.length}):**\n${playerList}`);
         break;
       }
       case 'entities': {
         const entities = Object.values(bot.entities)
-          .filter(e => e !== bot.entity)
+          .filter((e) => e !== bot.entity)
           .slice(0, 20);
         const entityList = entities
-          .map(e => `${e.name || e.username || 'Unknown'} (${e.kind}) - ${Math.floor(e.position.distanceTo(bot.entity?.position || { x: 0, y: 0, z: 0 }))}m`)
+          .map(
+            (e) =>
+              `${e.name || e.username || 'Unknown'} (${e.kind}) - ${Math.floor(e.position.distanceTo(bot.entity?.position || { x: 0, y: 0, z: 0 }))}m`
+          )
           .join('\n');
-        context.privateReply(`👻 **Nearby Entities (${entities.length}):**\n${entityList || 'None'}`);
+        context.privateReply(
+          `👻 **Nearby Entities (${entities.length}):**\n${entityList || 'None'}`
+        );
         break;
       }
       case 'items': {
@@ -214,7 +226,7 @@ export const listCommand: CommandDefinition = {
           return;
         }
         const chestList = chests
-          .map(pos => `Chest at ${Math.floor(pos.x)}, ${Math.floor(pos.y)}, ${Math.floor(pos.z)}`)
+          .map((pos) => `Chest at ${Math.floor(pos.x)}, ${Math.floor(pos.y)}, ${Math.floor(pos.z)}`)
           .join('\n');
         context.privateReply(`📦 **Nearby Chests:**\n${chestList}`);
         break;

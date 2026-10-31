@@ -20,19 +20,18 @@ const invoke = <TRequest, TResponse>(channel: string, request?: TRequest): Promi
 };
 
 // Type-safe event listening
-const on = <T>(channel: string, listener: (event: Electron.IpcRendererEvent, payload: T) => void): (() => void) => {
+const on = <T>(
+  channel: string,
+  listener: (event: Electron.IpcRendererEvent, payload: T) => void
+): (() => void) => {
   ipcRenderer.on(channel, listener);
-  return () => ipcRenderer.off(channel, listener);
-};
-
-const once = <T>(channel: string, listener: (event: Electron.IpcRendererEvent, payload: T) => void): (() => void) => {
-  ipcRenderer.once(channel, listener);
   return () => ipcRenderer.off(channel, listener);
 };
 
 // Settings API
 const settings = {
-  get: () => invoke<void, Settings & { portableMode: boolean; dataDirectory: string }>('settings:get'),
+  get: () =>
+    invoke<void, Settings & { portableMode: boolean; dataDirectory: string }>('settings:get'),
   save: (config: Partial<Settings>) => invoke<Partial<Settings>, Settings>('settings:save', config),
 };
 
@@ -48,11 +47,14 @@ const bot = {
 const logs = {
   get: (query?: LogQuery) => invoke<LogQuery | undefined, LogEntry[]>('logs:get', query),
   search: (query: LogSearchQuery) => invoke<LogSearchQuery, LogEntry[]>('logs:search', query),
-  export: (options: LogExportOptions) => invoke<LogExportOptions, { path: string }>('logs:export', options),
+  export: (options: LogExportOptions) =>
+    invoke<LogExportOptions, { path: string }>('logs:export', options),
   clear: () => invoke<void, void>('logs:clear'),
   copy: (text: string) => invoke<string, void>('logs:copy', text),
-  onLog: (listener: (entry: LogEntry) => void) => on<LogEntry>('app:log', (_e, entry) => listener(entry)),
-  onBotState: (listener: (state: BotState) => void) => on<BotState>('app:bot-state', (_e, state) => listener(state)),
+  onLog: (listener: (entry: LogEntry) => void) =>
+    on<LogEntry>('app:log', (_e, entry) => listener(entry)),
+  onBotState: (listener: (state: BotState) => void) =>
+    on<BotState>('app:bot-state', (_e, state) => listener(state)),
 };
 
 // Updater API
@@ -77,7 +79,9 @@ const system = {
   quit: () => invoke<void, void>('system:quit'),
   openExternal: (url: string) => invoke<string, void>('shell:openExternal', url),
   onLifecycle: (listener: (status: { status: string; detail: string; running: boolean }) => void) =>
-    on<{ status: string; detail: string; running: boolean }>('app:lifecycle', (_e, payload) => listener(payload)),
+    on<{ status: string; detail: string; running: boolean }>('app:lifecycle', (_e, payload) =>
+      listener(payload)
+    ),
   onDashboardReady: (listener: (url: string) => void) =>
     on<{ url: string }>('app:dashboard-ready', (_e, payload) => listener(payload.url)),
 };
@@ -146,7 +150,9 @@ declare global {
         showWindow: () => Promise<void>;
         quit: () => Promise<void>;
         openExternal: (url: string) => Promise<void>;
-        onLifecycle: (listener: (status: { status: string; detail: string; running: boolean }) => void) => () => void;
+        onLifecycle: (
+          listener: (status: { status: string; detail: string; running: boolean }) => void
+        ) => () => void;
         onDashboardReady: (listener: (url: string) => void) => () => void;
       };
       clipboard: {

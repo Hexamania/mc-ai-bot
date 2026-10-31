@@ -9,9 +9,7 @@ import type {
   FactEntry,
   RuleEntry,
   QueryOptions,
-  SearchOptions} from './types';
-import {
-  ExtendedTaskInfo
+  SearchOptions,
 } from './types';
 
 /**
@@ -93,7 +91,7 @@ export class MemoryQuery<T> {
 
     // Apply field selection (projection)
     if (this.options.fields && this.options.fields.length > 0) {
-      results = results.map(item => {
+      results = results.map((item) => {
         const projected: Partial<T> = {};
         for (const field of this.options.fields!) {
           projected[field] = item[field];
@@ -162,8 +160,17 @@ export function queryRules(memory: MemoryData): MemoryQuery<RuleEntry> {
 /**
  * Search locations by text query
  */
-export function searchLocations(memory: MemoryData, options: SearchOptions): ExtendedLocationInfo[] {
-  const { query, fields = ['type', 'description'], caseSensitive = false, fuzzy = false, limit = 50 } = options;
+export function searchLocations(
+  memory: MemoryData,
+  options: SearchOptions
+): ExtendedLocationInfo[] {
+  const {
+    query,
+    fields = ['type', 'description'],
+    caseSensitive = false,
+    fuzzy = false,
+    limit = 50,
+  } = options;
   const searchTerm = caseSensitive ? query : query.toLowerCase();
   const results: ExtendedLocationInfo[] = [];
 
@@ -196,7 +203,13 @@ export function searchLocations(memory: MemoryData, options: SearchOptions): Ext
  * Search players by text query
  */
 export function searchPlayers(memory: MemoryData, options: SearchOptions): ExtendedPlayerInfo[] {
-  const { query, fields = ['username', 'displayName', 'notes'], caseSensitive = false, fuzzy = false, limit = 50 } = options;
+  const {
+    query,
+    fields = ['username', 'displayName', 'notes'],
+    caseSensitive = false,
+    fuzzy = false,
+    limit = 50,
+  } = options;
   const searchTerm = caseSensitive ? query : query.toLowerCase();
   const results: ExtendedPlayerInfo[] = [];
 
@@ -229,7 +242,13 @@ export function searchPlayers(memory: MemoryData, options: SearchOptions): Exten
  * Search facts by text query
  */
 export function searchFacts(memory: MemoryData, options: SearchOptions): FactEntry[] {
-  const { query, fields = ['key', 'value', 'category'], caseSensitive = false, fuzzy = false, limit = 50 } = options;
+  const {
+    query,
+    fields = ['key', 'value', 'category'],
+    caseSensitive = false,
+    fuzzy = false,
+    limit = 50,
+  } = options;
   const searchTerm = caseSensitive ? query : query.toLowerCase();
   const results: FactEntry[] = [];
 
@@ -262,7 +281,13 @@ export function searchFacts(memory: MemoryData, options: SearchOptions): FactEnt
  * Search rules by text query
  */
 export function searchRules(memory: MemoryData, options: SearchOptions): RuleEntry[] {
-  const { query, fields = ['rule', 'category'], caseSensitive = false, fuzzy = false, limit = 50 } = options;
+  const {
+    query,
+    fields = ['rule', 'category'],
+    caseSensitive = false,
+    fuzzy = false,
+    limit = 50,
+  } = options;
   const searchTerm = caseSensitive ? query : query.toLowerCase();
   const results: RuleEntry[] = [];
 
@@ -294,7 +319,10 @@ export function searchRules(memory: MemoryData, options: SearchOptions): RuleEnt
 /**
  * Global search across all memory types
  */
-export function searchAll(memory: MemoryData, options: SearchOptions): {
+export function searchAll(
+  memory: MemoryData,
+  options: SearchOptions
+): {
   locations: ExtendedLocationInfo[];
   players: ExtendedPlayerInfo[];
   facts: FactEntry[];
@@ -331,16 +359,16 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
 // Location queries
 export const LocationQueries = {
   byType: (memory: MemoryData, type: string) =>
-    queryLocations(memory).filter(loc => loc.type === type),
+    queryLocations(memory).filter((loc) => loc.type === type),
 
   byDimension: (memory: MemoryData, dimension: string) =>
-    queryLocations(memory).filter(loc => loc.dimension === dimension),
+    queryLocations(memory).filter((loc) => loc.dimension === dimension),
 
   byTag: (memory: MemoryData, tag: string) =>
-    queryLocations(memory).filter(loc => loc.tags?.includes(tag) ?? false),
+    queryLocations(memory).filter((loc) => loc.tags?.includes(tag) ?? false),
 
   nearby: (memory: MemoryData, center: { x: number; y: number; z: number }, radius: number) =>
-    queryLocations(memory).filter(loc => {
+    queryLocations(memory).filter((loc) => {
       const dx = loc.x - center.x;
       const dy = loc.y - center.y;
       const dz = loc.z - center.z;
@@ -348,8 +376,8 @@ export const LocationQueries = {
     }),
 
   recentlyVisited: (memory: MemoryData, since: Date) =>
-    queryLocations(memory).filter(loc =>
-      loc.lastVisitedAt && new Date(loc.lastVisitedAt) >= since
+    queryLocations(memory).filter(
+      (loc) => loc.lastVisitedAt && new Date(loc.lastVisitedAt) >= since
     ),
 
   mostVisited: (memory: MemoryData, limit = 10) =>
@@ -361,21 +389,18 @@ export const LocationQueries = {
 // Player queries
 export const PlayerQueries = {
   byRole: (memory: MemoryData, role: ExtendedPlayerInfo['role']) =>
-    queryPlayers(memory).filter(p => p.role === role),
+    queryPlayers(memory).filter((p) => p.role === role),
 
   trusted: (memory: MemoryData) =>
-    queryPlayers(memory).filter(p => p.role === 'trusted' || p.role === 'admin'),
+    queryPlayers(memory).filter((p) => p.role === 'trusted' || p.role === 'admin'),
 
-  admins: (memory: MemoryData) =>
-    queryPlayers(memory).filter(p => p.role === 'admin'),
+  admins: (memory: MemoryData) => queryPlayers(memory).filter((p) => p.role === 'admin'),
 
   recentlySeen: (memory: MemoryData, since: Date) =>
-    queryPlayers(memory).filter(p =>
-      p.lastSeen && new Date(p.lastSeen) >= since
-    ),
+    queryPlayers(memory).filter((p) => p.lastSeen && new Date(p.lastSeen) >= since),
 
   byReputation: (memory: MemoryData, minReputation: number) =>
-    queryPlayers(memory).filter(p => (p.reputation ?? 0) >= minReputation),
+    queryPlayers(memory).filter((p) => (p.reputation ?? 0) >= minReputation),
 
   topInteractions: (memory: MemoryData, limit = 10) =>
     queryPlayers(memory)
@@ -386,18 +411,16 @@ export const PlayerQueries = {
 // Fact queries
 export const FactQueries = {
   byCategory: (memory: MemoryData, category: string) =>
-    queryFacts(memory).filter(f => f.category === category),
+    queryFacts(memory).filter((f) => f.category === category),
 
   highConfidence: (memory: MemoryData, threshold = 0.8) =>
-    queryFacts(memory).filter(f => (f.confidence ?? 1) >= threshold),
+    queryFacts(memory).filter((f) => (f.confidence ?? 1) >= threshold),
 
   bySource: (memory: MemoryData, source: string) =>
-    queryFacts(memory).filter(f => f.source === source),
+    queryFacts(memory).filter((f) => f.source === source),
 
   recentlyAccessed: (memory: MemoryData, since: Date) =>
-    queryFacts(memory).filter(f =>
-      f.lastAccessedAt && new Date(f.lastAccessedAt) >= since
-    ),
+    queryFacts(memory).filter((f) => f.lastAccessedAt && new Date(f.lastAccessedAt) >= since),
 
   mostAccessed: (memory: MemoryData, limit = 10) =>
     queryFacts(memory)
@@ -407,19 +430,16 @@ export const FactQueries = {
 
 // Rule queries
 export const RuleQueries = {
-  enabled: (memory: MemoryData) =>
-    queryRules(memory).filter(r => r.enabled),
+  enabled: (memory: MemoryData) => queryRules(memory).filter((r) => r.enabled),
 
   byCategory: (memory: MemoryData, category: string) =>
-    queryRules(memory).filter(r => r.category === category),
+    queryRules(memory).filter((r) => r.category === category),
 
   byAuthor: (memory: MemoryData, author: string) =>
-    queryRules(memory).filter(r => r.author === author),
+    queryRules(memory).filter((r) => r.author === author),
 
   recentlyAdded: (memory: MemoryData, since: Date) =>
-    queryRules(memory).filter(r =>
-      r.createdAt && new Date(r.createdAt) >= since
-    ),
+    queryRules(memory).filter((r) => r.createdAt && new Date(r.createdAt) >= since),
 };
 
 /**
@@ -434,45 +454,63 @@ export function getMemoryStats(memory: MemoryData) {
   return {
     locations: {
       total: locations.length,
-      byType: locations.reduce((acc, loc) => {
-        acc[loc.type] = (acc[loc.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      byDimension: locations.reduce((acc, loc) => {
-        acc[loc.dimension || 'overworld'] = (acc[loc.dimension || 'overworld'] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
+      byType: locations.reduce(
+        (acc, loc) => {
+          acc[loc.type] = (acc[loc.type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      ),
+      byDimension: locations.reduce(
+        (acc, loc) => {
+          acc[loc.dimension || 'overworld'] = (acc[loc.dimension || 'overworld'] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      ),
     },
     players: {
       total: players.length,
-      byRole: players.reduce((acc, p) => {
-        acc[p.role] = (acc[p.role] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
+      byRole: players.reduce(
+        (acc, p) => {
+          acc[p.role] = (acc[p.role] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      ),
     },
     facts: {
       total: facts.length,
-      byCategory: facts.reduce((acc, f) => {
-        acc[f.category || 'general'] = (acc[f.category || 'general'] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      avgConfidence: facts.length > 0
-        ? facts.reduce((sum, f) => sum + (f.confidence ?? 1), 0) / facts.length
-        : 0,
+      byCategory: facts.reduce(
+        (acc, f) => {
+          acc[f.category || 'general'] = (acc[f.category || 'general'] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      ),
+      avgConfidence:
+        facts.length > 0
+          ? facts.reduce((sum, f) => sum + (f.confidence ?? 1), 0) / facts.length
+          : 0,
     },
     rules: {
       total: rules.length,
-      enabled: rules.filter(r => r.enabled).length,
-      byCategory: rules.reduce((acc, r) => {
-        acc[r.category || 'general'] = (acc[r.category || 'general'] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
+      enabled: rules.filter((r) => r.enabled).length,
+      byCategory: rules.reduce(
+        (acc, r) => {
+          acc[r.category || 'general'] = (acc[r.category || 'general'] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      ),
     },
-    currentTask: memory.currentTask ? {
-      goal: memory.currentTask.goal,
-      status: memory.currentTask.status,
-      progress: memory.currentTask.progress,
-    } : null,
+    currentTask: memory.currentTask
+      ? {
+          goal: memory.currentTask.goal,
+          status: memory.currentTask.status,
+          progress: memory.currentTask.progress,
+        }
+      : null,
     metadata: memory.metadata,
   };
 }

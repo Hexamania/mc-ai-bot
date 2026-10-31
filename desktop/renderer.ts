@@ -298,11 +298,13 @@ function updateUserList(users: string[], admins: string[]): void {
   const adminList = document.getElementById('admin-list');
 
   if (userList) {
-    userList.innerHTML = users.map(u => `<li>${u}${admins.includes(u) ? ' ⭐' : ''}</li>`).join('');
+    userList.innerHTML = users
+      .map((u) => `<li>${u}${admins.includes(u) ? ' ⭐' : ''}</li>`)
+      .join('');
   }
 
   if (adminList) {
-    adminList.innerHTML = admins.map(u => `<li>${u}</li>`).join('');
+    adminList.innerHTML = admins.map((u) => `<li>${u}</li>`).join('');
   }
 }
 
@@ -348,7 +350,13 @@ function appendLog(message: string): void {
 }
 
 // Expose for global access
-(window as any).app = {
+interface AppAPI {
+  sendCommand: (input: string) => void;
+  getState: () => BotState | null;
+  getStatus: () => BotStatus | null;
+}
+
+(window as Window & { app: AppAPI }).app = {
   sendCommand,
   getState: () => currentState,
   getStatus: () => currentStatus,

@@ -31,14 +31,14 @@ export const EventNames = {
   SHUTDOWN: 'shutdown' as const,
 } as const;
 
-export type EventName = typeof EventNames[keyof typeof EventNames];
+export type EventName = (typeof EventNames)[keyof typeof EventNames];
 
 /**
  * Event data types for each event
  */
 export interface EventDataMap {
   [EventNames.STATE_CHANGE]: { newState: BotState; oldState: BotState; timestamp: number };
-  [EventNames.CONNECT]: { bot: any; timestamp: number };
+  [EventNames.CONNECT]: { bot: object; timestamp: number };
   [EventNames.DISCONNECT]: { reason: string; timestamp: number };
   [EventNames.ERROR]: { error: Error; timestamp: number; fatal?: boolean };
   [EventNames.RECONNECT]: { attempt: number; delay: number; timestamp: number };
@@ -168,16 +168,16 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
   ): Promise<{ event: K; args: BotEvents[K] }> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        events.forEach(e => this.off(e, handlers[e]));
+        events.forEach((e) => this.off(e, handlers[e]));
         reject(new Error(`Timeout waiting for any of: ${events.join(', ')}`));
       }, timeout);
 
-      const handlers: Record<string, (...args: any[]) => void> = {};
+      const handlers: Record<string, (...args: BotEvents[K]) => void> = {};
 
-      events.forEach(event => {
-        handlers[event] = (...args: any[]) => {
+      events.forEach((event) => {
+        handlers[event] = (...args: BotEvents[K]) => {
           clearTimeout(timer);
-          events.forEach(e => this.off(e, handlers[e]));
+          events.forEach((e) => this.off(e, handlers[e]));
           resolve({ event, args });
         };
         this.once(event, handlers[event]);
@@ -218,18 +218,20 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
           return { value: queue.shift()!, done: false };
         }
         if (closed) {
-          return { value: undefined as any, done: true };
+          return { value: undefined, done: true };
         }
-        return new Promise(r => { resolve = r; });
+        return new Promise((r) => {
+          resolve = r;
+        });
       },
       async return(): Promise<IteratorResult<BotEvents[K]>> {
         closed = true;
         this.off(event, handler);
         if (resolve) {
-          resolve({ value: undefined as any, done: true });
+          resolve({ value: undefined, done: true });
         }
-        return { value: undefined as any, done: true };
-      }
+        return { value: undefined, done: true };
+      },
     };
   }
 
@@ -262,13 +264,13 @@ export class EventBuilder<T extends EventName> {
   private data: Partial<EventDataMap[T]>;
   private timestamp: number;
 
-  constructor(eventName: T) {
+  constructor() {
     this.timestamp = Date.now();
     this.data = { timestamp: this.timestamp } as Partial<EventDataMap[T]>;
   }
 
   set<K extends keyof EventDataMap[T]>(key: K, value: EventDataMap[T][K]): this {
-    (this.data as any)[key] = value;
+    (this.data as Record<K, EventDataMap[T][K]>)[key] = value;
     return this;
   }
 
@@ -286,7 +288,7 @@ export function createEventData<T extends EventName>(
 ): EventDataMap[T] {
   return {
     ...data,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   } as EventDataMap[T];
 }
 

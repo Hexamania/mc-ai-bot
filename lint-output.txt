@@ -1,0 +1,522 @@
+
+> mc-ai-bot@2.0.0 lint
+> eslint .
+
+(node:4556) ESLintIgnoreWarning: The ".eslintignore" file is no longer supported. Switch to using the "ignores" property in "eslint.config.js": https://eslint.org/docs/latest/use/configure/migration-guide#ignoring-files
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4556) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/cat/Desktop/mc-ai-bot/eslint.config.js?mtime=1793368947781 is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\cat\Desktop\mc-ai-bot\package.json.
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\ipc\channels.ts
+  14:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  15:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  18:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  19:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  20:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  21:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  24:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  25:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  26:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  27:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  28:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  31:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  32:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  33:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  36:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  37:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  38:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  39:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  48:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  50:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  56:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  58:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  60:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  62:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\main.ts
+    5:46  error    'dialog' is defined but never used           @typescript-eslint/no-unused-vars
+   23:3   error    'IPC_CHANNELS' is defined but never used     @typescript-eslint/no-unused-vars
+   24:3   error    'IPC_EVENTS' is defined but never used       @typescript-eslint/no-unused-vars
+   25:3   error    'ChannelName' is defined but never used      @typescript-eslint/no-unused-vars
+   26:3   error    'ChannelRequest' is defined but never used   @typescript-eslint/no-unused-vars
+   27:3   error    'ChannelResponse' is defined but never used  @typescript-eslint/no-unused-vars
+   67:10  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  209:66  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\preload.ts
+  28:7  error  'once' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\renderer.ts
+  351:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\renderer\src\App.vue
+   2:34  error  'ref' is defined but never used                  @typescript-eslint/no-unused-vars
+  22:32  error  Unexpected empty arrow function                  @typescript-eslint/no-empty-function
+  26:31  error  Unexpected empty arrow function                  @typescript-eslint/no-empty-function
+  30:34  error  Unexpected empty arrow function                  @typescript-eslint/no-empty-function
+  75:5   error  'nextTick' is not defined                        no-undef
+  95:30  error  Expected to return a value in computed function  vue/return-in-computed-property
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\renderer\src\components\DashboardEmbed.vue
+   2:49  error  'nextTick' is defined but never used           @typescript-eslint/no-unused-vars
+  14:7   error  'isOnline' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\renderer\src\components\LogViewer.vue
+    2:10  error  'ref' is already defined              no-redeclare
+    2:49  error  'nextTick' is defined but never used  @typescript-eslint/no-unused-vars
+  272:21  error  'logContainer' is not defined         no-undef
+  275:5   error  'logStore' is not defined             no-undef
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\renderer\src\composables\useIpc.ts
+    1:72   error  'BotStatus' is defined but never used                                       @typescript-eslint/no-unused-vars
+    1:115  error  'Toast' is defined but never used                                           @typescript-eslint/no-unused-vars
+  109:13   error  'channel' is defined but never used. Allowed unused args must match /^_/u   @typescript-eslint/no-unused-vars
+  109:30   error  'callback' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\renderer\src\stores\logStore.ts
+  29:27  error  'query' is assigned a value but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\services\AutoUpdaterService.ts
+  10:13  error  'path' is defined but never used                     @typescript-eslint/no-unused-vars
+  60:44  error  'bytesPerSecond' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\services\BotProcessManager.ts
+  71:11  error  'webUrl' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\services\NotificationService.ts
+  33:9  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\cat\Desktop\mc-ai-bot\desktop\services\SystemTrayService.ts
+  87:11  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\BotManager.ts
+   7:1   error  Imports "Bot" and "BotOptions" are only used as type         @typescript-eslint/consistent-type-imports
+  48:46  error  Array type using 'Array<T>' is forbidden. Use 'T[]' instead  @typescript-eslint/array-type
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\StateMachine.ts
+  280:19  error  'state' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\events.ts
+   41:32  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  175:48  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  178:37  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  221:40  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  229:41  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  231:38  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  265:15  error    'eventName' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  271:19  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\BuildingFeature.ts
+  438:22  error  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\ChatAIFeature.ts
+    6:10  error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+    9:10  error    'FeatureRegistry' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   51:19  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  111:26  error    A `require()` style import is forbidden                                                                                                                             @typescript-eslint/no-require-imports
+  224:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\CombatFeature.ts
+    6:10  error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+    6:15  error    'Player' is defined but never used                                                                                                                                  @typescript-eslint/no-unused-vars
+    8:10  error    'Vec3' is defined but never used                                                                                                                                    @typescript-eslint/no-unused-vars
+   11:10  error    'FeatureRegistry' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   16:18  error    An interface declaring no members is equivalent to its supertype                                                                                                    @typescript-eslint/no-empty-object-type
+  115:11  error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  186:7   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  214:11  error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  223:7   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  272:11  error    'isMob' is assigned a value but never used                                                                                                                          @typescript-eslint/no-unused-vars
+  324:22  error    'username' is defined but never used. Allowed unused args must match /^_/u                                                                                          @typescript-eslint/no-unused-vars
+  353:7   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  376:7   error    Unexpected `await` of a non-Promise (non-"Thenable") value                                                                                                          @typescript-eslint/await-thenable
+  432:7   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\FarmingFeature.ts
+    6:10  error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+    9:17  error    'Movements' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+   12:10  error    'FeatureRegistry' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   66:11  error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  111:11  warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  135:11  error    'registry' is assigned a value but never used                                                                                                                       @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\FeatureFactory.ts
+   40:14  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   41:15  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   42:12  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   43:14  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   44:12  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   45:13  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   46:12  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   47:12  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   48:11  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   49:10  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   88:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   89:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   92:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   93:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   94:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   95:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   96:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   97:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   98:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   99:3   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  151:58  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  161:7   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  386:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\FollowFeature.ts
+    7:10  error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+   12:10  error    'FeatureRegistry' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   68:11  error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  108:9   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  116:9   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  122:7   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  267:59  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  268:37  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\GuardFeature.ts
+    6:10  error    'Bot' is defined but never used              @typescript-eslint/no-unused-vars
+   11:10  error    'FeatureRegistry' is defined but never used  @typescript-eslint/no-unused-vars
+   86:11  error    'bot' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   94:32  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  126:32  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  139:32  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\InventoryFeature.ts
+    6:10  error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+   10:10  error    'FeatureRegistry' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   99:11  error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  182:28  error    'recipe' is defined but never used. Allowed unused args must match /^_/u                                                                                            @typescript-eslint/no-unused-vars
+  182:36  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  198:11  warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  216:9   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  321:11  error    'sorted' is assigned a value but never used                                                                                                                         @typescript-eslint/no-unused-vars
+  433:13  error    'moveCount' is assigned a value but never used                                                                                                                      @typescript-eslint/no-unused-vars
+  548:11  error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  551:23  error    'recipe' is assigned a value but never used                                                                                                                         @typescript-eslint/no-unused-vars
+  701:36  error    'type' is defined but never used. Allowed unused args must match /^_/u                                                                                              @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\MiningFeature.ts
+    6:10  error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+   12:10  error    'FeatureRegistry' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   72:19  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  130:31  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  132:26  error    A `require()` style import is forbidden                                                                                                                             @typescript-eslint/no-require-imports
+  156:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  259:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  410:11  error    'registry' is assigned a value but never used                                                                                                                       @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\MovementFeature.ts
+    6:10  error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+    6:15  error    'Player' is defined but never used                                                                                                                                  @typescript-eslint/no-unused-vars
+   12:10  error    'FeatureRegistry' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+  162:37  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  186:7   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  194:11  error    'manager' is assigned a value but never used                                                                                                                        @typescript-eslint/no-unused-vars
+  287:11  error    Unexpected lexical declaration in case block                                                                                                                        no-case-declarations
+  294:58  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  302:11  warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  415:29  error    'name' is defined but never used. Allowed unused args must match /^_/u                                                                                              @typescript-eslint/no-unused-vars
+  432:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  440:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\features\RoamFeature.ts
+    6:10  error    'Bot' is defined but never used              @typescript-eslint/no-unused-vars
+    7:10  error    'Entity' is defined but never used           @typescript-eslint/no-unused-vars
+    8:10  error    'Vec3' is defined but never used             @typescript-eslint/no-unused-vars
+   12:10  error    'FeatureRegistry' is defined but never used  @typescript-eslint/no-unused-vars
+   50:19  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  117:31  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  119:26  error    A `require()` style import is forbidden      @typescript-eslint/no-require-imports
+  128:11  error    'bot' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  136:32  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  169:32  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  182:32  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  199:11  error    'bot' is assigned a value but never used     @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\bot\index.ts
+   10:10  error    'Vec3' is defined but never used                                                                                                                                    @typescript-eslint/no-unused-vars
+   21:3   error    'BotVitals' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+   22:3   error    'InventoryItem' is defined but never used                                                                                                                           @typescript-eslint/no-unused-vars
+   23:3   error    'Equipment' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+   24:3   error    'MapData' is defined but never used                                                                                                                                 @typescript-eslint/no-unused-vars
+   25:3   error    'PlayerInfo' is defined but never used                                                                                                                              @typescript-eslint/no-unused-vars
+   27:56  error    'getMemoryContext' is defined but never used                                                                                                                        @typescript-eslint/no-unused-vars
+   37:19  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  100:15  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  110:19  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  383:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  453:11  error    'registry' is assigned a value but never used                                                                                                                       @typescript-eslint/no-unused-vars
+  509:52  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  620:5   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\Command.ts
+   65:19  error    'context' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+   72:21  error    'context' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+   72:46  error    'error' is defined but never used. Allowed unused args must match /^_/u    @typescript-eslint/no-unused-vars
+   79:23  error    'context' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+   79:48  error    'partial' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  303:20  error    'allowedUsers' is assigned a value but never used                          @typescript-eslint/no-unused-vars
+  303:34  error    'deniedUsers' is assigned a value but never used                           @typescript-eslint/no-unused-vars
+  488:21  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  495:26  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  513:32  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\CommandRegistry.ts
+   15:3   error  'ParsedArguments' is defined but never used     @typescript-eslint/no-unused-vars
+   16:3   error  'CommandArgument' is defined but never used     @typescript-eslint/no-unused-vars
+   18:10  error  'Bot' is defined but never used                 @typescript-eslint/no-unused-vars
+  415:23  error  'isAdmin' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  415:32  error  'isTrusted' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\arguments.ts
+   11:3  error  'PermissionLevel' is defined but never used   @typescript-eslint/no-unused-vars
+  385:9  error  Unexpected lexical declaration in case block  no-case-declarations
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\botCommands.ts
+    7:17  error    'Movements' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+    8:10  error    'Vec3' is defined but never used                                                                                                                                    @typescript-eslint/no-unused-vars
+    9:8   error    'mcDataLoader' is defined but never used                                                                                                                            @typescript-eslint/no-unused-vars
+   11:30  error    'CommandContext' is defined but never used                                                                                                                          @typescript-eslint/no-unused-vars
+   14:3   error    'rememberPlayer' is defined but never used                                                                                                                          @typescript-eslint/no-unused-vars
+   17:3   error    'rememberTask' is defined but never used                                                                                                                            @typescript-eslint/no-unused-vars
+   19:3   error    'persistMemory' is defined but never used                                                                                                                           @typescript-eslint/no-unused-vars
+   21:3   error    'finishRememberedTask' is defined but never used                                                                                                                    @typescript-eslint/no-unused-vars
+   23:10  error    'autoArmor' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+   23:21  error    'forceEat' is defined but never used                                                                                                                                @typescript-eslint/no-unused-vars
+   23:31  error    'getBestToolForBlock' is defined but never used                                                                                                                     @typescript-eslint/no-unused-vars
+   23:52  error    'findBestItem' is defined but never used                                                                                                                            @typescript-eslint/no-unused-vars
+   28:49  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   30:9   error    'config' is assigned a value but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   35:5   error    'pm' is assigned a value but never used                                                                                                                             @typescript-eslint/no-unused-vars
+   36:5   error    'log' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+   40:5   error    'roaming' is assigned a value but never used                                                                                                                        @typescript-eslint/no-unused-vars
+   41:5   error    'following' is assigned a value but never used                                                                                                                      @typescript-eslint/no-unused-vars
+   42:5   error    'followTarget' is assigned a value but never used                                                                                                                   @typescript-eslint/no-unused-vars
+   43:5   error    'pvpTarget' is assigned a value but never used                                                                                                                      @typescript-eslint/no-unused-vars
+   45:5   error    'safeModeActive' is assigned a value but never used                                                                                                                 @typescript-eslint/no-unused-vars
+   46:5   error    'killAuraActive' is assigned a value but never used                                                                                                                 @typescript-eslint/no-unused-vars
+   48:5   error    'guarding' is assigned a value but never used                                                                                                                       @typescript-eslint/no-unused-vars
+   49:5   error    'medicMode' is assigned a value but never used                                                                                                                      @typescript-eslint/no-unused-vars
+   50:5   error    'medicTarget' is assigned a value but never used                                                                                                                    @typescript-eslint/no-unused-vars
+   51:5   error    'progressionActive' is assigned a value but never used                                                                                                              @typescript-eslint/no-unused-vars
+   52:5   error    'minerActive' is assigned a value but never used                                                                                                                    @typescript-eslint/no-unused-vars
+   53:5   error    'mineAreaActive' is assigned a value but never used                                                                                                                 @typescript-eslint/no-unused-vars
+   54:5   error    'minerProgress' is assigned a value but never used                                                                                                                  @typescript-eslint/no-unused-vars
+   55:5   error    'minerTotal' is assigned a value but never used                                                                                                                     @typescript-eslint/no-unused-vars
+   56:5   error    'isDepositing' is assigned a value but never used                                                                                                                   @typescript-eslint/no-unused-vars
+   57:5   error    'isFarming' is assigned a value but never used                                                                                                                      @typescript-eslint/no-unused-vars
+   58:5   error    'isHandlingSafety' is assigned a value but never used                                                                                                               @typescript-eslint/no-unused-vars
+   59:5   error    'currentObjective' is assigned a value but never used                                                                                                               @typescript-eslint/no-unused-vars
+   61:5   error    'autoDefense' is assigned a value but never used                                                                                                                    @typescript-eslint/no-unused-vars
+   62:5   error    'autoArmorEnabled' is assigned a value but never used                                                                                                               @typescript-eslint/no-unused-vars
+   64:5   error    'isShielding' is assigned a value but never used                                                                                                                    @typescript-eslint/no-unused-vars
+   65:5   error    'waitingForHelp' is assigned a value but never used                                                                                                                 @typescript-eslint/no-unused-vars
+   66:5   error    'helpObjective' is assigned a value but never used                                                                                                                  @typescript-eslint/no-unused-vars
+   67:5   error    'adminSessions' is assigned a value but never used                                                                                                                  @typescript-eslint/no-unused-vars
+   68:5   error    'mcData' is assigned a value but never used                                                                                                                         @typescript-eslint/no-unused-vars
+   69:5   error    'movements' is assigned a value but never used                                                                                                                      @typescript-eslint/no-unused-vars
+   77:5   error    'depositItems' is assigned a value but never used                                                                                                                   @typescript-eslint/no-unused-vars
+   78:5   error    'handleWaterSafety' is assigned a value but never used                                                                                                              @typescript-eslint/no-unused-vars
+   80:5   error    'mineArea' is assigned a value but never used                                                                                                                       @typescript-eslint/no-unused-vars
+   87:5   error    'buildNetherPortal' is assigned a value but never used                                                                                                              @typescript-eslint/no-unused-vars
+   88:5   error    'askForHelp' is assigned a value but never used                                                                                                                     @typescript-eslint/no-unused-vars
+   89:5   error    'collectMaterials' is assigned a value but never used                                                                                                               @typescript-eslint/no-unused-vars
+   90:5   error    'buildStructure' is assigned a value but never used                                                                                                                 @typescript-eslint/no-unused-vars
+   91:5   error    'autoFarmWheat' is assigned a value but never used                                                                                                                  @typescript-eslint/no-unused-vars
+   92:5   error    'safeModeLoop' is assigned a value but never used                                                                                                                   @typescript-eslint/no-unused-vars
+   93:5   error    'killAuraLoop' is assigned a value but never used                                                                                                                   @typescript-eslint/no-unused-vars
+   94:5   error    'handleNightAndSleep' is assigned a value but never used                                                                                                            @typescript-eslint/no-unused-vars
+   95:5   error    'craftIronArmor' is assigned a value but never used                                                                                                                 @typescript-eslint/no-unused-vars
+   96:5   error    'beatTheGame' is assigned a value but never used                                                                                                                    @typescript-eslint/no-unused-vars
+  212:42  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  215:9   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  242:60  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  283:21  error    'context' is defined but never used. Allowed unused args must match /^_/u                                                                                           @typescript-eslint/no-unused-vars
+  292:21  error    'context' is defined but never used. Allowed unused args must match /^_/u                                                                                           @typescript-eslint/no-unused-vars
+  301:21  error    'context' is defined but never used. Allowed unused args must match /^_/u                                                                                           @typescript-eslint/no-unused-vars
+  473:25  error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  485:28  error    A `require()` style import is forbidden                                                                                                                             @typescript-eslint/no-require-imports
+  537:21  error    'context' is defined but never used. Allowed unused args must match /^_/u                                                                                           @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\commands\general.ts
+    7:10  error  'Bot' is defined but never used           @typescript-eslint/no-unused-vars
+  145:11  error  'bot' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\help.ts
+   14:3   error  'CommandContext' is defined but never used                                @typescript-eslint/no-unused-vars
+   16:10  error  'Bot' is defined but never used                                           @typescript-eslint/no-unused-vars
+  558:3   error  'prefix' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\index.ts
+  12:3  error  'CommandRegistry' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\parser.ts
+  109:7  error  'found' is assigned a value but never used                                   @typescript-eslint/no-unused-vars
+  550:5  error  Expected a `for-of` loop instead of a `for` loop with this simple iteration  @typescript-eslint/prefer-for-of
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\permissions.ts
+   21:19  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+   26:53  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  371:3   error    'isAdmin' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  409:28  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  411:49  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  412:42  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  415:43  error    Use the rest parameters instead of 'arguments'                             prefer-rest-params
+  428:41  error    Use the rest parameters instead of 'arguments'                             prefer-rest-params
+  447:5   error    'isPM' is defined but never used. Allowed unused args must match /^_/u     @typescript-eslint/no-unused-vars
+  448:5   error    'isAdmin' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\commands\webHandler.ts
+  395:27  error    'socket' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  537:16  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  537:26  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  537:37  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  698:30  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\index.ts
+   20:22  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+   25:11  error    'config' is assigned a value but never used                                                                                                                         @typescript-eslint/no-unused-vars
+  102:9   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  136:19  warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\main.ts
+  10:11  error    'app' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  26:1   warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\cat\Desktop\mc-ai-bot\src\memory\backup.ts
+   13:3   error  'CleanupResult' is defined but never used       @typescript-eslint/no-unused-vars
+  197:11  error  'startTime' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\memory\cleanup.ts
+  6:10  error  'ExtendedLocationInfo' is defined but never used  @typescript-eslint/no-unused-vars
+  6:32  error  'ExtendedPlayerInfo' is defined but never used    @typescript-eslint/no-unused-vars
+  6:52  error  'FactEntry' is defined but never used             @typescript-eslint/no-unused-vars
+  6:63  error  'RuleEntry' is defined but never used             @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\memory\index.ts
+  7:13  error  'path' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\memory\queries.ts
+  14:3  error  'ExtendedTaskInfo' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\memory\schema.ts
+  112:9  error  'defaultMemory' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\plugins\index.ts
+   43:11  warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  248:22  error    'bot' is defined but never used. Allowed unused args must match /^_/u                                                                                               @typescript-eslint/no-unused-vars
+  262:22  error    'bot' is defined but never used. Allowed unused args must match /^_/u                                                                                               @typescript-eslint/no-unused-vars
+  276:22  error    'bot' is defined but never used. Allowed unused args must match /^_/u                                                                                               @typescript-eslint/no-unused-vars
+  290:22  error    'bot' is defined but never used. Allowed unused args must match /^_/u                                                                                               @typescript-eslint/no-unused-vars
+  304:22  error    'bot' is defined but never used. Allowed unused args must match /^_/u                                                                                               @typescript-eslint/no-unused-vars
+  304:32  error    'registry' is defined but never used. Allowed unused args must match /^_/u                                                                                          @typescript-eslint/no-unused-vars
+  318:22  error    'bot' is defined but never used. Allowed unused args must match /^_/u                                                                                               @typescript-eslint/no-unused-vars
+  318:32  error    'registry' is defined but never used. Allowed unused args must match /^_/u                                                                                          @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\types\index.ts
+    8:10  error  'Server' is defined but never used                                @typescript-eslint/no-unused-vars
+    8:18  error  'Socket' is defined but never used                                @typescript-eslint/no-unused-vars
+  304:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  305:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\cat\Desktop\mc-ai-bot\src\utils\index.ts
+    6:10  error    'goals' is defined but never used              @typescript-eslint/no-unused-vars
+  115:67  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  116:9   error    'registry' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  146:72  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  228:41  error    Unexpected empty arrow function                @typescript-eslint/no-empty-function
+  259:14  error    'e' is defined but never used                  @typescript-eslint/no-unused-vars
+  290:21  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  291:4   warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  302:20  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  304:4   warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  305:16  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  325:9   warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  393:46  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  393:56  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  408:46  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  408:56  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  459:57  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\web\index.ts
+   20:36   error    'Namespace' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+   30:74   error    'broadcastBulkUpdate' is defined but never used                                                                                                                     @typescript-eslint/no-unused-vars
+   30:131  error    'broadcastCommandOutput' is defined but never used                                                                                                                  @typescript-eslint/no-unused-vars
+  176:60   error    'next' is defined but never used. Allowed unused args must match /^_/u                                                                                              @typescript-eslint/no-unused-vars
+  194:39   error    'socket' is defined but never used. Allowed unused args must match /^_/u                                                                                            @typescript-eslint/no-unused-vars
+  268:7    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\cat\Desktop\mc-ai-bot\src\web\middleware\auth.ts
+    8:10  error    'getConfig' is defined but never used     @typescript-eslint/no-unused-vars
+  229:46  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  248:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\web\middleware\rateLimit.ts
+    7:10  error    'AuthenticatedRequest' is defined but never used  @typescript-eslint/no-unused-vars
+  152:19  warning  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\src\web\routes\api.ts
+    9:10  error    'loadMemory' is defined but never used                                                            @typescript-eslint/no-unused-vars
+   15:10  error    'BotState' is defined but never used                                                              @typescript-eslint/no-unused-vars
+   15:20  error    'BotStatus' is defined but never used                                                             @typescript-eslint/no-unused-vars
+   15:31  error    'BotPosition' is defined but never used                                                           @typescript-eslint/no-unused-vars
+   15:44  error    'CommandContext' is defined but never used                                                        @typescript-eslint/no-unused-vars
+  134:48  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  141:30  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  141:60  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  212:59  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  271:17  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  272:14  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  570:22  error    A `require()` style import is forbidden                                                           @typescript-eslint/no-require-imports
+  583:48  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  588:23  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  589:25  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  592:21  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  620:26  error    'options' is assigned a value but never used                                                      @typescript-eslint/no-unused-vars
+  639:8   error    'msg' is defined but never used. Allowed unused args must match /^_/u                             @typescript-eslint/no-unused-vars
+  640:8   error    'msg' is defined but never used. Allowed unused args must match /^_/u                             @typescript-eslint/no-unused-vars
+  717:52  warning  Unexpected any. Specify a different type                                                          @typescript-eslint/no-explicit-any
+  776:15  error    Unexpected constant binary expression. Compares constantly with the right-hand side of the `!==`  no-constant-binary-expression
+  810:15  error    Unexpected constant binary expression. Compares constantly with the right-hand side of the `!==`  no-constant-binary-expression
+  886:54  error    'next' is defined but never used. Allowed unused args must match /^_/u                            @typescript-eslint/no-unused-vars
+
+C:\Users\cat\Desktop\mc-ai-bot\src\web\socket\events.ts
+  159:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  160:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+  161:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\cat\Desktop\mc-ai-bot\src\web\socket\handlers.ts
+    7:10   error    'Namespace' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+    8:10   error    'Bot' is defined but never used                                                                                                                                     @typescript-eslint/no-unused-vars
+   12:10   error    'loadMemory' is defined but never used                                                                                                                              @typescript-eslint/no-unused-vars
+   12:98   error    'getMemoryContext' is defined but never used                                                                                                                        @typescript-eslint/no-unused-vars
+   12:116  error    'persistMemory' is defined but never used                                                                                                                           @typescript-eslint/no-unused-vars
+   68:11   error    'bot' is assigned a value but never used                                                                                                                            @typescript-eslint/no-unused-vars
+   73:5    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   75:7    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   77:7    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  144:73   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  145:52   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  150:27   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  151:29   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  235:48   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  240:23   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  241:25   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  251:9    error    'isOnline' is assigned a value but never used                                                                                                                       @typescript-eslint/no-unused-vars
+  254:42   error    'data' is defined but never used. Allowed unused args must match /^_/u                                                                                              @typescript-eslint/no-unused-vars
+  427:7    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  428:7    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  639:47   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+  640:7    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  647:5    warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  714:10   warning  Unexpected any. Specify a different type                                                                                                                            @typescript-eslint/no-explicit-any
+
+C:\Users\cat\Desktop\mc-ai-bot\tests\stateMachine.test.ts
+  3:10  error  'BotEvents' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 399 problems (262 errors, 137 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+

@@ -3,11 +3,9 @@
  * Handles inventory operations, sorting, crafting, and item management
  */
 
-import { Bot } from 'mineflayer';
 import type { Item } from 'prismarine-item';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
 
 /**
  * Inventory feature configuration
@@ -89,15 +87,15 @@ export class InventoryFeature extends BaseFeature {
   private craftingRecipes = new Map<string, CraftingRecipe>();
 
   constructor() {
-    super('inventory', '1.0.0', 'Inventory management, sorting, crafting, and item handling', ['core']);
+    super('inventory', '1.0.0', 'Inventory management, sorting, crafting, and item handling', [
+      'core',
+    ]);
   }
 
   /**
    * Initialize the inventory feature
    */
   protected async onEnable(): Promise<void> {
-    const bot = this.getBot();
-
     // Configure from options
     this.configureFromOptions();
 
@@ -133,7 +131,7 @@ export class InventoryFeature extends BaseFeature {
     this.autoDropEnabled = options.autoDrop ?? false;
 
     if (options.dropList) {
-      this.dropList = new Set(options.dropList.map(item => item.toLowerCase()));
+      this.dropList = new Set(options.dropList.map((item) => item.toLowerCase()));
     }
 
     if (options.keepMinimum) {
@@ -154,20 +152,22 @@ export class InventoryFeature extends BaseFeature {
       const result = recipe.result;
       if (result) {
         const recipeKey = result.name;
-        if (!this.craftingRecipes.has(recipeKey) ||
-            (this.craftingRecipes.get(recipeKey)!.ingredients.length > recipe.ingredients.length)) {
+        if (
+          !this.craftingRecipes.has(recipeKey) ||
+          this.craftingRecipes.get(recipeKey)!.ingredients.length > recipe.ingredients.length
+        ) {
           this.craftingRecipes.set(recipeKey, {
             name: result.name,
-            ingredients: recipe.ingredients.map(ing => ({
+            ingredients: recipe.ingredients.map((ing) => ({
               name: ing?.name ?? 'air',
-              count: ing?.count ?? 1
+              count: ing?.count ?? 1,
             })),
             result: {
               name: result.name,
-              count: result.count
+              count: result.count,
             },
             shaped: recipe.requiresTable,
-            pattern: recipe.requiresTable ? this.getRecipePattern(recipe) : undefined
+            pattern: recipe.requiresTable ? this.getRecipePattern(recipe) : undefined,
           });
         }
       }
@@ -179,7 +179,7 @@ export class InventoryFeature extends BaseFeature {
   /**
    * Get recipe pattern for shaped recipes
    */
-  private getRecipePattern(recipe: any): string[] {
+  private getRecipePattern(_recipe: unknown): string[] {
     // This is a simplified pattern extraction
     // In reality, you'd need to parse the recipe matrix
     return ['###', '###', '###'];
@@ -195,7 +195,7 @@ export class InventoryFeature extends BaseFeature {
     if (this.autoSortEnabled) {
       bot.on('windowUpdate', () => {
         if (bot.currentWindow && bot.currentWindow.type === 'minecraft:container') {
-          this.sortInventory();
+          void this.sortInventory();
         }
       });
     }
@@ -204,7 +204,7 @@ export class InventoryFeature extends BaseFeature {
     if (this.autoDropEnabled) {
       bot.on('playerCollect', (entity) => {
         if (entity.username === bot.username) {
-          setTimeout(() => this.checkAutoDrop(), 100);
+          setTimeout(() => void this.checkAutoDrop(), 100);
         }
       });
     }
@@ -213,7 +213,7 @@ export class InventoryFeature extends BaseFeature {
     const options = this.config.options as InventoryFeatureOptions | undefined;
     if (options?.autoEquipArmor) {
       bot.on('health', () => {
-        this.autoEquipBestArmor();
+        void this.autoEquipBestArmor();
       });
     }
   }
@@ -248,7 +248,7 @@ export class InventoryFeature extends BaseFeature {
    */
   getItemByName(name: string): InventoryItemInfo | null {
     const bot = this.getBot();
-    const item = bot.inventory.items().find(i => i.name === name || i.displayName === name);
+    const item = bot.inventory.items().find((i) => i.name === name || i.displayName === name);
     return item ? this.itemToInfo(item) : null;
   }
 
@@ -286,7 +286,7 @@ export class InventoryFeature extends BaseFeature {
       legs: bot.inventory.slots[7] ? this.itemToInfo(bot.inventory.slots[7]) : null,
       feet: bot.inventory.slots[8] ? this.itemToInfo(bot.inventory.slots[8]) : null,
       hand: bot.inventory.slots[45] ? this.itemToInfo(bot.inventory.slots[45]) : null,
-      offhand: bot.inventory.slots[44] ? this.itemToInfo(bot.inventory.slots[44]) : null
+      offhand: bot.inventory.slots[44] ? this.itemToInfo(bot.inventory.slots[44]) : null,
     };
   }
 
@@ -302,7 +302,7 @@ export class InventoryFeature extends BaseFeature {
       maxStackSize: item.stackSize,
       durability: item.durability,
       maxDurability: item.maxDurability,
-      enchantments: item.enchantments ? Object.fromEntries(item.enchantments) : undefined
+      enchantments: item.enchantments ? Object.fromEntries(item.enchantments) : undefined,
     };
   }
 
@@ -318,7 +318,7 @@ export class InventoryFeature extends BaseFeature {
 
     // Simple sorting: group by item type
     const items = bot.inventory.items();
-    const sorted = [...items].sort((a, b) => {
+    [...items].sort((a, b) => {
       // Sort by name, then by count (descending)
       if (a.name !== b.name) return a.name.localeCompare(b.name);
       return b.count - a.count;
@@ -333,7 +333,7 @@ export class InventoryFeature extends BaseFeature {
    */
   async dropItem(name: string, count?: number): Promise<boolean> {
     const bot = this.getBot();
-    const item = bot.inventory.items().find(i => i.name === name);
+    const item = bot.inventory.items().find((i) => i.name === name);
 
     if (!item) return false;
 
@@ -423,16 +423,15 @@ export class InventoryFeature extends BaseFeature {
   /**
    * Move item between slots
    */
-  async moveItem(fromSlot: number, toSlot: number, count?: number): Promise<boolean> {
+  async moveItem(fromSlot: number, toSlot: number, _count?: number): Promise<boolean> {
     const bot = this.getBot();
 
     try {
       const item = bot.inventory.slots[fromSlot];
       if (!item) return false;
 
-      const moveCount = count ?? item.count;
       await bot.windowClick(fromSlot, 0, 0); // Click to pick up
-      await bot.windowClick(toSlot, 0, 0);   // Click to place
+      await bot.windowClick(toSlot, 0, 0); // Click to place
       return true;
     } catch (error) {
       console.error('[InventoryFeature] Move item error:', error);
@@ -502,7 +501,7 @@ export class InventoryFeature extends BaseFeature {
     const bot = this.getBot();
 
     // Find crafting table in inventory or nearby
-    const table = bot.inventory.items().find(i => i.name === 'crafting_table');
+    const table = bot.inventory.items().find((i) => i.name === 'crafting_table');
     if (!table) {
       throw new Error('No crafting table available');
     }
@@ -545,10 +544,9 @@ export class InventoryFeature extends BaseFeature {
    * Get all craftable items
    */
   getCraftableItems(): string[] {
-    const bot = this.getBot();
     const craftable: string[] = [];
 
-    for (const [name, recipe] of this.craftingRecipes) {
+    for (const [name] of this.craftingRecipes) {
       if (this.canCraft(name)) {
         craftable.push(name);
       }
@@ -620,8 +618,12 @@ export class InventoryFeature extends BaseFeature {
     // Add enchantment value
     if (item.enchantments) {
       for (const [ench, level] of item.enchantments) {
-        if (ench.includes('protection') || ench.includes('blast') ||
-            ench.includes('fire') || ench.includes('projectile')) {
+        if (
+          ench.includes('protection') ||
+          ench.includes('blast') ||
+          ench.includes('fire') ||
+          ench.includes('projectile')
+        ) {
           value += level * 50;
         }
       }
@@ -629,7 +631,7 @@ export class InventoryFeature extends BaseFeature {
 
     // Factor in durability
     if (item.durability && item.maxDurability) {
-      value *= (item.durability / item.maxDurability);
+      value *= item.durability / item.maxDurability;
     }
 
     return value;
@@ -646,7 +648,7 @@ export class InventoryFeature extends BaseFeature {
       legs: 7,
       feet: 8,
       hand: 45,
-      offhand: 44
+      offhand: 44,
     };
 
     const targetSlot = slotMap[toSlot];
@@ -669,7 +671,10 @@ export class InventoryFeature extends BaseFeature {
     const current = bot.inventory.slots[handSlot];
 
     const best = this.findBestTool(toolType);
-    if (best && (!current || this.getToolValue(best, toolType) > this.getToolValue(current, toolType))) {
+    if (
+      best &&
+      (!current || this.getToolValue(best, toolType) > this.getToolValue(current, toolType))
+    ) {
       await this.equipItem(best.slot, 'hand');
     }
   }
@@ -698,7 +703,7 @@ export class InventoryFeature extends BaseFeature {
   /**
    * Get tool value
    */
-  private getToolValue(item: Item, type: string): number {
+  private getToolValue(item: Item, _type: string): number {
     let value = 0;
 
     if (item.name.includes('netherite')) value += 1000;
@@ -710,8 +715,12 @@ export class InventoryFeature extends BaseFeature {
 
     if (item.enchantments) {
       for (const [ench, level] of item.enchantments) {
-        if (ench.includes('efficiency') || ench.includes('fortune') ||
-            ench.includes('silk_touch') || ench.includes('sharpness')) {
+        if (
+          ench.includes('efficiency') ||
+          ench.includes('fortune') ||
+          ench.includes('silk_touch') ||
+          ench.includes('sharpness')
+        ) {
           value += level * 100;
         }
         if (ench.includes('unbreaking') || ench.includes('mending')) {
@@ -721,7 +730,7 @@ export class InventoryFeature extends BaseFeature {
     }
 
     if (item.durability && item.maxDurability) {
-      value *= (item.durability / item.maxDurability);
+      value *= item.durability / item.maxDurability;
     }
 
     return value;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue';
+import { onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useBotStore } from './stores/botStore';
 import { useLogStore } from './stores/logStore';
 import { useUIStore } from './stores/uiStore';
@@ -19,15 +19,15 @@ const sidebarOpen = computed(() => uiStore.isSidebarOpen);
 const activeView = computed(() => uiStore.activeView);
 
 function handleStart() {
-  botStore.start().catch(() => {});
+  void botStore.start();
 }
 
 function handleStop() {
-  botStore.stop().catch(() => {});
+  void botStore.stop();
 }
 
 function handleRestart() {
-  botStore.restart().catch(() => {});
+  void botStore.restart();
 }
 
 function handleOpenDashboard() {
@@ -94,9 +94,14 @@ function handleKeydown(event: KeyboardEvent) {
 
 const currentView = computed(() => {
   switch (activeView.value) {
-    case 'dashboard': return DashboardEmbed;
-    case 'settings': return SettingsPanel;
-    case 'logs': return LogViewer;
+    case 'dashboard':
+      return DashboardEmbed;
+    case 'settings':
+      return SettingsPanel;
+    case 'logs':
+      return LogViewer;
+    default:
+      return DashboardEmbed;
   }
 });
 </script>
@@ -109,44 +114,15 @@ const currentView = computed(() => {
 
     <!-- Topbar -->
     <header class="topbar">
-      <button
-        class="sidebar-toggle"
-        aria-label="Toggle sidebar"
-        @click="toggleSidebar"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <line
-            x1="3"
-            y1="12"
-            x2="21"
-            y2="12"
-          />
-          <line
-            x1="3"
-            y1="6"
-            x2="21"
-            y2="6"
-          />
-          <line
-            x1="3"
-            y1="18"
-            x2="21"
-            y2="18"
-          />
+      <button class="sidebar-toggle" aria-label="Toggle sidebar" @click="toggleSidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
 
-      <a
-        class="brand"
-        href="https://github.com/Hexamania"
-        target="_blank"
-        rel="noopener"
-      >
+      <a class="brand" href="https://github.com/Hexamania" target="_blank" rel="noopener">
         <div class="brand-mark"><span>A</span></div>
         <div class="brand-copy">
           <strong>Airi OS</strong>
@@ -159,20 +135,12 @@ const currentView = computed(() => {
       </div>
 
       <div class="topbar-actions">
-        <a
-          class="repo-link"
-          href="https://github.com/Hexamania"
-          target="_blank"
-          rel="noopener"
-        >
+        <a class="repo-link" href="https://github.com/Hexamania" target="_blank" rel="noopener">
           <span class="repo-glyph">
-            <svg
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              fill="currentColor"
-            >
-              <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path
+                d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"
+              />
             </svg>
           </span>
           <span>GitHub</span>
@@ -183,107 +151,39 @@ const currentView = computed(() => {
     <!-- Main App Shell -->
     <div class="app-shell">
       <!-- Sidebar -->
-      <aside
-        class="settings-rail"
-        :class="{ collapsed: !sidebarOpen }"
-      >
+      <aside class="settings-rail" :class="{ collapsed: !sidebarOpen }">
         <div class="rail-header">
-          <div
-            v-show="sidebarOpen"
-            class="intro"
-          >
-            <p class="eyebrow">
-              Configuration
-            </p>
-            <h1 v-show="sidebarOpen">
-              Airi <span>OS</span>
-            </h1>
+          <div v-show="sidebarOpen" class="intro">
+            <p class="eyebrow">Configuration</p>
+            <h1 v-show="sidebarOpen">Airi <span>OS</span></h1>
             <p v-show="sidebarOpen">
-              Enter your server details, choose a Minecraft version, and optionally add an OpenAI key for in-game AI chat.
+              Enter your server details, choose a Minecraft version, and optionally add an OpenAI key for in-game AI
+              chat.
             </p>
           </div>
         </div>
 
-        <nav
-          v-show="sidebarOpen"
-          class="rail-nav"
-        >
-          <button
-            class="nav-item"
-            :class="{ active: activeView === 'dashboard' }"
-            @click="setActiveView('dashboard')"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              class="nav-icon"
-            >
-              <rect
-                x="3"
-                y="3"
-                width="7"
-                height="7"
-                rx="1"
-              />
-              <rect
-                x="14"
-                y="3"
-                width="7"
-                height="7"
-                rx="1"
-              />
-              <rect
-                x="3"
-                y="14"
-                width="7"
-                height="7"
-                rx="1"
-              />
-              <rect
-                x="14"
-                y="14"
-                width="7"
-                height="7"
-                rx="1"
-              />
+        <nav v-show="sidebarOpen" class="rail-nav">
+          <button class="nav-item" :class="{ active: activeView === 'dashboard' }" @click="setActiveView('dashboard')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
             <span>Dashboard</span>
           </button>
-          <button
-            class="nav-item"
-            :class="{ active: activeView === 'settings' }"
-            @click="setActiveView('settings')"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              class="nav-icon"
-            >
-              <circle
-                cx="12"
-                cy="12"
-                r="3"
+          <button class="nav-item" :class="{ active: activeView === 'settings' }" @click="setActiveView('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 21.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
               />
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 21.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
             </svg>
             <span>Settings</span>
           </button>
-          <button
-            class="nav-item"
-            :class="{ active: activeView === 'logs' }"
-            @click="setActiveView('logs')"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              class="nav-icon"
-            >
+          <button class="nav-item" :class="{ active: activeView === 'logs' }" @click="setActiveView('logs')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
@@ -291,69 +191,42 @@ const currentView = computed(() => {
           </button>
         </nav>
 
-        <div
-          v-show="sidebarOpen"
-          class="rail-footer"
-        >
+        <div v-show="sidebarOpen" class="rail-footer">
           <div class="quick-actions">
-            <button
-              class="btn btn--primary btn--launch"
-              :disabled="!botStore.canStart"
-              @click="handleStart"
-            >
+            <button class="btn btn--primary btn--launch" :disabled="!botStore.canStart" @click="handleStart">
               <span>Save & Start Bot</span>
               <span class="launch-icon">▶</span>
             </button>
             <div class="secondary-actions">
-              <button
-                class="btn btn--stop"
-                :disabled="!botStore.canStop"
-                @click="handleStop"
-              >
-                Stop Bot
-              </button>
-              <button
-                class="btn btn--dashboard"
-                :disabled="!botStore.isOnline"
-                @click="handleOpenDashboard"
-              >
+              <button class="btn btn--stop" :disabled="!botStore.canStop" @click="handleStop">Stop Bot</button>
+              <button class="btn btn--dashboard" :disabled="!botStore.isOnline" @click="handleOpenDashboard">
                 Open Dashboard
               </button>
             </div>
-            <button
-              class="btn btn--dashboard"
-              :disabled="!botStore.isRunning"
-              @click="handleRestart"
-            >
+            <button class="btn btn--dashboard" :disabled="!botStore.isRunning" @click="handleRestart">
               <span>Restart Bot</span>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                class="launch-icon"
-              ><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" /></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="launch-icon">
+                <path d="M23 4v6h-6" />
+                <path d="M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
             </button>
           </div>
 
-          <p
-            v-if="settingsStore.saveError"
-            id="notice"
-            class="notice"
-          >
+          <p v-if="settingsStore.saveError" id="notice" class="notice">
             {{ settingsStore.saveError }}
           </p>
 
           <div class="rail-footer-info">
             <p class="storage-note">
               <span class="secure-icon">🔒</span>
-              {{ settingsStore.isPortableMode
-                ? `Portable settings and memory: ${settingsStore.dataDirectory}. API key encryption is tied to this Windows account.`
-                : 'Settings and memory are stored in your Windows profile. API key uses Windows secure storage.' }}
+              {{
+                settingsStore.isPortableMode
+                  ? `Portable settings and memory: ${settingsStore.dataDirectory}. API key encryption is tied to this Windows account.`
+                  : 'Settings and memory are stored in your Windows profile. API key uses Windows secure storage.'
+              }}
             </p>
-            <p class="maker-note">
-              <span class="maker-dot">●</span>Created by <strong>Hexamania</strong>
-            </p>
+            <p class="maker-note"><span class="maker-dot">●</span>Created by <strong>Hexamania</strong></p>
           </div>
         </div>
       </aside>
@@ -365,16 +238,8 @@ const currentView = computed(() => {
     </div>
 
     <!-- Toast Container -->
-    <div
-      class="toast-container"
-      aria-live="polite"
-      aria-atomic="true"
-    >
-      <Toast
-        v-for="toast in uiStore.visibleToasts"
-        :key="toast.id"
-        :toast="toast"
-      />
+    <div class="toast-container" aria-live="polite" aria-atomic="true">
+      <Toast v-for="toast in uiStore.visibleToasts" :key="toast.id" :toast="toast" />
     </div>
   </div>
 </template>
@@ -386,7 +251,7 @@ const currentView = computed(() => {
   height: 100vh;
   overflow: hidden;
   background: radial-gradient(ellipse at 77% -20%, rgba(81, 87, 159, 0.15), transparent 45%), #080b12;
-  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -439,7 +304,9 @@ const currentView = computed(() => {
   background: transparent;
   color: #a9b4c7;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .sidebar-toggle:hover {
@@ -463,9 +330,14 @@ const currentView = computed(() => {
   border: 1px solid rgba(151, 242, 221, 0.35);
   border-radius: 12px;
   background: linear-gradient(145deg, #9af4d8 0%, #6ec9ff 100%);
-  box-shadow: 0 0 26px rgba(93, 217, 195, 0.19), inset 0 1px 0 #ffffff80;
+  box-shadow:
+    0 0 26px rgba(93, 217, 195, 0.19),
+    inset 0 1px 0 #ffffff80;
   color: #09111b;
-  font: 700 22px "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font:
+    700 22px 'Segoe UI Variable Display',
+    'Segoe UI',
+    sans-serif;
 }
 
 .brand-mark span {
@@ -474,7 +346,10 @@ const currentView = computed(() => {
 
 .brand-copy strong {
   display: block;
-  font: 600 14px "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font:
+    600 14px 'Segoe UI Variable Display',
+    'Segoe UI',
+    sans-serif;
   letter-spacing: -0.03em;
 }
 
@@ -482,7 +357,10 @@ const currentView = computed(() => {
   display: block;
   margin-top: 3px;
   color: #69758a;
-  font: 8px "Cascadia Code", Consolas, monospace;
+  font:
+    8px 'Cascadia Code',
+    Consolas,
+    monospace;
   letter-spacing: 0.13em;
 }
 
@@ -546,7 +424,9 @@ const currentView = computed(() => {
   border-right: 1px solid rgba(149, 166, 197, 0.13);
   background: linear-gradient(165deg, rgba(17, 25, 39, 0.78), rgba(10, 14, 22, 0.88));
   animation: slide-right 0.65s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  transition: padding 0.3s ease, width 0.3s ease;
+  transition:
+    padding 0.3s ease,
+    width 0.3s ease;
 }
 
 .settings-rail.collapsed {
@@ -565,13 +445,19 @@ const currentView = computed(() => {
 .eyebrow {
   margin: 0 0 8px;
   color: #73ebc2;
-  font: 8px "Cascadia Code", Consolas, monospace;
+  font:
+    8px 'Cascadia Code',
+    Consolas,
+    monospace;
   letter-spacing: 0.17em;
 }
 
 h1 {
   margin: 0 0 8px;
-  font: 500 28px/0.98 "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font:
+    500 28px/0.98 'Segoe UI Variable Display',
+    'Segoe UI',
+    sans-serif;
   letter-spacing: -0.06em;
 }
 
@@ -609,7 +495,10 @@ h1 > span {
   font-weight: 500;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .nav-item:hover {
@@ -653,7 +542,12 @@ h1 > span {
   font-size: 10px;
   font-weight: 700;
   font-family: inherit;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
+  transition:
+    transform 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s,
+    opacity 0.15s;
 }
 
 .btn:hover:not(:disabled) {
@@ -671,12 +565,16 @@ h1 > span {
 
 .btn--primary {
   background: linear-gradient(105deg, #87f0cd, #77cfe7);
-  box-shadow: 0 7px 23px rgba(98, 219, 186, 0.22), inset 0 1px rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 7px 23px rgba(98, 219, 186, 0.22),
+    inset 0 1px rgba(255, 255, 255, 0.4);
   color: #081610;
 }
 
 .btn--primary:hover:not(:disabled) {
-  box-shadow: 0 9px 26px rgba(98, 219, 186, 0.35), inset 0 1px rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 9px 26px rgba(98, 219, 186, 0.35),
+    inset 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .btn--launch {
@@ -759,7 +657,10 @@ h1 > span {
   gap: 6px;
   margin-top: 10px;
   color: #66748a;
-  font: 7px "Cascadia Code", Consolas, monospace;
+  font:
+    7px 'Cascadia Code',
+    Consolas,
+    monospace;
   letter-spacing: 0.08em;
 }
 
@@ -800,23 +701,45 @@ h1 > span {
 }
 
 @keyframes slide-down {
-  from { opacity: 0; transform: translateY(-12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slide-right {
-  from { opacity: 0; transform: translateX(-14px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes rise-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes ambient-drift {
-  from { transform: translateY(-15px) scale(0.9); }
-  to { transform: translateY(25px) scale(1.1); }
+  from {
+    transform: translateY(-15px) scale(0.9);
+  }
+  to {
+    transform: translateY(25px) scale(1.1);
+  }
 }
 
 @media (max-width: 1100px) {
@@ -897,7 +820,9 @@ h1 > span {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

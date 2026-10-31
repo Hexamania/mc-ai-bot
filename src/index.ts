@@ -5,8 +5,13 @@
 
 import type { BotManager } from './bot';
 import { createBotManager } from './bot';
-import { createWebServer } from './web';
-import { getCommandRegistry, registerHelpCommand, registerPingCommand, registerCoordsCommand } from './commands';
+import { createWebServer, type WebServer } from './web';
+import {
+  getCommandRegistry,
+  registerHelpCommand,
+  registerPingCommand,
+  registerCoordsCommand,
+} from './commands';
 import { registerBotCommands } from './commands/botCommands';
 import { loadMemory, persistMemory } from './memory';
 import { registerBuiltinFeatures, getFeatureRegistry } from './plugins';
@@ -17,12 +22,12 @@ import { getConfig } from './config';
  */
 export class Application {
   private botManager: BotManager;
-  private webServer: any;
+  private webServer: WebServer;
   private isShuttingDown = false;
 
   constructor() {
     // Load configuration
-    const config = getConfig();
+    void getConfig();
 
     // Load persistent memory
     loadMemory();
@@ -99,7 +104,9 @@ export class Application {
     process.on('uncaughtException', (error) => {
       console.error('[APP] Uncaught exception:', error);
       if (!this.isShuttingDown) {
-        shutdown('uncaughtException');
+        void shutdown('uncaughtException').catch(() => {
+          /* ignore */
+        });
       }
     });
 
@@ -133,7 +140,7 @@ export class Application {
   /**
    * Get web server instance
    */
-  getWebServer(): any {
+  getWebServer(): WebServer {
     return this.webServer;
   }
 }
@@ -149,7 +156,7 @@ export async function createApp(): Promise<Application> {
 
 // Auto-start if this is the main module
 if (import.meta.url === `file://${process.argv[1]}`) {
-  createApp().catch(error => {
+  createApp().catch((error) => {
     console.error('[APP] Failed to start:', error);
     process.exit(1);
   });

@@ -5,7 +5,6 @@
 import type { Bot } from 'mineflayer';
 import type { Entity } from 'prismarine-entity';
 import type { Vec3 } from 'vec3';
-import { Server, Socket } from 'socket.io';
 import type { BotManager } from '../bot/BotManager';
 
 /**
@@ -301,8 +300,8 @@ export interface APIResponse<T = unknown> {
   error?: string;
 }
 
-export interface StateAPIResponse extends APIResponse<BotState> {}
-export interface StatusAPIResponse extends APIResponse<BotStatus> {}
+export type StateAPIResponse = APIResponse<BotState>;
+export type StatusAPIResponse = APIResponse<BotStatus>;
 
 /**
  * Progression/Task types

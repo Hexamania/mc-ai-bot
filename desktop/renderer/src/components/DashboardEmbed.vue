@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useBotStore } from '../stores/botStore';
 import { useUIStore } from '../stores/uiStore';
 
@@ -11,7 +11,6 @@ const isLoaded = ref(false);
 const showPlaceholder = ref(true);
 const dashboardUrl = ref('');
 
-const isOnline = computed(() => botStore.isOnline);
 const isRunning = computed(() => botStore.isRunning);
 
 const placeholderRotation = ref(0);
@@ -76,52 +75,22 @@ function handleOpenInBrowser() {
     <div class="dashboard-header">
       <div class="dashboard-url">
         <span class="url-label">LOCAL DASHBOARD</span>
-        <span
-          v-if="dashboardUrl"
-          class="url-value"
-        >{{ dashboardUrl.replace(/^https?:\/\//, '') }}</span>
-        <span
-          v-else
-          class="url-value placeholder"
-        >not running</span>
+        <span v-if="dashboardUrl" class="url-value">{{ dashboardUrl.replace(/^https?:\/\//, '') }}</span>
+        <span v-else class="url-value placeholder">not running</span>
       </div>
       <div class="dashboard-actions">
-        <button
-          class="btn btn--icon"
-          :disabled="!isRunning"
-          title="Refresh dashboard"
-          @click="handleRefresh"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            class="icon-spin"
-          >
-            <path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+        <button class="btn btn--icon" :disabled="!isRunning" title="Refresh dashboard" @click="handleRefresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-spin">
+            <path d="M23 4v6h-6" />
+            <path d="M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
           </svg>
         </button>
-        <button
-          class="btn btn--icon"
-          :disabled="!dashboardUrl"
-          title="Open in browser"
-          @click="handleOpenInBrowser"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
+        <button class="btn btn--icon" :disabled="!dashboardUrl" title="Open in browser" @click="handleOpenInBrowser">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
             <polyline points="15 3 21 3 21 9" />
-            <line
-              x1="10"
-              y1="14"
-              x2="21"
-              y2="3"
-            />
+            <line x1="10" y1="14" x2="21" y2="3" />
           </svg>
         </button>
       </div>
@@ -139,41 +108,22 @@ function handleOpenInBrowser() {
         @load="handleIframeLoad"
       />
 
-      <div
-        v-show="showPlaceholder && !isLoaded"
-        class="dashboard-placeholder"
-      >
-        <div class="placeholder-core">
-          A
-        </div>
+      <div v-show="showPlaceholder && !isLoaded" class="dashboard-placeholder">
+        <div class="placeholder-core">A</div>
         <div class="placeholder-orbit">
-          <div
-            class="orbit-ring"
-            :style="{ transform: `rotate(${placeholderRotation}deg)` }"
-          />
-          <div
-            class="orbit-ring"
-            :style="{ transform: `rotate(${placeholderRotation + 120}deg)` }"
-          />
-          <div
-            class="orbit-ring"
-            :style="{ transform: `rotate(${placeholderRotation + 240}deg)` }"
-          />
+          <div class="orbit-ring" :style="{ transform: `rotate(${placeholderRotation}deg)` }" />
+          <div class="orbit-ring" :style="{ transform: `rotate(${placeholderRotation + 120}deg)` }" />
+          <div class="orbit-ring" :style="{ transform: `rotate(${placeholderRotation + 240}deg)` }" />
         </div>
-        <p class="placeholder-text">
-          Awaiting bot process
-        </p>
+        <p class="placeholder-text">Awaiting bot process</p>
         <h3>Dashboard <span>preview</span></h3>
         <p class="placeholder-desc">
-          Save settings and start the bot to load the live dashboard.
-          The web server runs on loopback and is embedded here for convenience.
+          Save settings and start the bot to load the live dashboard. The web server runs on loopback and is embedded
+          here for convenience.
         </p>
       </div>
 
-      <div
-        v-if="isRunning && !isLoaded && !showPlaceholder"
-        class="dashboard-loading"
-      >
+      <div v-if="isRunning && !isLoaded && !showPlaceholder" class="dashboard-loading">
         <div class="loading-spinner" />
         <p>Loading dashboard...</p>
       </div>
@@ -216,13 +166,13 @@ function handleOpenInBrowser() {
   font-weight: 600;
   letter-spacing: 0.1em;
   color: #556176;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: 'Cascadia Code', Consolas, monospace;
   text-transform: uppercase;
 }
 
 .url-value {
   font-size: 9px;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: 'Cascadia Code', Consolas, monospace;
   color: #76849a;
   white-space: nowrap;
   overflow: hidden;
@@ -253,7 +203,12 @@ function handleOpenInBrowser() {
   font-size: 9px;
   font-weight: 600;
   font-family: inherit;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
+  transition:
+    transform 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s,
+    opacity 0.15s;
 }
 
 .btn:hover:not(:disabled) {
@@ -319,9 +274,13 @@ function handleOpenInBrowser() {
   gap: 16px;
   padding: 24px;
   text-align: center;
-  background: radial-gradient(ellipse at 51% 44%, rgba(43, 65, 82, 0.36), transparent 46%), linear-gradient(150deg, #111a29, #0b111a 70%);
+  background:
+    radial-gradient(ellipse at 51% 44%, rgba(43, 65, 82, 0.36), transparent 46%),
+    linear-gradient(150deg, #111a29, #0b111a 70%);
   z-index: 2;
-  transition: opacity 0.4s, transform 0.4s;
+  transition:
+    opacity 0.4s,
+    transform 0.4s;
 }
 
 .dashboard-placeholder[hidden] {
@@ -336,9 +295,14 @@ function handleOpenInBrowser() {
   border: 1px solid #91f1d080;
   border-radius: 14px;
   background: linear-gradient(145deg, #98f2d5, #76baf8);
-  box-shadow: 0 0 40px #6bdcc744, inset 0 1px #ffffff88;
+  box-shadow:
+    0 0 40px #6bdcc744,
+    inset 0 1px #ffffff88;
   color: #0c1620;
-  font: 700 24px "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font:
+    700 24px 'Segoe UI Variable Display',
+    'Segoe UI',
+    sans-serif;
   animation: core-float 3s ease-in-out infinite;
 }
 
@@ -374,8 +338,13 @@ function handleOpenInBrowser() {
 }
 
 @keyframes core-float {
-  0%, 100% { transform: translateY(0) rotate(-3deg); }
-  50% { transform: translateY(-6px) rotate(3deg); }
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
 }
 
 .placeholder-text {
@@ -393,7 +362,10 @@ function handleOpenInBrowser() {
   position: relative;
   z-index: 1;
   margin: 0;
-  font: 500 clamp(22px, 2.8vw, 34px)/1.1 "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font:
+    500 clamp(22px, 2.8vw, 34px)/1.1 'Segoe UI Variable Display',
+    'Segoe UI',
+    sans-serif;
   letter-spacing: -0.05em;
 }
 
@@ -433,7 +405,9 @@ function handleOpenInBrowser() {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .dashboard-loading p {

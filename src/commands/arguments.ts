@@ -3,13 +3,7 @@
  * Advanced argument parsing with type validation, autocomplete, and error handling
  */
 
-import type {
-  CommandArgument,
-  CommandOption,
-  ParsedArguments} from './types';
-import {
-  PermissionLevel
-} from './types';
+import type { CommandArgument, CommandOption, ParsedArguments } from './types';
 import type { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 
@@ -68,7 +62,7 @@ export class ArgumentParser {
       if (arg.startsWith('--')) {
         // Long option (--flag)
         const optionName = arg.slice(2);
-        const optionDef = optionsDef.find(o => o.name === optionName);
+        const optionDef = optionsDef.find((o) => o.name === optionName);
 
         if (optionDef) {
           if (optionDef.hasValue) {
@@ -96,7 +90,7 @@ export class ArgumentParser {
         let handledShort = true;
 
         for (const shortOpt of shortOptions) {
-          const optionDef = optionsDef.find(o => o.alias === shortOpt);
+          const optionDef = optionsDef.find((o) => o.alias === shortOpt);
           if (optionDef) {
             if (optionDef.hasValue) {
               i++;
@@ -135,9 +129,9 @@ export class ArgumentParser {
         // Consume all remaining arguments
         const remaining = remainingArgs.slice(argIndex);
         if (remaining.length > 0) {
-          const parsed = remaining.map(v => this.parseValue(v, argDef.type));
-          if (parsed.every(p => p.success)) {
-            positionalArgs.push(parsed.map(p => p.value));
+          const parsed = remaining.map((v) => this.parseValue(v, argDef.type));
+          if (parsed.every((p) => p.success)) {
+            positionalArgs.push(parsed.map((p) => p.value));
           } else {
             // If any fail, push raw values
             positionalArgs.push(remaining);
@@ -190,11 +184,7 @@ export class ArgumentParser {
   /**
    * Parse a single value according to type
    */
-  parseValue(
-    value: string,
-    type: CommandArgument['type'],
-    argDef?: CommandArgument
-  ): ParseResult {
+  parseValue(value: string, type: CommandArgument['type'], argDef?: CommandArgument): ParseResult {
     const str = value.trim();
 
     // Handle empty string
@@ -218,14 +208,21 @@ export class ArgumentParser {
         if (argDef?.validator) {
           const validation = argDef.validator(num);
           if (validation !== true) {
-            return { success: false, error: typeof validation === 'string' ? validation : 'Validation failed' };
+            return {
+              success: false,
+              error: typeof validation === 'string' ? validation : 'Validation failed',
+            };
           }
         }
         return { success: true, value: num };
       }
 
       case 'boolean': {
-        const bool = str.toLowerCase() === 'true' || str === '1' || str.toLowerCase() === 'yes' || str.toLowerCase() === 'on';
+        const bool =
+          str.toLowerCase() === 'true' ||
+          str === '1' ||
+          str.toLowerCase() === 'yes' ||
+          str.toLowerCase() === 'on';
         return { success: true, value: bool };
       }
 
@@ -257,14 +254,17 @@ export class ArgumentParser {
         const item = this.bot.registry.itemsByName[str];
         if (!item) {
           // Try partial match
-          const matches = Object.values(this.bot.registry.itemsByName).filter(
-            i => i.name.toLowerCase().includes(str.toLowerCase())
+          const matches = Object.values(this.bot.registry.itemsByName).filter((i) =>
+            i.name.toLowerCase().includes(str.toLowerCase())
           );
           if (matches.length === 1) {
             return { success: true, value: matches[0] };
           }
           if (matches.length > 1) {
-            return { success: false, error: `Ambiguous item: ${str}. Matches: ${matches.map(m => m.name).join(', ')}` };
+            return {
+              success: false,
+              error: `Ambiguous item: ${str}. Matches: ${matches.map((m) => m.name).join(', ')}`,
+            };
           }
           return { success: false, error: `Item "${str}" not found` };
         }
@@ -275,7 +275,7 @@ export class ArgumentParser {
         if (!argDef?.enumValues || argDef.enumValues.length === 0) {
           return { success: true, value: str };
         }
-        const matching = argDef.enumValues.find(v => v.toLowerCase() === str.toLowerCase());
+        const matching = argDef.enumValues.find((v) => v.toLowerCase() === str.toLowerCase());
         if (!matching) {
           return {
             success: false,
@@ -305,9 +305,12 @@ export class ArgumentParser {
       const currentPos = this.bot.entity.position;
 
       // Split by spaces or commas
-      const parts = trimmed.split(/[\s,]+/).filter(p => p);
+      const parts = trimmed.split(/[\s,]+/).filter((p) => p);
       if (parts.length !== 3) {
-        return { success: false, error: 'Relative position requires 3 coordinates (e.g., "~ ~ ~" or "~1 ~2 ~3")' };
+        return {
+          success: false,
+          error: 'Relative position requires 3 coordinates (e.g., "~ ~ ~" or "~1 ~2 ~3")',
+        };
       }
 
       const coords = parts.map((part, i) => {
@@ -339,12 +342,12 @@ export class ArgumentParser {
     }
 
     // Absolute coordinates
-    const parts = trimmed.split(/[\s,]+/).filter(p => p);
+    const parts = trimmed.split(/[\s,]+/).filter((p) => p);
     if (parts.length !== 3) {
       return { success: false, error: 'Position requires 3 coordinates (x y z)' };
     }
 
-    const coords = parts.map(p => {
+    const coords = parts.map((p) => {
       const num = parseFloat(p);
       if (isNaN(num)) {
         throw new Error(`Invalid coordinate: ${p}`);
@@ -370,16 +373,16 @@ export class ArgumentParser {
       case 'player':
         if (!bot) return [];
         return Object.keys(bot.players)
-          .filter(name => name.toLowerCase().startsWith(lowerPartial))
+          .filter((name) => name.toLowerCase().startsWith(lowerPartial))
           .slice(0, 10);
 
       case 'item':
         if (!bot) return [];
         return Object.keys(bot.registry.itemsByName)
-          .filter(name => name.toLowerCase().includes(lowerPartial))
+          .filter((name) => name.toLowerCase().includes(lowerPartial))
           .slice(0, 10);
 
-      case 'position':
+      case 'position': {
         // Suggest current position and relative
         if (!bot?.entity) return ['~ ~ ~'];
         const pos = bot.entity.position;
@@ -387,22 +390,21 @@ export class ArgumentParser {
           `~ ~ ~`,
           `~${Math.floor(pos.x)} ~${Math.floor(pos.y)} ~${Math.floor(pos.z)}`,
           `${Math.floor(pos.x)} ${Math.floor(pos.y)} ${Math.floor(pos.z)}`,
-        ].filter(s => s.toLowerCase().startsWith(lowerPartial));
+        ].filter((s) => s.toLowerCase().startsWith(lowerPartial));
+      }
 
       case 'enum':
         if (!argDef.enumValues) return [];
         return argDef.enumValues
-          .filter(v => v.toLowerCase().startsWith(lowerPartial))
+          .filter((v) => v.toLowerCase().startsWith(lowerPartial))
           .slice(0, 10);
 
       case 'number':
         // Suggest common numbers
-        return ['1', '10', '64', '100', '1000']
-          .filter(n => n.startsWith(partial))
-          .slice(0, 5);
+        return ['1', '10', '64', '100', '1000'].filter((n) => n.startsWith(partial)).slice(0, 5);
 
       case 'boolean':
-        return ['true', 'false'].filter(b => b.startsWith(lowerPartial));
+        return ['true', 'false'].filter((b) => b.startsWith(lowerPartial));
 
       case 'string':
       default:
@@ -439,7 +441,8 @@ export class ArgumentParser {
   formatOption(optionDef: CommandOption): string {
     const aliasStr = optionDef.alias ? `, -${optionDef.alias}` : '';
     const valueStr = optionDef.hasValue ? ` <${optionDef.type}>` : '';
-    const defaultStr = optionDef.defaultValue !== undefined ? ` (default: ${optionDef.defaultValue})` : '';
+    const defaultStr =
+      optionDef.defaultValue !== undefined ? ` (default: ${optionDef.defaultValue})` : '';
     return `--${optionDef.name}${aliasStr}${valueStr}${defaultStr}: ${optionDef.description}`;
   }
 
@@ -466,14 +469,18 @@ export class ArgumentParser {
       if (value !== undefined && value !== null && argDef.validator) {
         const validation = argDef.validator(value);
         if (validation !== true) {
-          errors.push(typeof validation === 'string' ? validation : `Invalid value for ${argDef.name}`);
+          errors.push(
+            typeof validation === 'string' ? validation : `Invalid value for ${argDef.name}`
+          );
         }
       }
 
       if (argDef.type === 'enum' && argDef.enumValues && value !== undefined) {
         const strVal = String(value);
         if (!argDef.enumValues.includes(strVal)) {
-          errors.push(`Invalid value for ${argDef.name}: ${strVal}. Allowed: ${argDef.enumValues.join(', ')}`);
+          errors.push(
+            `Invalid value for ${argDef.name}: ${strVal}. Allowed: ${argDef.enumValues.join(', ')}`
+          );
         }
       }
     }
@@ -544,7 +551,13 @@ export const CommonArguments = {
     type: 'number',
   }),
 
-  integer: (name: string, description: string, required = true, min?: number, max?: number): CommandArgument => ({
+  integer: (
+    name: string,
+    description: string,
+    required = true,
+    min?: number,
+    max?: number
+  ): CommandArgument => ({
     name,
     description,
     required,
@@ -572,7 +585,12 @@ export const CommonArguments = {
     type: 'boolean',
   }),
 
-  enum: (name: string, description: string, values: string[], required = true): CommandArgument => ({
+  enum: (
+    name: string,
+    description: string,
+    values: string[],
+    required = true
+  ): CommandArgument => ({
     name,
     description,
     required,

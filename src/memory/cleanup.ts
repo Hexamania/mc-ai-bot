@@ -2,8 +2,7 @@
  * Automatic cleanup and pruning for the memory system
  */
 
-import type { MemoryData, CleanupOptions, CleanupResult} from './types';
-import { ExtendedLocationInfo, ExtendedPlayerInfo, FactEntry, RuleEntry } from './types';
+import type { MemoryData, CleanupOptions, CleanupResult } from './types';
 
 /**
  * Default cleanup configuration
@@ -94,8 +93,12 @@ export class MemoryCleanup {
 
       // Sort by lastVisitedAt or updatedAt (oldest first)
       locationEntries.sort((a, b) => {
-        const dateA = a[1].lastVisitedAt ? new Date(a[1].lastVisitedAt).getTime() : new Date(a[1].updatedAt).getTime();
-        const dateB = b[1].lastVisitedAt ? new Date(b[1].lastVisitedAt).getTime() : new Date(b[1].updatedAt).getTime();
+        const dateA = a[1].lastVisitedAt
+          ? new Date(a[1].lastVisitedAt).getTime()
+          : new Date(a[1].updatedAt).getTime();
+        const dateB = b[1].lastVisitedAt
+          ? new Date(b[1].lastVisitedAt).getTime()
+          : new Date(b[1].updatedAt).getTime();
         return dateA - dateB;
       });
 
@@ -105,7 +108,9 @@ export class MemoryCleanup {
       if (locationAge > 0) {
         const cutoff = now.getTime() - locationAge;
         for (const [key, loc] of locationEntries) {
-          const lastVisit = loc.lastVisitedAt ? new Date(loc.lastVisitedAt).getTime() : new Date(loc.updatedAt).getTime();
+          const lastVisit = loc.lastVisitedAt
+            ? new Date(loc.lastVisitedAt).getTime()
+            : new Date(loc.updatedAt).getTime();
           if (lastVisit < cutoff) {
             toRemove.add(key);
           }
@@ -143,8 +148,8 @@ export class MemoryCleanup {
       const playerEntries = Object.entries(memory.players);
 
       // Sort by lastSeen (oldest first)
-      playerEntries.sort((a, b) =>
-        new Date(a[1].lastSeen).getTime() - new Date(b[1].lastSeen).getTime()
+      playerEntries.sort(
+        (a, b) => new Date(a[1].lastSeen).getTime() - new Date(b[1].lastSeen).getTime()
       );
 
       const toRemove = new Set<string>();
@@ -193,8 +198,12 @@ export class MemoryCleanup {
 
       // Sort by lastAccessedAt or createdAt (oldest first)
       factEntries.sort((a, b) => {
-        const dateA = a[1].lastAccessedAt ? new Date(a[1].lastAccessedAt).getTime() : new Date(a[1].createdAt).getTime();
-        const dateB = b[1].lastAccessedAt ? new Date(b[1].lastAccessedAt).getTime() : new Date(b[1].createdAt).getTime();
+        const dateA = a[1].lastAccessedAt
+          ? new Date(a[1].lastAccessedAt).getTime()
+          : new Date(a[1].createdAt).getTime();
+        const dateB = b[1].lastAccessedAt
+          ? new Date(b[1].lastAccessedAt).getTime()
+          : new Date(b[1].createdAt).getTime();
         return dateA - dateB;
       });
 
@@ -204,7 +213,9 @@ export class MemoryCleanup {
       if (factAge > 0) {
         const cutoff = now.getTime() - factAge;
         for (const [key, fact] of factEntries) {
-          const lastAccess = fact.lastAccessedAt ? new Date(fact.lastAccessedAt).getTime() : new Date(fact.createdAt).getTime();
+          const lastAccess = fact.lastAccessedAt
+            ? new Date(fact.lastAccessedAt).getTime()
+            : new Date(fact.createdAt).getTime();
           if (lastAccess < cutoff && (fact.confidence ?? 1) < 0.9) {
             // Only remove low-confidence old facts
             toRemove.add(key);
@@ -217,7 +228,9 @@ export class MemoryCleanup {
         const excess = factEntries.length - toRemove.size - maxFacts;
         let removed = 0;
         // Sort by access count (least accessed first)
-        const byAccess = [...factEntries].sort((a, b) => (a[1].accessCount ?? 0) - (b[1].accessCount ?? 0));
+        const byAccess = [...factEntries].sort(
+          (a, b) => (a[1].accessCount ?? 0) - (b[1].accessCount ?? 0)
+        );
         for (const [key] of byAccess) {
           if (!toRemove.has(key) && removed < excess) {
             toRemove.add(key);
@@ -245,9 +258,7 @@ export class MemoryCleanup {
       const ruleEntries = [...memory.rules];
 
       // Sort by createdAt (oldest first)
-      ruleEntries.sort((a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+      ruleEntries.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
       const toRemove = new Set<string>();
 
@@ -283,7 +294,7 @@ export class MemoryCleanup {
 
       // Actually remove
       if (!mergedOptions.dryRun) {
-        memory.rules = memory.rules.filter(r => !toRemove.has(r.id));
+        memory.rules = memory.rules.filter((r) => !toRemove.has(r.id));
         removedRules = toRemove.size;
       } else {
         removedRules = toRemove.size;
@@ -331,9 +342,15 @@ export class MemoryCleanup {
         if (onCleanup) {
           onCleanup(result);
         }
-        if (result.removedLocations > 0 || result.removedPlayers > 0 ||
-            result.removedFacts > 0 || result.removedRules > 0) {
-          console.log(`[MEMORY-CLEANUP] Cleaned up: ${result.removedLocations} locations, ${result.removedPlayers} players, ${result.removedFacts} facts, ${result.removedRules} rules in ${result.duration}ms`);
+        if (
+          result.removedLocations > 0 ||
+          result.removedPlayers > 0 ||
+          result.removedFacts > 0 ||
+          result.removedRules > 0
+        ) {
+          console.log(
+            `[MEMORY-CLEANUP] Cleaned up: ${result.removedLocations} locations, ${result.removedPlayers} players, ${result.removedFacts} facts, ${result.removedRules} rules in ${result.duration}ms`
+          );
         }
       } catch (error) {
         console.error('[MEMORY-CLEANUP] Auto cleanup failed:', error);
@@ -392,15 +409,21 @@ export class MemoryCleanup {
         const maxLocations = options.maxEntries ?? this.config.maxLocations;
         const entries = Object.entries(memory.locations);
         entries.sort((a, b) => {
-          const dateA = a[1].lastVisitedAt ? new Date(a[1].lastVisitedAt).getTime() : new Date(a[1].updatedAt).getTime();
-          const dateB = b[1].lastVisitedAt ? new Date(b[1].lastVisitedAt).getTime() : new Date(b[1].updatedAt).getTime();
+          const dateA = a[1].lastVisitedAt
+            ? new Date(a[1].lastVisitedAt).getTime()
+            : new Date(a[1].updatedAt).getTime();
+          const dateB = b[1].lastVisitedAt
+            ? new Date(b[1].lastVisitedAt).getTime()
+            : new Date(b[1].updatedAt).getTime();
           return dateA - dateB;
         });
         const toRemove = new Set<string>();
         if (locationAge > 0) {
           const cutoff = now.getTime() - locationAge;
           for (const [key, loc] of entries) {
-            const lastVisit = loc.lastVisitedAt ? new Date(loc.lastVisitedAt).getTime() : new Date(loc.updatedAt).getTime();
+            const lastVisit = loc.lastVisitedAt
+              ? new Date(loc.lastVisitedAt).getTime()
+              : new Date(loc.updatedAt).getTime();
             if (lastVisit < cutoff) toRemove.add(key);
           }
         }
@@ -408,67 +431,99 @@ export class MemoryCleanup {
           const excess = entries.length - toRemove.size - maxLocations;
           let removed = 0;
           for (const [key] of entries) {
-            if (!toRemove.has(key) && removed < excess) { toRemove.add(key); removed++; }
+            if (!toRemove.has(key) && removed < excess) {
+              toRemove.add(key);
+              removed++;
+            }
           }
         }
         if (!options.dryRun) {
           for (const key of toRemove) delete memory.locations[key];
         }
-        return { removedLocations: options.dryRun ? toRemove.size : toRemove.size, timestamp: now.toISOString(), duration: Date.now() - startTime };
+        return {
+          removedLocations: options.dryRun ? toRemove.size : toRemove.size,
+          timestamp: now.toISOString(),
+          duration: Date.now() - startTime,
+        };
       }
       case 'players': {
         const playerAge = options.maxAge ?? this.config.maxPlayerInactiveAge;
         const maxPlayers = options.maxEntries ?? this.config.maxPlayers;
         const entries = Object.entries(memory.players);
-        entries.sort((a, b) => new Date(a[1].lastSeen).getTime() - new Date(b[1].lastSeen).getTime());
+        entries.sort(
+          (a, b) => new Date(a[1].lastSeen).getTime() - new Date(b[1].lastSeen).getTime()
+        );
         const toRemove = new Set<string>();
         if (playerAge > 0) {
           const cutoff = now.getTime() - playerAge;
           for (const [key, player] of entries) {
-            if (player.role === 'guest' && new Date(player.lastSeen).getTime() < cutoff) toRemove.add(key);
+            if (player.role === 'guest' && new Date(player.lastSeen).getTime() < cutoff)
+              toRemove.add(key);
           }
         }
         if (maxPlayers > 0 && entries.length - toRemove.size > maxPlayers) {
           const excess = entries.length - toRemove.size - maxPlayers;
           let removed = 0;
           for (const [key] of entries) {
-            if (!toRemove.has(key) && removed < excess) { toRemove.add(key); removed++; }
+            if (!toRemove.has(key) && removed < excess) {
+              toRemove.add(key);
+              removed++;
+            }
           }
         }
         if (!options.dryRun) {
           for (const key of toRemove) delete memory.players[key];
         }
-        return { removedPlayers: options.dryRun ? toRemove.size : toRemove.size, timestamp: now.toISOString(), duration: Date.now() - startTime };
+        return {
+          removedPlayers: options.dryRun ? toRemove.size : toRemove.size,
+          timestamp: now.toISOString(),
+          duration: Date.now() - startTime,
+        };
       }
       case 'facts': {
         const factAge = options.maxAge ?? this.config.maxFactAge;
         const maxFacts = options.maxEntries ?? this.config.maxFacts;
         const entries = Object.entries(memory.learnedFacts);
         entries.sort((a, b) => {
-          const dateA = a[1].lastAccessedAt ? new Date(a[1].lastAccessedAt).getTime() : new Date(a[1].createdAt).getTime();
-          const dateB = b[1].lastAccessedAt ? new Date(b[1].lastAccessedAt).getTime() : new Date(b[1].createdAt).getTime();
+          const dateA = a[1].lastAccessedAt
+            ? new Date(a[1].lastAccessedAt).getTime()
+            : new Date(a[1].createdAt).getTime();
+          const dateB = b[1].lastAccessedAt
+            ? new Date(b[1].lastAccessedAt).getTime()
+            : new Date(b[1].createdAt).getTime();
           return dateA - dateB;
         });
         const toRemove = new Set<string>();
         if (factAge > 0) {
           const cutoff = now.getTime() - factAge;
           for (const [key, fact] of entries) {
-            const lastAccess = fact.lastAccessedAt ? new Date(fact.lastAccessedAt).getTime() : new Date(fact.createdAt).getTime();
+            const lastAccess = fact.lastAccessedAt
+              ? new Date(fact.lastAccessedAt).getTime()
+              : new Date(fact.createdAt).getTime();
             if (lastAccess < cutoff && (fact.confidence ?? 1) < 0.9) toRemove.add(key);
           }
         }
         if (maxFacts > 0 && entries.length - toRemove.size > maxFacts) {
           const excess = entries.length - toRemove.size - maxFacts;
           let removed = 0;
-          const byAccess = [...entries].sort((a, b) => (a[1].accessCount ?? 0) - (b[1].accessCount ?? 0));
+          const byAccess = [...entries].sort(
+            (a, b) => (a[1].accessCount ?? 0) - (b[1].accessCount ?? 0)
+          );
           for (const [key] of byAccess) {
-            if (!toRemove.has(key) && removed < excess) { toRemove.add(key); removed++; }
+            if (!toRemove.has(key) && removed < excess) {
+              toRemove.add(key);
+              removed++;
+            }
           }
         }
         if (!options.dryRun) {
           for (const key of toRemove) delete memory.learnedFacts[key];
         }
-        return { removedFacts: options.dryRun ? toRemove.size : toRemove.size, timestamp: now.toISOString(), duration: Date.now() - startTime };
+        return {
+          removedFacts: options.dryRun ? toRemove.size : toRemove.size,
+          timestamp: now.toISOString(),
+          duration: Date.now() - startTime,
+        };
       }
       case 'rules': {
         const ruleAge = options.maxAge ?? this.config.maxRuleAge;
@@ -490,13 +545,20 @@ export class MemoryCleanup {
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           });
           for (const rule of sorted) {
-            if (!toRemove.has(rule.id) && removed < excess) { toRemove.add(rule.id); removed++; }
+            if (!toRemove.has(rule.id) && removed < excess) {
+              toRemove.add(rule.id);
+              removed++;
+            }
           }
         }
         if (!options.dryRun) {
-          memory.rules = memory.rules.filter(r => !toRemove.has(r.id));
+          memory.rules = memory.rules.filter((r) => !toRemove.has(r.id));
         }
-        return { removedRules: options.dryRun ? toRemove.size : toRemove.size, timestamp: now.toISOString(), duration: Date.now() - startTime };
+        return {
+          removedRules: options.dryRun ? toRemove.size : toRemove.size,
+          timestamp: now.toISOString(),
+          duration: Date.now() - startTime,
+        };
       }
     }
 

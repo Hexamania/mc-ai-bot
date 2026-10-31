@@ -7,7 +7,7 @@ import { createApp } from './index';
 
 async function main(): Promise<void> {
   try {
-    const app = await createApp();
+    await createApp();
 
     // Keep the process alive
     console.log('[MAIN] Application running. Press Ctrl+C to stop.');
@@ -23,4 +23,4 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+void main();

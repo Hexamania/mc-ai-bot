@@ -2,7 +2,7 @@
  * Main process entry point for Airi OS desktop app
  */
 
-import { app, BrowserWindow, ipcMain, shell, dialog, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, protocol } from 'electron';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,16 +16,7 @@ import { NotificationService } from './services/NotificationService';
 import { PortableService } from './services/PortableService';
 
 // IPC Channels
-import type {
-  EventName,
-  EventPayload} from './ipc/channels';
-import {
-  IPC_CHANNELS,
-  IPC_EVENTS,
-  ChannelName,
-  ChannelRequest,
-  ChannelResponse
-} from './ipc/channels';
+import type { EventName, EventPayload } from './ipc/channels';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,12 +41,12 @@ function initializeServices(): void {
   systemTray.setMainWindow(mainWindow!);
   notifications.setMainWindow(mainWindow!);
   systemTray.setOptions({
-    showWindow: showWindow,
-    hideWindow: hideWindow,
+    showWindow,
+    hideWindow,
     startBot: () => startBot(),
     stopBot: () => stopBot(),
     isBotRunning: () => botManager.isRunning(),
-    quitApp: quitApp,
+    quitApp,
   });
 
   // Forward bot state changes to renderer
@@ -64,7 +55,7 @@ function initializeServices(): void {
       connected: state.running,
       status: state.status,
       error: state.error,
-    } as any);
+    } as EventPayload<'app:bot-state'>);
   });
 
   // Forward auto-updater events
@@ -206,7 +197,7 @@ function setupIpcHandlers(): void {
     return settingsService.load();
   });
 
-  ipcMain.handle('settings:save', async (_event, config: Partial<any>) => {
+  ipcMain.handle('settings:save', async (_event, config: unknown) => {
     return settingsService.save(config);
   });
 
@@ -342,4 +333,13 @@ logService.appendLog('system', `Airi OS starting (v${app.getVersion()})`);
 logService.appendLog('system', `Portable mode: ${portableService.isPortable()}`);
 logService.appendLog('system', `Data directory: ${portableService.getDataDirectory()}`);
 
-export { mainWindow, settingsService, logService, botManager, autoUpdater, systemTray, notifications, portableService };
+export {
+  mainWindow,
+  settingsService,
+  logService,
+  botManager,
+  autoUpdater,
+  systemTray,
+  notifications,
+  portableService,
+};

@@ -3,13 +3,9 @@
  * Handles random wandering/roaming behavior
  */
 
-import { Bot } from 'mineflayer';
-import { Entity } from 'prismarine-entity';
-import { Vec3 } from 'vec3';
 import { goals, Movements } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
 
 /**
  * Roam feature configuration
@@ -31,6 +27,22 @@ export interface RoamFeatureOptions {
 }
 
 /**
+ * Minecraft data type
+ */
+interface MinecraftData {
+  version: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Command context type
+ */
+interface CommandContext {
+  args: string[];
+  reply: (message: string) => void;
+}
+
+/**
  * Roam Feature Class
  * Ported from original bot.js roam() function
  */
@@ -47,7 +59,7 @@ export class RoamFeature extends BaseFeature {
   private roamYAxis = false;
   private maxYDifference = 2;
   private movements: Movements | null = null;
-  private mcData: any = null;
+  private mcData: MinecraftData | null = null;
 
   constructor() {
     super('roam', '1.0.0', 'Random wandering/roaming behavior', ['core', 'movement']);
@@ -114,8 +126,9 @@ export class RoamFeature extends BaseFeature {
   /**
    * Get minecraft data
    */
-  private getMinecraftData(): any {
+  private getMinecraftData(): MinecraftData {
     const bot = this.getBot();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mcDataLoader = require('minecraft-data');
     return mcDataLoader(bot.version) || mcDataLoader(process.env.MC_VERSION || '1.21.1');
   }
@@ -125,7 +138,6 @@ export class RoamFeature extends BaseFeature {
    */
   private registerCommands(): void {
     const manager = this.getManager();
-    const bot = this.getBot();
 
     // Roam command - start roaming
     manager.registerCommand?.({
@@ -133,7 +145,7 @@ export class RoamFeature extends BaseFeature {
       description: 'Start random wandering/roaming',
       usage: 'roam [radius] [interval]',
       adminOnly: true,
-      execute: async (context: any) => {
+      execute: async (context: CommandContext) => {
         const { args, reply } = context;
 
         let radius = this.roamRadius;
@@ -157,7 +169,7 @@ export class RoamFeature extends BaseFeature {
 
         await this.startRoaming(radius, interval);
         reply(`🚶 Started roaming (radius: ${radius}, interval: ${interval}ms)`);
-      }
+      },
     });
 
     // Stop roam command
@@ -166,11 +178,11 @@ export class RoamFeature extends BaseFeature {
       description: 'Stop roaming',
       usage: 'stoproam',
       adminOnly: true,
-      execute: async (context: any) => {
+      execute: async (context: CommandContext) => {
         const { reply } = context;
         await this.stopRoaming();
         reply('🛑 Stopped roaming');
-      }
+      },
     });
 
     // Roam status command
@@ -179,14 +191,14 @@ export class RoamFeature extends BaseFeature {
       description: 'Get current roam status',
       usage: 'roamstatus',
       adminOnly: true,
-      execute: async (context: any) => {
+      execute: async (context: CommandContext) => {
         const { reply } = context;
         const status = this.isRoamingNow() ? 'Roaming' : 'Not roaming';
         const radius = this.getRoamRadius();
         const interval = this.getUpdateInterval();
 
         reply(`🚶 ${status} (radius: ${radius}, interval: ${interval}ms)`);
-      }
+      },
     });
   }
 
@@ -196,8 +208,6 @@ export class RoamFeature extends BaseFeature {
    * @param interval - Optional update interval override
    */
   async startRoaming(radius?: number, interval?: number): Promise<void> {
-    const bot = this.getBot();
-
     if (this.isRoaming) {
       console.warn('[RoamFeature] Already roaming');
       return;
@@ -214,7 +224,9 @@ export class RoamFeature extends BaseFeature {
     // Start the roam loop
     this.roamLoop(effectiveRadius, effectiveInterval);
 
-    console.log(`[RoamFeature] Started roaming with radius ${effectiveRadius}, interval ${effectiveInterval}ms`);
+    console.log(
+      `[RoamFeature] Started roaming with radius ${effectiveRadius}, interval ${effectiveInterval}ms`
+    );
   }
 
   /**

@@ -3,13 +3,19 @@
  * Handles all real-time communication between bot and dashboard
  */
 
-import type { Server, Socket} from 'socket.io';
-import { Namespace } from 'socket.io';
-import { Bot } from 'mineflayer';
+import type { Server, Socket } from 'socket.io';
 import { Vec3 } from 'vec3';
 import { Movements, goals } from 'mineflayer-pathfinder';
 import type { BotManager } from '../../bot';
-import { loadMemory, getMemory, rememberLocation, rememberFact, forgetFact, addRule, removeRule, getMemoryContext, persistMemory, stopRememberedTask } from '../../memory';
+import {
+  getMemory,
+  rememberLocation,
+  rememberFact,
+  forgetFact,
+  addRule,
+  removeRule,
+  stopRememberedTask,
+} from '../../memory';
 import { getCommandRegistry, createCommandContext } from '../../commands';
 import type {
   BotStatusPayload,
@@ -26,14 +32,9 @@ import type {
   SaveLocationPayload,
   RememberFactPayload,
   UpdateSettingsPayload,
-  PingPayload} from './events';
-import {
-  NAMESPACES,
-  SERVER_EVENTS,
-  CLIENT_EVENTS,
-  ROOMS,
-  ROOM_EVENTS
+  PingPayload,
 } from './events';
+import { NAMESPACES, SERVER_EVENTS, CLIENT_EVENTS, ROOMS, ROOM_EVENTS } from './events';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -65,16 +66,12 @@ export function setupMainNamespace(io: Server, botManager: BotManager): void {
   });
 
   nsp.on('connection', (socket: AuthenticatedSocket) => {
-    const bot = botManager.getBot();
-
-    console.log(`[SOCKET] Dashboard connected: ${socket.id} (${socket.user?.username})`);
-
     // Join default rooms
-    socket.join(ROOMS.ALL);
+    void socket.join(ROOMS.ALL);
     if (socket.user?.role === 'admin') {
-      socket.join(ROOMS.ADMINS);
+      void socket.join(ROOMS.ADMINS);
     } else if (socket.user?.role === 'trusted') {
-      socket.join(ROOMS.TRUSTED);
+      void socket.join(ROOMS.TRUSTED);
     }
 
     // Send initial state
@@ -107,18 +104,21 @@ export function setupAdminNamespace(io: Server, botManager: BotManager): void {
     console.log(`[SOCKET] Admin connected: ${socket.id}`);
 
     // Admin-only events
-    socket.on(CLIENT_EVENTS.EXECUTE_CONSOLE_COMMAND, (data: { command: string; requestId?: string }) => {
-      const bot = botManager.getBot();
-      if (bot && data.command) {
-        bot.chat(`/${data.command}`);
-        socket.emit(SERVER_EVENTS.COMMAND_RESULT, {
-          requestId: data.requestId,
-          command: `console:${data.command}`,
-          success: true,
-          output: `Executed: /${data.command}`,
-        });
+    socket.on(
+      CLIENT_EVENTS.EXECUTE_CONSOLE_COMMAND,
+      (data: { command: string; requestId?: string }) => {
+        const bot = botManager.getBot();
+        if (bot && data.command) {
+          bot.chat(`/${data.command}`);
+          socket.emit(SERVER_EVENTS.COMMAND_RESULT, {
+            requestId: data.requestId,
+            command: `console:${data.command}`,
+            success: true,
+            output: `Executed: /${data.command}`,
+          });
+        }
       }
-    });
+    );
   });
 }
 
@@ -129,7 +129,7 @@ export function setupCommandsNamespace(io: Server, botManager: BotManager): void
   const nsp = io.of(NAMESPACES.COMMANDS);
 
   nsp.use((socket: AuthenticatedSocket, next) => {
-    const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+    const token = socket.handshake.auth?.token || socket.handcape.query?.token;
     if (!token) {
       return next(new Error('Authentication required'));
     }
@@ -141,30 +141,37 @@ export function setupCommandsNamespace(io: Server, botManager: BotManager): void
     const registry = getCommandRegistry();
 
     // Get command list
-    socket.on(CLIENT_EVENTS.GET_COMMANDS, (callback: (data: { commands: any[] }) => void) => {
-      const commands = registry.getAll().map((cmd: any) => ({
-        name: cmd.name,
-        aliases: cmd.aliases || [],
-        description: cmd.description,
-        usage: cmd.usage,
-        category: (cmd as any).category || 'General',
-        permission: (cmd as any).permission?.level || 'guest',
-        adminOnly: cmd.adminOnly,
-        pmOnly: cmd.pmOnly,
-      }));
+    socket.on(CLIENT_EVENTS.GET_COMMANDS, (callback: (data: { commands: unknown[] }) => void) => {
+      const commands = registry.getAll().map((cmd: unknown) => {
+        const c = cmd as Record<string, unknown>;
+        return {
+          name: c.name as string,
+          aliases: (c.aliases as string[]) || [],
+          description: c.description as string,
+          usage: c.usage as string,
+          category: (c.category as string) || 'General',
+          permission: (c.permission as { level?: string } | undefined)?.level || 'guest',
+          adminOnly: c.adminOnly as boolean,
+          pmOnly: c.pmOnly as boolean,
+        };
+      });
       if (callback) callback({ commands });
     });
 
     // Get command help
-    socket.on(CLIENT_EVENTS.GET_COMMAND_HELP, (data: { command: string; prefix?: string }, callback: (data: { help: string }) => void) => {
-      const prefix = data.prefix || '!';
-      const help = registry.getHelp(data.command, prefix);
-      if (callback) callback({ help: help || `No help found for "${data.command}"` });
-    });
+    socket.on(
+      CLIENT_EVENTS.GET_COMMAND_HELP,
+      (data: { command: string; prefix?: string }, callback: (data: { help: string }) => void) => {
+        const prefix = data.prefix || '!';
+        const help = registry.getHelp(data.command, prefix);
+        if (callback) callback({ help: help || `No help found for "${data.command}"` });
+      }
+    );
 
     // Execute command
     socket.on(CLIENT_EVENTS.SEND_COMMAND, async (data: SendCommandPayload) => {
-      const requestId = data.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const requestId =
+        data.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       const startTime = Date.now();
 
       try {
@@ -180,15 +187,25 @@ export function setupCommandsNamespace(io: Server, botManager: BotManager): void
           return;
         }
 
-        const args = Array.isArray(data.args) ? data.args : (data.args ? [data.args] : []);
+        const args = Array.isArray(data.args) ? data.args : data.args ? [data.args] : [];
         const context = createCommandContext(
           bot,
           socket.user?.username || 'dashboard',
           args,
           socket.user?.role === 'admin',
           true,
-          (msg: string) => socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, { message: msg, type: 'reply', timestamp: new Date().toISOString() }),
-          (msg: string) => socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, { message: msg, type: 'private', timestamp: new Date().toISOString() })
+          (msg: string) =>
+            socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, {
+              message: msg,
+              type: 'reply',
+              timestamp: new Date().toISOString(),
+            }),
+          (msg: string) =>
+            socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, {
+              message: msg,
+              type: 'private',
+              timestamp: new Date().toISOString(),
+            })
         );
 
         const result = await registry.execute(data.command, context);
@@ -200,7 +217,6 @@ export function setupCommandsNamespace(io: Server, botManager: BotManager): void
           output: result ? 'Command executed' : 'Command failed or not found',
           executionTime: Date.now() - startTime,
         });
-
       } catch (error) {
         socket.emit(SERVER_EVENTS.COMMAND_RESULT, {
           requestId,
@@ -232,26 +248,30 @@ function sendInitialState(socket: AuthenticatedSocket, botManager: BotManager): 
 
   // Send command list
   const registry = getCommandRegistry();
-  const commands = registry.getAll().map((cmd: any) => ({
-    name: cmd.name,
-    aliases: cmd.aliases || [],
-    description: cmd.description,
-    usage: cmd.usage,
-    category: (cmd as any).category || 'General',
-    permission: (cmd as any).permission?.level || 'guest',
-  }));
+  const commands = registry.getAll().map((cmd: unknown) => {
+    const c = cmd as Record<string, unknown>;
+    return {
+      name: c.name as string,
+      aliases: (c.aliases as string[]) || [],
+      description: c.description as string,
+      usage: c.usage as string,
+      category: (c.category as string) || 'General',
+      permission: (c.permission as { level?: string } | undefined)?.level || 'guest',
+    };
+  });
   socket.emit(SERVER_EVENTS.COMMAND_LIST, { commands });
 }
 
 /**
  * Set up individual socket event handlers for bot control
  */
-function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotManager, io: Server): void {
-  const bot = botManager.getBot();
-  const isOnline = bot !== null;
-
+function setupSocketEventHandlers(
+  socket: AuthenticatedSocket,
+  botManager: BotManager,
+  io: Server
+): void {
   // Authentication
-  socket.on(CLIENT_EVENTS.AUTHENTICATE, (data: AuthenticatePayload) => {
+  socket.on(CLIENT_EVENTS.AUTHENTICATE, (_data: AuthenticatePayload) => {
     // Handled by middleware, but can re-authenticate
     socket.emit(SERVER_EVENTS.AUTHENTICATED, { user: socket.user });
   });
@@ -268,7 +288,8 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
   // Send command (legacy support)
   socket.on(CLIENT_EVENTS.SEND_COMMAND, async (data: SendCommandPayload) => {
     // Forward to commands namespace or handle directly
-    const requestId = data.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const requestId =
+      data.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const startTime = Date.now();
 
     try {
@@ -284,7 +305,7 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
         return;
       }
 
-      const args = Array.isArray(data.args) ? data.args : (data.args ? [data.args] : []);
+      const args = Array.isArray(data.args) ? data.args : data.args ? [data.args] : [];
       const registry = getCommandRegistry();
 
       const context = createCommandContext(
@@ -293,8 +314,18 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
         args,
         socket.user?.role === 'admin',
         true,
-        (msg: string) => socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, { message: msg, type: 'reply', timestamp: new Date().toISOString() }),
-        (msg: string) => socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, { message: msg, type: 'private', timestamp: new Date().toISOString() })
+        (msg: string) =>
+          socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, {
+            message: msg,
+            type: 'reply',
+            timestamp: new Date().toISOString(),
+          }),
+        (msg: string) =>
+          socket.emit(SERVER_EVENTS.COMMAND_OUTPUT, {
+            message: msg,
+            type: 'private',
+            timestamp: new Date().toISOString(),
+          })
       );
 
       const result = await registry.execute(data.command, context);
@@ -305,7 +336,6 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
         success: result,
         executionTime: Date.now() - startTime,
       });
-
     } catch (error) {
       socket.emit(SERVER_EVENTS.COMMAND_RESULT, {
         requestId,
@@ -374,7 +404,9 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
     const pos = currentBot.entity.position;
     rememberLocation('home', pos, 'home');
     botManager.baseLocation = pos;
-    botManager.say(`🏠 Home set to ${Math.floor(pos.x)}, ${Math.floor(pos.y)}, ${Math.floor(pos.z)}`);
+    botManager.say(
+      `🏠 Home set to ${Math.floor(pos.x)}, ${Math.floor(pos.y)}, ${Math.floor(pos.z)}`
+    );
     socket.emit(SERVER_EVENTS.LOCATION_SAVED, { name: 'home', position: pos });
   });
 
@@ -398,7 +430,7 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
 
     const item = currentBot.inventory.slots[data.slot];
     if (item) {
-      currentBot.tossStack(item).catch((err: Error) => {
+      void currentBot.tossStack(item).catch((err: Error) => {
         socket.emit(SERVER_EVENTS.ERROR, { message: `Failed to drop item: ${err.message}` });
       });
     }
@@ -424,8 +456,8 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
     if (!currentBot) return;
 
     try {
-      currentBot.simpleClick.leftMouse(data.from);
-      currentBot.simpleClick.leftMouse(data.to);
+      void currentBot.simpleClick.leftMouse(data.from);
+      void currentBot.simpleClick.leftMouse(data.to);
     } catch (err) {
       socket.emit(SERVER_EVENTS.ERROR, { message: `Failed to move item: ${err}` });
     }
@@ -467,7 +499,10 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
     botManager.killAuraActive = enabled;
     botManager.log('WEB', `Kill Aura ${enabled ? 'Enabled' : 'Disabled'}`);
     socket.emit(SERVER_EVENTS.FEATURE_TOGGLED, { feature: 'killAura', enabled });
-    io.of(NAMESPACES.MAIN).to(ROOMS.ALL).emit(SERVER_EVENTS.BULK_UPDATE, botManager.getState());
+    void io
+      .of(NAMESPACES.MAIN)
+      .to(ROOMS.ALL)
+      .emit(SERVER_EVENTS.BULK_UPDATE, botManager.getState());
   });
 
   socket.on(CLIENT_EVENTS.TOGGLE_AUTODEFENSE, (enabled: boolean) => {
@@ -476,7 +511,10 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
     botManager.autoDefense = enabled;
     botManager.log('WEB', `Auto-defense ${enabled ? 'enabled' : 'disabled'}`);
     socket.emit(SERVER_EVENTS.FEATURE_TOGGLED, { feature: 'autoDefense', enabled });
-    io.of(NAMESPACES.MAIN).to(ROOMS.ALL).emit(SERVER_EVENTS.BULK_UPDATE, botManager.getState());
+    void io
+      .of(NAMESPACES.MAIN)
+      .to(ROOMS.ALL)
+      .emit(SERVER_EVENTS.BULK_UPDATE, botManager.getState());
   });
 
   // Automation toggles
@@ -574,7 +612,10 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
     const state = botManager.getState();
     Object.assign(state.settings, data.settings);
     socket.emit(SERVER_EVENTS.SETTINGS_CHANGED, data.settings);
-    io.of(NAMESPACES.MAIN).to(ROOMS.ALL).emit(SERVER_EVENTS.BULK_UPDATE, botManager.getState());
+    void io
+      .of(NAMESPACES.MAIN)
+      .to(ROOMS.ALL)
+      .emit(SERVER_EVENTS.BULK_UPDATE, botManager.getState());
   });
 
   // Memory
@@ -588,7 +629,7 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
     const state = botManager.getState();
     state.favorites[data.name] = pos;
     socket.emit(SERVER_EVENTS.LOCATION_SAVED, { name: data.name, position: pos });
-    io.of(NAMESPACES.MAIN).to(ROOMS.ALL).emit(SERVER_EVENTS.BULK_UPDATE, state);
+    void io.of(NAMESPACES.MAIN).to(ROOMS.ALL).emit(SERVER_EVENTS.BULK_UPDATE, state);
   });
 
   socket.on(CLIENT_EVENTS.REMEMBER_FACT, (data: RememberFactPayload) => {
@@ -628,23 +669,29 @@ function setupSocketEventHandlers(socket: AuthenticatedSocket, botManager: BotMa
   });
 
   // Utility
-  socket.on(CLIENT_EVENTS.PING, (data: PingPayload, callback: (data: { pong: boolean; timestamp: number; latency: number }) => void) => {
-    if (callback) {
-      callback({ pong: true, timestamp: Date.now(), latency: Date.now() - data.timestamp });
+  socket.on(
+    CLIENT_EVENTS.PING,
+    (
+      data: PingPayload,
+      callback: (data: { pong: boolean; timestamp: number; latency: number }) => void
+    ) => {
+      if (callback) {
+        callback({ pong: true, timestamp: Date.now(), latency: Date.now() - data.timestamp });
+      }
     }
-  });
+  );
 
   // Room management
   socket.on(ROOM_EVENTS.JOIN, (room: string) => {
-    if (Object.values(ROOMS).includes(room as any)) {
-      socket.join(room);
+    if (Object.values(ROOMS).includes(room as keyof typeof ROOMS)) {
+      void socket.join(room);
       const roomObj = io.of(NAMESPACES.MAIN).adapter.rooms.get(room);
-      socket.emit(ROOM_EVENTS.ROOM_USERS, { room, users: roomObj?.size || 0 });
+      void socket.emit(ROOM_EVENTS.ROOM_USERS, { room, users: roomObj?.size || 0 });
     }
   });
 
   socket.on(ROOM_EVENTS.LEAVE, (room: string) => {
-    socket.leave(room);
+    void socket.leave(room);
   });
 }
 
@@ -672,17 +719,27 @@ export function broadcastBulkUpdate(io: Server, state: BulkUpdatePayload): void 
 /**
  * Broadcast log entry to all connected dashboards
  */
-export function broadcastLog(io: Server, entry: { level: string; tag: string; message: string }): void {
-  io.of(NAMESPACES.MAIN).to(ROOMS.LOGS).emit(SERVER_EVENTS.LOG_ENTRY, {
-    ...entry,
-    timestamp: new Date().toISOString(),
-  });
+export function broadcastLog(
+  io: Server,
+  entry: { level: string; tag: string; message: string }
+): void {
+  io.of(NAMESPACES.MAIN)
+    .to(ROOMS.LOGS)
+    .emit(SERVER_EVENTS.LOG_ENTRY, {
+      ...entry,
+      timestamp: new Date().toISOString(),
+    });
 }
 
 /**
  * Broadcast chat message to all connected dashboards
  */
-export function broadcastChatMessage(io: Server, username: string, message: string, type: 'chat' | 'whisper' | 'broadcast' = 'chat'): void {
+export function broadcastChatMessage(
+  io: Server,
+  username: string,
+  message: string,
+  type: 'chat' | 'whisper' | 'broadcast' = 'chat'
+): void {
   io.of(NAMESPACES.MAIN).to(ROOMS.ALL).emit(SERVER_EVENTS.CHAT_MESSAGE, {
     username,
     message,
@@ -694,7 +751,11 @@ export function broadcastChatMessage(io: Server, username: string, message: stri
 /**
  * Broadcast command output to all connected dashboards
  */
-export function broadcastCommandOutput(io: Server, message: string, type: 'reply' | 'private' | 'error' | 'info' = 'info'): void {
+export function broadcastCommandOutput(
+  io: Server,
+  message: string,
+  type: 'reply' | 'private' | 'error' | 'info' = 'info'
+): void {
   io.of(NAMESPACES.MAIN).to(ROOMS.ALL).emit(SERVER_EVENTS.COMMAND_OUTPUT, {
     message,
     type,
@@ -711,5 +772,5 @@ export function initializeAllNamespaces(io: Server, botManager: BotManager): voi
   setupCommandsNamespace(io, botManager);
 
   // Make botManager available to broadcast functions
-  (io as any).botManager = botManager;
+  (io as { botManager?: BotManager }).botManager = botManager;
 }

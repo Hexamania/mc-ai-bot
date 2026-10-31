@@ -4,9 +4,10 @@
  */
 
 import { EventEmitter } from 'events';
+import mineflayer from 'mineflayer';
 import type { Bot, BotOptions } from 'mineflayer';
-import { pathfinder } from 'mineflayer-pathfinder';
-import type { Vec3 } from 'vec3';
+import { pathfinder, goals } from 'mineflayer-pathfinder';
+import type { Vec3, Window } from 'prismarine-windows';
 
 import type {
   BotConfig,
@@ -15,11 +16,9 @@ import type {
   Plugin,
   PluginManager,
   BotEvents,
-  ShutdownOptions} from './types.js';
-import {
-  BotState,
-  ReconnectConfig
+  ShutdownOptions,
 } from './types.js';
+import { BotState } from './types.js';
 
 import { StateMachine } from './StateMachine.js';
 import { ConfigLoader } from './Config.js';
@@ -45,7 +44,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
   private lastError: Error | null = null;
 
   // Mineflayer event handlers storage for cleanup
-  private botEventHandlers = new Map<string, Function[]>();
+  private botEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>();
 
   constructor(configOptions?: Partial<BotConfig>) {
     super();
@@ -79,7 +78,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       this.eventEmitter.emit(EventNames.STATE_CHANGE, {
         newState: to,
         oldState: from,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     });
 
@@ -92,17 +91,17 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
         this.startTime = Date.now();
         this.eventEmitter.emit(EventNames.CONNECT, {
           bot: this.bot,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
-      }
+      },
     });
 
     this.stateMachine.addTransition({
       from: [BotState.CONNECTED, BotState.CONNECTING],
       to: BotState.RECONNECTING,
       onEnter: async () => {
-        await this.handleReconnect();
-      }
+        void this.handleReconnect();
+      },
     });
 
     this.stateMachine.addTransition({
@@ -110,7 +109,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       to: BotState.CONNECTING,
       onEnter: async () => {
         await this.connect();
-      }
+      },
     });
 
     this.stateMachine.addTransition({
@@ -121,9 +120,9 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
         this.eventEmitter.emit(EventNames.ERROR, {
           error: this.lastError,
           timestamp: Date.now(),
-          fatal: false
+          fatal: false,
         });
-      }
+      },
     });
 
     this.stateMachine.addTransition({
@@ -132,7 +131,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       onEnter: async () => {
         this.isShuttingDown = true;
         await this.cleanup();
-      }
+      },
     });
 
     this.stateMachine.addTransition({
@@ -141,10 +140,10 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       onEnter: async () => {
         this.eventEmitter.emit(EventNames.SHUTDOWN, {
           reason: 'Graceful shutdown',
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
         this.emit('shutdown');
-      }
+      },
     });
   }
 
@@ -154,8 +153,8 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
   private setupEventForwarding(): void {
     // Forward all events from eventEmitter to this manager
     const events = Object.values(EventNames);
-    events.forEach(eventName => {
-      this.eventEmitter.on(eventName, (...args: any[]) => {
+    events.forEach((eventName) => {
+      this.eventEmitter.on(eventName, (...args: unknown[]) => {
         this.emit(eventName, ...args);
       });
     });
@@ -180,10 +179,12 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
           password: this._config.password,
           version: this._config.version,
           auth: this._config.auth,
-          checkTimeoutInterval: this._config.checkTimeoutInterval
+          checkTimeoutInterval: this._config.checkTimeoutInterval,
         };
 
-        console.log(`[BotManager] Connecting to ${options.host}:${options.port} as ${options.username}`);
+        console.log(
+          `[BotManager] Connecting to ${options.host}:${options.port} as ${options.username}`
+        );
 
         this.bot = mineflayer.createBot(options);
 
@@ -196,7 +197,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
         // Handle connection events
         this.bot.once('spawn', () => {
           console.log('[BotManager] Bot spawned');
-          this.stateMachine.transition(BotState.CONNECTED).then(success => {
+          void this.stateMachine.transition(BotState.CONNECTED).then((success) => {
             if (success) {
               resolve(this.bot!);
             } else {
@@ -219,16 +220,15 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
           }
         });
 
-        this.bot.once('kicked', (reason: string, loggedIn: boolean) => {
+        this.bot.once('kicked', (reason: string, _loggedIn: boolean) => {
           console.log('[BotManager] Kicked:', reason);
           if (this.stateMachine.getState() === BotState.CONNECTING) {
             this.handleConnectionError(new Error(reason));
             reject(new Error(reason));
           }
         });
-
       } catch (error) {
-        this.stateMachine.transition(BotState.ERROR);
+        void this.stateMachine.transition(BotState.ERROR);
         reject(error);
       }
     });
@@ -240,16 +240,16 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
   private setupBotEvents(): void {
     if (!this.bot) return;
 
-    const handlers: { event: string; handler: Function }[] = [
+    const handlers: { event: string; handler: (...args: unknown[]) => void }[] = [
       // Spawn event
       {
         event: 'spawn',
         handler: () => {
           this.eventEmitter.emit(EventNames.SPAWN, {
             position: this.bot!.entity.position,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
-        }
+        },
       },
 
       // Death event
@@ -258,36 +258,36 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
         handler: () => {
           this.eventEmitter.emit(EventNames.DEATH, {
             location: this.bot!.entity.position,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
-        }
+        },
       },
 
       // Chat event
       {
         event: 'chat',
-        handler: (username: string, message: string, type: string) => {
+        handler: (username: string, message: string, _type: string) => {
           if (username === this.bot!.username) return;
           this.eventEmitter.emit(EventNames.CHAT, {
             username,
             message,
-            type,
-            timestamp: Date.now()
+            type: _type,
+            timestamp: Date.now(),
           });
-        }
+        },
       },
 
       // Whisper event
       {
         event: 'whisper',
-        handler: (username: string, message: string, type: string) => {
+        handler: (username: string, message: string, _type: string) => {
           this.eventEmitter.emit(EventNames.CHAT, {
             username,
             message,
             type: 'whisper',
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
-        }
+        },
       },
 
       // Error event
@@ -299,14 +299,14 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
           this.eventEmitter.emit(EventNames.ERROR, {
             error,
             timestamp: Date.now(),
-            fatal: false
+            fatal: false,
           });
 
           // Check if we should reconnect
           if (this.stateMachine.getState() === BotState.CONNECTED) {
-            this.stateMachine.transition(BotState.RECONNECTING);
+            void this.stateMachine.transition(BotState.RECONNECTING);
           }
-        }
+        },
       },
 
       // End event (disconnect)
@@ -316,33 +316,33 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
           console.log('[BotManager] Disconnected:', reason);
           this.eventEmitter.emit(EventNames.DISCONNECT, {
             reason,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
 
           if (!this.isShuttingDown && this._config.reconnect.enabled) {
-            this.stateMachine.transition(BotState.RECONNECTING);
+            void this.stateMachine.transition(BotState.RECONNECTING);
           } else {
-            this.stateMachine.transition(BotState.DISCONNECTED);
+            void this.stateMachine.transition(BotState.DISCONNECTED);
           }
-        }
+        },
       },
 
       // Kicked event
       {
         event: 'kicked',
-        handler: (reason: string, loggedIn: boolean) => {
+        handler: (reason: string, _loggedIn: boolean) => {
           console.log('[BotManager] Kicked:', reason);
           this.eventEmitter.emit(EventNames.DISCONNECT, {
             reason: `Kicked: ${reason}`,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
 
           if (!this.isShuttingDown && this._config.reconnect.enabled) {
-            this.stateMachine.transition(BotState.RECONNECTING);
+            void this.stateMachine.transition(BotState.RECONNECTING);
           } else {
-            this.stateMachine.transition(BotState.DISCONNECTED);
+            void this.stateMachine.transition(BotState.DISCONNECTED);
           }
-        }
+        },
       },
 
       // Health changes
@@ -350,7 +350,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
         event: 'health',
         handler: () => {
           this.emit('healthChange', this.bot!.health, this.bot!.food);
-        }
+        },
       },
 
       // Position changes
@@ -358,23 +358,23 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
         event: 'move',
         handler: () => {
           this.emit('positionChange', this.bot!.entity.position);
-        }
+        },
       },
 
       // Inventory changes
       {
         event: 'windowOpen',
-        handler: (window: any) => {
+        handler: (window: Window) => {
           this.emit('windowOpen', window);
-        }
+        },
       },
 
       {
         event: 'windowClose',
-        handler: (window: any) => {
+        handler: (window: Window) => {
           this.emit('windowClose', window);
-        }
-      }
+        },
+      },
     ];
 
     // Register all handlers
@@ -392,7 +392,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
    */
   private handleConnectionError(error: Error): void {
     this.lastError = error;
-    this.stateMachine.transition(BotState.ERROR);
+    void this.stateMachine.transition(BotState.ERROR);
   }
 
   /**
@@ -409,9 +409,9 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       this.eventEmitter.emit(EventNames.RECONNECT_FAILED, {
         error,
         attempts: this.reconnectAttempt,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      this.stateMachine.transition(BotState.ERROR);
+      void this.stateMachine.transition(BotState.ERROR);
       return;
     }
 
@@ -420,16 +420,18 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       ? Math.min(baseDelay * Math.pow(2, this.reconnectAttempt - 1), maxDelay)
       : baseDelay;
 
-    console.log(`[BotManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt}/${maxAttempts})`);
+    console.log(
+      `[BotManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt}/${maxAttempts})`
+    );
 
     this.eventEmitter.emit(EventNames.RECONNECT, {
       attempt: this.reconnectAttempt,
       delay,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     // Wait for delay
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       this.reconnectTimer = setTimeout(resolve, delay);
     });
 
@@ -473,7 +475,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
     // Remove all bot event handlers
     if (this.bot) {
       this.botEventHandlers.forEach((handlers, event) => {
-        handlers.forEach(handler => {
+        handlers.forEach((handler) => {
           this.bot!.off(event, handler);
         });
       });
@@ -500,7 +502,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
     const opts: ShutdownOptions = {
       timeout: options.timeout ?? 10000,
       forceExit: options.forceExit ?? false,
-      saveState: options.saveState ?? true
+      saveState: options.saveState ?? true,
     };
 
     console.log('[BotManager] Stopping...');
@@ -510,10 +512,10 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
 
     // Wait for shutdown with timeout
     await Promise.race([
-      new Promise<void>(resolve => this.once('shutdown', resolve)),
+      new Promise<void>((resolve) => this.once('shutdown', resolve)),
       new Promise<void>((_, reject) =>
         setTimeout(() => reject(new Error('Shutdown timeout')), opts.timeout)
-      )
+      ),
     ]);
 
     console.log('[BotManager] Stopped');
@@ -551,7 +553,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       reconnectAttempts: this.reconnectAttempt,
       lastError: this.lastError,
       plugins: this.pluginManager.getLoadOrder(),
-      memoryUsage: process.memoryUsage()
+      memoryUsage: process.memoryUsage(),
     };
   }
 
@@ -638,7 +640,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       throw new Error('Bot not connected');
     }
 
-    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
+    const goal = new goals.GoalBlock(x, y, z);
     await this.bot.pathfinder.goto(goal);
   }
 
@@ -666,7 +668,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
   /**
    * Get bot inventory
    */
-  getInventory(): any[] {
+  getInventory(): ReturnType<Bot['inventory']['items']> {
     return this.bot?.inventory.items() ?? [];
   }
 

@@ -16,8 +16,8 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import express from 'express';
 import http from 'http';
-import type { Socket} from 'socket.io';
-import { Server as SocketIOServer, Namespace } from 'socket.io';
+import type { Socket } from 'socket.io';
+import { Server as SocketIOServer } from 'socket.io';
 import * as path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -27,7 +27,13 @@ import type { BotManager } from '../bot';
 import { getConfig } from '../config';
 import type { BotState, BotStatus, BotPosition } from '../types';
 import { initializeApiRoutes, apiRouter } from './routes/api';
-import { initializeAllNamespaces, broadcastBotStatus, broadcastBotState, broadcastBulkUpdate, broadcastLog, broadcastChatMessage, broadcastCommandOutput } from './socket/handlers';
+import {
+  initializeAllNamespaces,
+  broadcastBotStatus,
+  broadcastBotState,
+  broadcastLog,
+  broadcastChatMessage,
+} from './socket/handlers';
 import { createLoginHandler, logoutHandler, meHandler } from './middleware/auth';
 import { rateLimiters } from './middleware/rateLimit';
 
@@ -48,7 +54,9 @@ export class WebServer {
     this.server = http.createServer(this.app);
     this.io = new SocketIOServer(this.server, {
       cors: {
-        origin: this.config.web.host ? `http://${this.config.web.host}:${this.config.web.port}` : '*',
+        origin: this.config.web.host
+          ? `http://${this.config.web.host}:${this.config.web.port}`
+          : '*',
         methods: ['GET', 'POST'],
         credentials: true,
       },
@@ -71,18 +79,24 @@ export class WebServer {
     this.app.set('trust proxy', 1);
 
     // Security headers
-    this.app.use(helmet({
-      contentSecurityPolicy: false, // Disable for development, configure for production
-      crossOriginEmbedderPolicy: false,
-    }));
+    this.app.use(
+      helmet({
+        contentSecurityPolicy: false, // Disable for development, configure for production
+        crossOriginEmbedderPolicy: false,
+      })
+    );
 
     // CORS configuration
-    this.app.use(cors({
-      origin: this.config.web.host ? `http://${this.config.web.host}:${this.config.web.port}` : true,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    }));
+    this.app.use(
+      cors({
+        origin: this.config.web.host
+          ? `http://${this.config.web.host}:${this.config.web.port}`
+          : true,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      })
+    );
 
     // Compression
     this.app.use(compression());
@@ -110,15 +124,19 @@ export class WebServer {
     const publicPath = path.join(__dirname, '../../Website test/public');
     const rootPath = path.join(__dirname, '../../');
 
-    this.app.use(express.static(publicPath, {
-      maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
-      etag: true,
-    }));
+    this.app.use(
+      express.static(publicPath, {
+        maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+        etag: true,
+      })
+    );
 
-    this.app.use(express.static(rootPath, {
-      maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
-      etag: true,
-    }));
+    this.app.use(
+      express.static(rootPath, {
+        maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+        etag: true,
+      })
+    );
 
     // Apply global rate limiting
     this.app.use(rateLimiters.static);
@@ -132,7 +150,11 @@ export class WebServer {
     initializeApiRoutes(this.botManager);
 
     // Auth endpoints (with stricter rate limiting)
-    this.app.post('/api/auth/login', rateLimiters.auth, createLoginHandler(this.config.admin.password));
+    this.app.post(
+      '/api/auth/login',
+      rateLimiters.auth,
+      createLoginHandler(this.config.admin.password)
+    );
     this.app.post('/api/auth/logout', logoutHandler);
     this.app.get('/api/auth/me', meHandler);
 
@@ -173,7 +195,7 @@ export class WebServer {
     });
 
     // Error handling middleware
-    this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    this.app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
       console.error('[WEB] Server error:', err);
       res.status(500).json({
         success: false,
@@ -191,7 +213,7 @@ export class WebServer {
     initializeAllNamespaces(this.io, this.botManager);
 
     // Global connection logging
-    this.io.of('/').on('connection', (socket: Socket) => {
+    this.io.of('/').on('connection', (_socket: Socket) => {
       if (!this.dashboardConnected) {
         this.dashboardConnected = true;
         this.botManager.log('WEB', 'Dashboard connected');
@@ -265,7 +287,7 @@ export class WebServer {
   stop(): Promise<void> {
     return new Promise((resolve) => {
       // Close all socket connections
-      this.io.close(() => {
+      void this.io.close(() => {
         this.server.close(() => {
           this.botManager.log('WEB', 'Web server stopped');
           resolve();
@@ -307,16 +329,11 @@ export function createWebServer(botManager: BotManager): WebServer {
 export {
   broadcastBotStatus,
   broadcastBotState,
-  broadcastBulkUpdate,
   broadcastLog,
   broadcastChatMessage,
-  broadcastCommandOutput,
 } from './socket/handlers';
 
-export {
-  apiRouter,
-  initializeApiRoutes,
-} from './routes/api';
+export { apiRouter, initializeApiRoutes } from './routes/api';
 
 export {
   createLoginHandler,
@@ -330,24 +347,10 @@ export {
   verifyToken,
 } from './middleware/auth';
 
-export {
-  createRateLimiter,
-  rateLimiters,
-  createSocketRateLimiter,
-} from './middleware/rateLimit';
+export { createRateLimiter, rateLimiters, createSocketRateLimiter } from './middleware/rateLimit';
 
-export {
-  NAMESPACES,
-  SERVER_EVENTS,
-  CLIENT_EVENTS,
-  ROOMS,
-  ROOM_EVENTS,
-} from './socket/events';
+export { NAMESPACES, SERVER_EVENTS, CLIENT_EVENTS, ROOMS, ROOM_EVENTS } from './socket/events';
 
-export type {
-  BotStatusPayload,
-  BotStatePayload,
-  BulkUpdatePayload,
-} from './socket/events';
+export type { BotStatusPayload, BotStatePayload, BulkUpdatePayload } from './socket/events';
 
 export { WebServer as default };

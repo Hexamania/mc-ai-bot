@@ -10,7 +10,7 @@ import type {
   CommandOption,
   PermissionConfig,
   ParsedArguments,
-  PermissionLevel
+  PermissionLevel,
 } from './types';
 import type { Bot } from 'mineflayer';
 
@@ -37,7 +37,7 @@ export abstract class BaseCommand implements CommandDefinition {
 
   protected constructor(config: BaseCommandConfig) {
     this.name = config.name.toLowerCase();
-    this.aliases = config.aliases?.map(a => a.toLowerCase()) ?? [];
+    this.aliases = config.aliases?.map((a) => a.toLowerCase()) ?? [];
     this.description = config.description;
     this.usage = config.usage;
     this.shortDescription = config.shortDescription;
@@ -62,21 +62,21 @@ export abstract class BaseCommand implements CommandDefinition {
    * Optional validation before execution
    * Return true for success, string for error message
    */
-  public validate(context: CommandContext): boolean | string | Promise<boolean | string> {
+  public validate(_context: CommandContext): boolean | string | Promise<boolean | string> {
     return true;
   }
 
   /**
    * Optional cleanup after execution
    */
-  public onComplete(context: CommandContext, error?: Error): void | Promise<void> {
+  public onComplete(_context: CommandContext, _error?: Error): void | Promise<void> {
     // Override in subclass if needed
   }
 
   /**
    * Optional autocomplete/suggestions
    */
-  public autocomplete(context: CommandContext, partial: string): string[] | Promise<string[]> {
+  public autocomplete(_context: CommandContext, _partial: string): string[] | Promise<string[]> {
     return [];
   }
 
@@ -160,7 +160,7 @@ export abstract class BaseCommand implements CommandDefinition {
       // Check for options (--flag or -f)
       if (arg.startsWith('--')) {
         const optionName = arg.slice(2);
-        const optionDef = this.options.find(o => o.name === optionName);
+        const optionDef = this.options.find((o) => o.name === optionName);
         if (optionDef) {
           if (optionDef.hasValue) {
             i++;
@@ -180,7 +180,7 @@ export abstract class BaseCommand implements CommandDefinition {
         // Short options (-f, -abc)
         const shortOptions = arg.slice(1).split('');
         for (const shortOpt of shortOptions) {
-          const optionDef = this.options.find(o => o.alias === shortOpt);
+          const optionDef = this.options.find((o) => o.alias === shortOpt);
           if (optionDef) {
             if (optionDef.hasValue) {
               i++;
@@ -234,7 +234,7 @@ export abstract class BaseCommand implements CommandDefinition {
         // Consume all remaining arguments
         const remaining = rawPositional.slice(argIndex);
         if (remaining.length > 0) {
-          result.push(remaining.map(v => this.parseValue(v, argDef.type)));
+          result.push(remaining.map((v) => this.parseValue(v, argDef.type)));
         } else if (argDef.required) {
           throw new Error(`Missing required argument: ${argDef.name}`);
         } else if (argDef.defaultValue !== undefined) {
@@ -300,13 +300,7 @@ export abstract class BaseCommand implements CommandDefinition {
     isTrusted: boolean,
     isPM: boolean
   ): boolean {
-    const { level, allowedUsers, deniedUsers, pmOnly, publicOnly } = this.permission;
-
-    // Check denied users first (overrides everything)
-    // Note: would need username here, so this is checked in registry
-
-    // Check allowed users (bypasses level check)
-    // Note: would need username here, so this is checked in registry
+    const { level, pmOnly, publicOnly } = this.permission;
 
     // Check PM/public only restrictions
     if (pmOnly && !isPM) return false;
@@ -342,7 +336,8 @@ export abstract class BaseCommand implements CommandDefinition {
     lines.push(`📋 **${this.name}**`);
     if (this.description) lines.push(this.description);
     if (this.usage) lines.push(`Usage: ${this.formatUsage(prefix)}`);
-    if (this.aliases.length > 0) lines.push(`Aliases: ${this.aliases.map(a => `${prefix}${a}`).join(', ')}`);
+    if (this.aliases.length > 0)
+      lines.push(`Aliases: ${this.aliases.map((a) => `${prefix}${a}`).join(', ')}`);
 
     if (this.arguments.length > 0) {
       lines.push('\n**Arguments:**');
@@ -398,6 +393,10 @@ export interface BaseCommandConfig {
   deprecationMessage?: string;
   cooldown?: number;
   maxUses?: number;
+  _execute?: (context: CommandContext) => Promise<void> | void;
+  validate?: (context: CommandContext) => boolean | string | Promise<boolean | string>;
+  onComplete?: (context: CommandContext, error?: Error) => void | Promise<void>;
+  autocomplete?: (context: CommandContext, partial: string) => string[] | Promise<string[]>;
 }
 
 /**
@@ -484,15 +483,14 @@ export class CommandBuilder {
   }
 
   public setExecute(execute: (context: CommandContext) => Promise<void> | void): this {
-    // Store execute in a way we can use it
-    (this.config as any)._execute = execute;
+    this.config._execute = execute;
     return this;
   }
 
   public build(): CommandDefinition {
     if (!this.config.name) throw new Error('Command name is required');
     if (!this.config.description) throw new Error('Command description is required');
-    if (!(this.config as any)._execute) throw new Error('Command execute function is required');
+    if (!this.config._execute) throw new Error('Command execute function is required');
 
     return {
       name: this.config.name,
@@ -510,7 +508,7 @@ export class CommandBuilder {
       deprecationMessage: this.config.deprecationMessage,
       cooldown: this.config.cooldown,
       maxUses: this.config.maxUses,
-      execute: (this.config as any)._execute,
+      execute: this.config._execute,
       validate: this.config.validate,
       onComplete: this.config.onComplete,
       autocomplete: this.config.autocomplete,

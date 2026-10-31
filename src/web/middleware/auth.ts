@@ -5,7 +5,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
-import { getConfig } from '../../config';
+import type { Socket } from 'socket.io';
 
 interface TokenPayload {
   username: string;
@@ -27,7 +27,10 @@ const JWT_EXPIRY = '24h';
 /**
  * Generate a JWT token for a user
  */
-export function generateToken(username: string, role: 'guest' | 'trusted' | 'admin' = 'guest'): string {
+export function generateToken(
+  username: string,
+  role: 'guest' | 'trusted' | 'admin' = 'guest'
+): string {
   return jwt.sign({ username, role }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 }
 
@@ -75,7 +78,7 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
     res.status(401).json({
       success: false,
       error: 'Authentication required',
-      code: 'AUTH_REQUIRED'
+      code: 'AUTH_REQUIRED',
     });
     return;
   }
@@ -85,7 +88,7 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
     res.status(401).json({
       success: false,
       error: 'Invalid or expired token',
-      code: 'AUTH_INVALID'
+      code: 'AUTH_INVALID',
     });
     return;
   }
@@ -97,7 +100,11 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
 /**
  * Optional authentication middleware - adds user if token is valid but doesn't require it
  */
-export function optionalAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export function optionalAuthMiddleware(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void {
   const token = extractToken(req);
 
   if (token) {
@@ -119,7 +126,7 @@ export function requireRole(...allowedRoles: ('guest' | 'trusted' | 'admin')[]) 
       res.status(401).json({
         success: false,
         error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
+        code: 'AUTH_REQUIRED',
       });
       return;
     }
@@ -130,7 +137,7 @@ export function requireRole(...allowedRoles: ('guest' | 'trusted' | 'admin')[]) 
         error: 'Insufficient permissions',
         code: 'AUTH_FORBIDDEN',
         required: allowedRoles,
-        current: req.user.role
+        current: req.user.role,
       });
       return;
     }
@@ -159,7 +166,7 @@ export function createLoginHandler(adminPassword: string) {
     if (!username || !password) {
       res.status(400).json({
         success: false,
-        error: 'Username and password required'
+        error: 'Username and password required',
       });
       return;
     }
@@ -209,7 +216,7 @@ export function meHandler(req: AuthenticatedRequest, res: Response): void {
   if (!req.user) {
     res.status(401).json({
       success: false,
-      error: 'Not authenticated'
+      error: 'Not authenticated',
     });
     return;
   }
@@ -226,7 +233,7 @@ export function meHandler(req: AuthenticatedRequest, res: Response): void {
 /**
  * Socket.io authentication middleware
  */
-export function socketAuthMiddleware(socket: any, next: (err?: Error) => void): void {
+export function socketAuthMiddleware(socket: Socket, next: (err?: Error) => void): void {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
 
   if (!token) {
@@ -245,7 +252,10 @@ export function socketAuthMiddleware(socket: any, next: (err?: Error) => void): 
 /**
  * Socket.io role-based authorization
  */
-export function socketRequireRole(socket: any, ...allowedRoles: ('guest' | 'trusted' | 'admin')[]): boolean {
+export function socketRequireRole(
+  socket: Socket,
+  ...allowedRoles: ('guest' | 'trusted' | 'admin')[]
+): boolean {
   if (!socket.user || !allowedRoles.includes(socket.user.role)) {
     return false;
   }

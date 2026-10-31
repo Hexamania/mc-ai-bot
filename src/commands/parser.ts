@@ -9,7 +9,7 @@ import type {
   ChatParserConfig,
   CommandContext,
   PermissionLevel,
-  CommandRegistry
+  CommandRegistry,
 } from './types';
 import type { PermissionManager } from './permissions';
 
@@ -104,9 +104,8 @@ export class ChatParser {
     const { commandName, args, isAdminCommand, prefix } = commandCheck;
 
     // Check if command exists in registry
-    let found = false;
     if (this.registry) {
-      found = this.registry.has(commandName);
+      this.registry.has(commandName);
     }
 
     return {
@@ -547,9 +546,7 @@ export class ChatArgumentParser {
     let quoteChar = '';
     let escaped = false;
 
-    for (let i = 0; i < raw.length; i++) {
-      const char = raw[i];
-
+    for (const char of raw) {
       if (escaped) {
         current += char;
         escaped = false;
@@ -592,14 +589,16 @@ export class ChatArgumentParser {
    * Join arguments back into a string (for logging/re-display)
    */
   static joinArgs(args: string[]): string {
-    return args.map(arg => {
-      if (arg.includes(' ') || arg.includes('"') || arg.includes("'")) {
-        // Escape quotes
-        const escaped = arg.replace(/"/g, '\\"');
-        return `"${escaped}"`;
-      }
-      return arg;
-    }).join(' ');
+    return args
+      .map((arg) => {
+        if (arg.includes(' ') || arg.includes('"') || arg.includes("'")) {
+          // Escape quotes
+          const escaped = arg.replace(/"/g, '\\"');
+          return `"${escaped}"`;
+        }
+        return arg;
+      })
+      .join(' ');
   }
 
   /**
@@ -623,7 +622,10 @@ export class ChatArgumentParser {
   /**
    * Extract flags from arguments (--flag or -f)
    */
-  static parseFlags(args: string[]): { flags: Record<string, boolean | string>; positional: string[] } {
+  static parseFlags(args: string[]): {
+    flags: Record<string, boolean | string>;
+    positional: string[];
+  } {
     const flags: Record<string, boolean | string> = {};
     const positional: string[] = [];
 

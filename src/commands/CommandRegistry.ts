@@ -10,12 +10,8 @@ import type {
   CommandResult,
   PermissionLevel,
   CooldownEntry,
-  CommandStats} from './types';
-import {
-  ParsedArguments,
-  CommandArgument
+  CommandStats,
 } from './types';
-import { Bot } from 'mineflayer';
 
 /**
  * Default permission hierarchy
@@ -146,7 +142,7 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
    * Get commands by category
    */
   getByCategory(category: string): CommandDefinition[] {
-    return this.getAll().filter(c => c.category === category);
+    return this.getAll().filter((c) => c.category === category);
   }
 
   /**
@@ -186,7 +182,9 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
     // Check cooldown
     const cooldownCheck = this.checkCooldown(command, context);
     if (!cooldownCheck.allowed) {
-      context.error(`⏳ Command on cooldown. Try again in ${Math.ceil(cooldownCheck.remaining! / 1000)}s.`);
+      context.error(
+        `⏳ Command on cooldown. Try again in ${Math.ceil(cooldownCheck.remaining! / 1000)}s.`
+      );
       return {
         success: false,
         found: true,
@@ -292,7 +290,8 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
     let help = `\n📋 **${command.name}**`;
     if (command.description) help += `\n${command.description}`;
     if (command.usage) help += `\nUsage: ${prefix}${command.name} ${command.usage}`;
-    if (command.aliases && command.aliases.length > 0) help += `\nAliases: ${command.aliases.join(', ')}`;
+    if (command.aliases && command.aliases.length > 0)
+      help += `\nAliases: ${command.aliases.join(', ')}`;
     if (command.examples && command.examples.length > 0) {
       help += `\nExamples:`;
       for (const example of command.examples) {
@@ -314,7 +313,7 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
     const userLevelValue = PERMISSION_HIERARCHY[userLevel];
 
     // Filter commands by permission
-    const accessibleCommands = allCommands.filter(cmd => {
+    const accessibleCommands = allCommands.filter((cmd) => {
       const cmdLevelValue = PERMISSION_HIERARCHY[cmd.permission.level];
       return cmdLevelValue <= userLevelValue && !cmd.hidden;
     });
@@ -336,7 +335,7 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
       const cmds = categorized[category];
       helpText += `**${category}:**\n`;
       const cmdList = cmds
-        .map(c => {
+        .map((c) => {
           let cmdStr = `\`${prefix}${c.name}\``;
           if (c.shortDescription) cmdStr += ` - ${c.shortDescription}`;
           return cmdStr;
@@ -410,9 +409,12 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
   /**
    * Check command permission
    */
-  private checkPermission(command: CommandDefinition, context: CommandContext): { allowed: boolean; message?: string } {
+  private checkPermission(
+    command: CommandDefinition,
+    context: CommandContext
+  ): { allowed: boolean; message?: string } {
     const { permission } = command;
-    const { username, isAdmin, isTrusted, isPM, permissionLevel } = context;
+    const { username, isPM, permissionLevel } = context;
 
     // Check denied users
     if (permission.deniedUsers?.includes(username)) {
@@ -449,7 +451,10 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
   /**
    * Check command cooldown
    */
-  private checkCooldown(command: CommandDefinition, context: CommandContext): { allowed: boolean; remaining?: number } {
+  private checkCooldown(
+    command: CommandDefinition,
+    context: CommandContext
+  ): { allowed: boolean; remaining?: number } {
     if (!command.cooldown) return { allowed: true };
 
     const key = `${command.name}:${context.username}`;
@@ -499,7 +504,12 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
   /**
    * Update command statistics
    */
-  private updateStats(commandName: string, executionTime: number, success: boolean, error?: string): void {
+  private updateStats(
+    commandName: string,
+    executionTime: number,
+    success: boolean,
+    error?: string
+  ): void {
     const stats = this.stats.get(commandName);
     if (!stats) return;
 
@@ -577,7 +587,10 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
 /**
  * Create a new command registry
  */
-export function createCommandRegistry(prefix?: string, adminPrefix?: string): CommandRegistryInterface {
+export function createCommandRegistry(
+  prefix?: string,
+  adminPrefix?: string
+): CommandRegistryInterface {
   return new CommandRegistryImpl(prefix, adminPrefix);
 }
 
@@ -589,7 +602,10 @@ let registryInstance: CommandRegistryImpl | null = null;
 /**
  * Get the singleton command registry instance
  */
-export function getCommandRegistry(prefix?: string, adminPrefix?: string): CommandRegistryInterface {
+export function getCommandRegistry(
+  prefix?: string,
+  adminPrefix?: string
+): CommandRegistryInterface {
   if (!registryInstance) {
     registryInstance = new CommandRegistryImpl(prefix, adminPrefix);
   }

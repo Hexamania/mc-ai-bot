@@ -37,16 +37,16 @@ export interface FeatureInstances {
  * Feature configuration map
  */
 export interface FeatureConfigMap {
-  movement?: any;
-  inventory?: any;
-  combat?: any;
-  building?: any;
-  mining?: any;
-  farming?: any;
-  chatAI?: any;
-  follow?: any;
-  guard?: any;
-  roam?: any;
+  movement?: unknown;
+  inventory?: unknown;
+  combat?: unknown;
+  building?: unknown;
+  mining?: unknown;
+  farming?: unknown;
+  chatAI?: unknown;
+  follow?: unknown;
+  guard?: unknown;
+  roam?: unknown;
 }
 
 /**
@@ -56,7 +56,11 @@ export interface FeatureConfigMap {
  * @param configs - Optional configuration for each feature
  * @returns Object containing all feature instances
  */
-export function createAllFeatures(bot: Bot, manager: BotManager, configs: FeatureConfigMap = {}): FeatureInstances {
+export async function createAllFeatures(
+  bot: Bot,
+  manager: BotManager,
+  configs: FeatureConfigMap = {}
+): Promise<FeatureInstances> {
   // Create all feature instances
   const features: FeatureInstances = {
     movement: new MovementFeature(),
@@ -80,23 +84,23 @@ export function createAllFeatures(bot: Bot, manager: BotManager, configs: Featur
 
   // Initialize all features with the bot and manager
   for (const feature of Object.values(features)) {
-    feature.initialize(bot, manager);
+    await feature.initialize(bot, manager);
   }
 
   // Enable all features in dependency order
   // Core features first (movement, inventory)
-  features.movement.enable();
-  features.inventory.enable();
+  await features.movement.enable();
+  await features.inventory.enable();
 
   // Then dependent features
-  features.combat.enable();
-  features.building.enable();
-  features.mining.enable();
-  features.farming.enable();
-  features.chatAI.enable();
-  features.follow.enable();
-  features.guard.enable();
-  features.roam.enable();
+  await features.combat.enable();
+  await features.building.enable();
+  await features.mining.enable();
+  await features.farming.enable();
+  await features.chatAI.enable();
+  await features.follow.enable();
+  await features.guard.enable();
+  await features.roam.enable();
 
   return features;
 }
@@ -148,17 +152,17 @@ export class FeatureFactory {
   /**
    * Set configuration for a feature
    */
-  setConfig(featureName: keyof FeatureConfigMap, config: any): void {
+  setConfig(featureName: keyof FeatureConfigMap, config: unknown): void {
     this.configs[featureName] = config;
   }
 
   /**
    * Create a single feature instance
    */
-  private createFeature<T extends BaseFeature>(FeatureClass: new () => T): T {
+  private async createFeature<T extends BaseFeature>(FeatureClass: new () => T): Promise<T> {
     const feature = new FeatureClass();
     if (this.bot && this.manager) {
-      feature.initialize(this.bot, this.manager);
+      await feature.initialize(this.bot, this.manager);
     }
     return feature;
   }
@@ -166,9 +170,12 @@ export class FeatureFactory {
   /**
    * Get or create a feature instance
    */
-  getFeature<T extends BaseFeature>(featureName: keyof FeatureInstances, FeatureClass: new () => T): T {
+  async getFeature<T extends BaseFeature>(
+    featureName: keyof FeatureInstances,
+    FeatureClass: new () => T
+  ): Promise<T> {
     if (!this.features[featureName]) {
-      this.features[featureName] = this.createFeature(FeatureClass);
+      this.features[featureName] = await this.createFeature(FeatureClass);
     }
     return this.features[featureName] as T;
   }
@@ -176,70 +183,70 @@ export class FeatureFactory {
   /**
    * Get movement feature
    */
-  getMovement(): MovementFeature {
+  async getMovement(): Promise<MovementFeature> {
     return this.getFeature('movement', MovementFeature);
   }
 
   /**
    * Get inventory feature
    */
-  getInventory(): InventoryFeature {
+  async getInventory(): Promise<InventoryFeature> {
     return this.getFeature('inventory', InventoryFeature);
   }
 
   /**
    * Get combat feature
    */
-  getCombat(): CombatFeature {
+  async getCombat(): Promise<CombatFeature> {
     return this.getFeature('combat', CombatFeature);
   }
 
   /**
    * Get building feature
    */
-  getBuilding(): BuildingFeature {
+  async getBuilding(): Promise<BuildingFeature> {
     return this.getFeature('building', BuildingFeature);
   }
 
   /**
    * Get mining feature
    */
-  getMining(): MiningFeature {
+  async getMining(): Promise<MiningFeature> {
     return this.getFeature('mining', MiningFeature);
   }
 
   /**
    * Get farming feature
    */
-  getFarming(): FarmingFeature {
+  async getFarming(): Promise<FarmingFeature> {
     return this.getFeature('farming', FarmingFeature);
   }
 
   /**
    * Get chatAI feature
    */
-  getChatAI(): ChatAIFeature {
+  async getChatAI(): Promise<ChatAIFeature> {
     return this.getFeature('chatAI', ChatAIFeature);
   }
 
   /**
    * Get follow feature
    */
-  getFollow(): FollowFeature {
+  async getFollow(): Promise<FollowFeature> {
     return this.getFeature('follow', FollowFeature);
   }
 
   /**
    * Get guard feature
    */
-  getGuard(): GuardFeature {
+  async getGuard(): Promise<GuardFeature> {
     return this.getFeature('guard', GuardFeature);
   }
 
   /**
    * Get roam feature
    */
-  getRoam(): RoamFeature {
+  async getRoam(): Promise<RoamFeature> {
     return this.getFeature('roam', RoamFeature);
   }
 
@@ -296,7 +303,7 @@ export class FeatureFactory {
       'chatAI',
       'follow',
       'guard',
-      'roam'
+      'roam',
     ];
 
     for (const featureName of enableOrder) {
@@ -320,7 +327,7 @@ export class FeatureFactory {
       'building',
       'combat',
       'inventory',
-      'movement'
+      'movement',
     ];
 
     for (const featureName of disableOrder) {
@@ -381,9 +388,9 @@ export function getDefaultFactory(): FeatureFactory {
 /**
  * Reset the default factory
  */
-export function resetDefaultFactory(): void {
+export async function resetDefaultFactory(): Promise<void> {
   if (defaultFactory) {
-    defaultFactory.reset();
+    await defaultFactory.reset();
     defaultFactory = null;
   }
 }

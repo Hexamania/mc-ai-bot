@@ -6,13 +6,27 @@
 import type { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
 import type { BotManager } from '../../bot';
-import { loadMemory, getMemory, rememberLocation, rememberFact, forgetFact, addRule, removeRule, persistMemory, getMemoryContext } from '../../memory';
+import {
+  getMemory,
+  rememberLocation,
+  rememberFact,
+  forgetFact,
+  addRule,
+  removeRule,
+  persistMemory,
+  getMemoryContext,
+  clearMemory,
+} from '../../memory';
 import { getCommandRegistry, createCommandContext } from '../../commands';
 import { getConfig } from '../../config';
 import type { AuthenticatedRequest } from '../middleware/auth';
-import { authMiddleware, optionalAuthMiddleware, requireAdmin, requireTrusted } from '../middleware/auth';
+import {
+  authMiddleware,
+  optionalAuthMiddleware,
+  requireAdmin,
+  requireTrusted,
+} from '../middleware/auth';
 import { rateLimiters } from '../middleware/rateLimit';
-import { BotState, BotStatus, BotPosition, CommandContext } from '../../types';
 
 const router = Router();
 
@@ -131,14 +145,15 @@ router.get('/inventory', authMiddleware, (req: AuthenticatedRequest, res: Respon
     });
   }
 
-  const items = bot.inventory.slots.map((item: any, index: number) => {
+  const items = bot.inventory.slots.map((item: unknown, index: number) => {
     if (!item) return { slot: index, name: 'air', count: 0, displayName: 'Empty' };
+    const itemObj = item as Record<string, unknown>;
     return {
       slot: index,
-      name: item.name,
-      displayName: item.displayName,
-      count: item.count,
-      maxStackSize: (item as any).maxStackSize || (item as any).stackSize || 64,
+      name: itemObj.name as string,
+      displayName: itemObj.displayName as string,
+      count: itemObj.count as number,
+      maxStackSize: (itemObj.maxStackSize as number) || (itemObj.stackSize as number) || 64,
     };
   });
 
@@ -148,12 +163,14 @@ router.get('/inventory', authMiddleware, (req: AuthenticatedRequest, res: Respon
       items,
       usedSlots: bot.inventory.items().length,
       totalSlots: 36,
-      heldItem: bot.heldItem ? {
-        slot: bot.heldItem.slot,
-        name: bot.heldItem.name,
-        displayName: bot.heldItem.displayName,
-        count: bot.heldItem.count,
-      } : null,
+      heldItem: bot.heldItem
+        ? {
+            slot: bot.heldItem.slot,
+            name: bot.heldItem.name,
+            displayName: bot.heldItem.displayName,
+            count: bot.heldItem.count,
+          }
+        : null,
     },
   });
 });
@@ -209,15 +226,18 @@ router.get('/players', authMiddleware, (req: AuthenticatedRequest, res: Response
     });
   }
 
-  const players = Object.values(bot.players).map((player: any) => ({
-    username: player.username,
-    entityId: player.entity?.id,
-    position: player.entity?.position,
-    health: player.entity?.health,
-    gamemode: player.gamemode,
-    ping: player.ping,
-    isBot: player.username === bot.username,
-  }));
+  const players = Object.values(bot.players).map((player: unknown) => {
+    const p = player as Record<string, unknown>;
+    return {
+      username: p.username as string,
+      entityId: (p.entity as Record<string, unknown> | undefined)?.id as number | undefined,
+      position: (p.entity as Record<string, unknown> | undefined)?.position,
+      health: (p.entity as Record<string, unknown> | undefined)?.health as number | undefined,
+      gamemode: p.gamemode as string | undefined,
+      ping: p.ping as number | undefined,
+      isBot: p.username === bot.username,
+    };
+  });
 
   res.json({
     success: true,
@@ -255,7 +275,12 @@ router.get('/map', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
     for (let z = -radius; z <= radius; z++) {
       for (let y = -2; y <= 2; y++) {
         const block = bot.blockAt(bot.entity.position.offset(x, y, z));
-        if (block && block.name !== 'air' && block.name !== 'cave_air' && block.name !== 'void_air') {
+        if (
+          block &&
+          block.name !== 'air' &&
+          block.name !== 'cave_air' &&
+          block.name !== 'void_air'
+        ) {
           mapBlocks.push({
             x: Math.floor(block.position.x),
             y: Math.floor(block.position.y),
@@ -268,20 +293,32 @@ router.get('/map', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
   }
 
   const entities = Object.values(bot.entities)
-    .filter((e: any) => e !== bot.entity && e.position.distanceTo(bot.entity.position) < radius)
-    .map((e: any) => ({
-      id: e.id,
-      username: e.username,
-      name: e.displayName || e.name || e.username,
-      position: {
-        x: e.position.x,
-        y: e.position.y,
-        z: e.position.z,
-      },
-      type: e.type,
-      isPlayer: e.type === 'player',
-      distance: e.position.distanceTo(bot.entity.position),
-    }));
+    .filter((e: unknown) => {
+      const ent = e as Record<string, unknown>;
+      return (
+        ent !== bot.entity &&
+        (ent.position as { distanceTo: (pos: unknown) => number }).distanceTo(bot.entity.position) <
+          radius
+      );
+    })
+    .map((e: unknown) => {
+      const ent = e as Record<string, unknown>;
+      return {
+        id: ent.id as number,
+        username: ent.username as string | undefined,
+        name: (ent.displayName as string) || (ent.name as string) || (ent.username as string),
+        position: {
+          x: (ent.position as { x: number }).x,
+          y: (ent.position as { y: number }).y,
+          z: (ent.position as { z: number }).z,
+        },
+        type: ent.type as string,
+        isPlayer: ent.type === 'player',
+        distance: (ent.position as { distanceTo: (pos: unknown) => number }).distanceTo(
+          bot.entity.position
+        ),
+      };
+    });
 
   res.json({
     success: true,
@@ -334,31 +371,36 @@ router.get('/settings', authMiddleware, (req: AuthenticatedRequest, res: Respons
 /**
  * Settings endpoint - UPDATE
  */
-router.patch('/settings', authMiddleware, requireTrusted, (req: AuthenticatedRequest, res: Response) => {
-  if (!botManager) {
-    return res.status(503).json({
-      success: false,
-      error: 'Bot manager not initialized',
-    });
-  }
+router.patch(
+  '/settings',
+  authMiddleware,
+  requireTrusted,
+  (req: AuthenticatedRequest, res: Response) => {
+    if (!botManager) {
+      return res.status(503).json({
+        success: false,
+        error: 'Bot manager not initialized',
+      });
+    }
 
-  const state = botManager.getState();
-  const newSettings = req.body;
+    const state = botManager.getState();
+    const newSettings = req.body;
 
-  if (newSettings && typeof newSettings === 'object') {
-    Object.assign(state.settings, newSettings);
-    res.json({
-      success: true,
-      data: state.settings,
-      message: 'Settings updated',
-    });
-  } else {
-    res.status(400).json({
-      success: false,
-      error: 'Invalid settings object',
-    });
+    if (newSettings && typeof newSettings === 'object') {
+      Object.assign(state.settings, newSettings);
+      res.json({
+        success: true,
+        data: state.settings,
+        message: 'Settings updated',
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid settings object',
+      });
+    }
   }
-});
+);
 
 /**
  * Favorites/locations endpoint - GET
@@ -374,46 +416,56 @@ router.get('/locations', authMiddleware, (req: AuthenticatedRequest, res: Respon
 /**
  * Favorites/locations endpoint - POST (save location)
  */
-router.post('/locations', authMiddleware, requireTrusted, (req: AuthenticatedRequest, res: Response) => {
-  const { name, position, type } = req.body;
+router.post(
+  '/locations',
+  authMiddleware,
+  requireTrusted,
+  (req: AuthenticatedRequest, res: Response) => {
+    const { name, position, type } = req.body;
 
-  if (!name || !position) {
-    return res.status(400).json({
-      success: false,
-      error: 'Name and position required',
+    if (!name || !position) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name and position required',
+      });
+    }
+
+    const success = rememberLocation(name, position, type || 'waypoint');
+
+    if (success && botManager) {
+      const state = botManager.getState();
+      state.favorites[name] = position;
+    }
+
+    res.json({
+      success,
+      message: success ? `Location "${name}" saved` : 'Failed to save location',
     });
   }
-
-  const success = rememberLocation(name, position, type || 'waypoint');
-
-  if (success && botManager) {
-    const state = botManager.getState();
-    state.favorites[name] = position;
-  }
-
-  res.json({
-    success,
-    message: success ? `Location "${name}" saved` : 'Failed to save location',
-  });
-});
+);
 
 /**
  * Favorites/locations endpoint - DELETE
  */
-router.delete('/locations/:name', authMiddleware, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const { name } = req.params;
+router.delete(
+  '/locations/:name',
+  authMiddleware,
+  requireAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    const { name } = req.params;
 
-  // Note: The memory module doesn't have a deleteLocation function
-  // We'd need to add one, or manually remove from memory
-  const memory = getMemory();
-  if (memory.locations[name]) {
-    delete memory.locations[name];
-    persistMemory();
-    res.json({ success: true, message: `Location "${name}" deleted` });
-  } else {
-    res.status(404).json({ success: false, error: 'Location not found' });
+    // Note: The memory module doesn't have a deleteLocation function
+    // We'd need to add one, or manually remove from memory
+    const memory = getMemory();
+    if (memory.locations[name]) {
+      delete memory.locations[name];
+      persistMemory();
+      res.json({ success: true, message: `Location "${name}" deleted` });
+    } else {
+      res.status(404).json({ success: false, error: 'Location not found' });
+    }
   }
-});
+);
 
 /**
  * Memory endpoint - GET all
@@ -451,34 +503,44 @@ router.get('/memory/facts', authMiddleware, (req: AuthenticatedRequest, res: Res
 /**
  * Memory facts endpoint - POST (remember fact)
  */
-router.post('/memory/facts', authMiddleware, requireTrusted, (req: AuthenticatedRequest, res: Response) => {
-  const { key, fact } = req.body;
+router.post(
+  '/memory/facts',
+  authMiddleware,
+  requireTrusted,
+  (req: AuthenticatedRequest, res: Response) => {
+    const { key, fact } = req.body;
 
-  if (!key || !fact) {
-    return res.status(400).json({
-      success: false,
-      error: 'Key and fact required',
+    if (!key || !fact) {
+      return res.status(400).json({
+        success: false,
+        error: 'Key and fact required',
+      });
+    }
+
+    const success = rememberFact(key, fact);
+    res.json({
+      success,
+      message: success ? `Fact "${key}" remembered` : 'Failed to remember fact',
     });
   }
-
-  const success = rememberFact(key, fact);
-  res.json({
-    success,
-    message: success ? `Fact "${key}" remembered` : 'Failed to remember fact',
-  });
-});
+);
 
 /**
  * Memory facts endpoint - DELETE
  */
-router.delete('/memory/facts/:key', authMiddleware, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const { key } = req.params;
-  const success = forgetFact(key);
-  res.json({
-    success,
-    message: success ? `Fact "${key}" forgotten` : 'Fact not found',
-  });
-});
+router.delete(
+  '/memory/facts/:key',
+  authMiddleware,
+  requireAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    const { key } = req.params;
+    const success = forgetFact(key);
+    res.json({
+      success,
+      message: success ? `Fact "${key}" forgotten` : 'Fact not found',
+    });
+  }
+);
 
 /**
  * Memory rules endpoint - GET
@@ -494,34 +556,44 @@ router.get('/memory/rules', authMiddleware, (req: AuthenticatedRequest, res: Res
 /**
  * Memory rules endpoint - POST (add rule)
  */
-router.post('/memory/rules', authMiddleware, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const { rule } = req.body;
+router.post(
+  '/memory/rules',
+  authMiddleware,
+  requireAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    const { rule } = req.body;
 
-  if (!rule) {
-    return res.status(400).json({
-      success: false,
-      error: 'Rule required',
+    if (!rule) {
+      return res.status(400).json({
+        success: false,
+        error: 'Rule required',
+      });
+    }
+
+    const success = addRule(rule);
+    res.json({
+      success,
+      message: success ? `Rule added` : 'Rule already exists or failed',
     });
   }
-
-  const success = addRule(rule);
-  res.json({
-    success,
-    message: success ? `Rule added` : 'Rule already exists or failed',
-  });
-});
+);
 
 /**
  * Memory rules endpoint - DELETE
  */
-router.delete('/memory/rules/:rule', authMiddleware, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const { rule } = req.params;
-  const success = removeRule(rule);
-  res.json({
-    success,
-    message: success ? `Rule removed` : 'Rule not found',
-  });
-});
+router.delete(
+  '/memory/rules/:rule',
+  authMiddleware,
+  requireAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    const { rule } = req.params;
+    const success = removeRule(rule);
+    res.json({
+      success,
+      message: success ? `Rule removed` : 'Rule not found',
+    });
+  }
+);
 
 /**
  * Memory current task endpoint
@@ -548,49 +620,61 @@ router.get('/memory/players', authMiddleware, (req: AuthenticatedRequest, res: R
 /**
  * Persist memory endpoint
  */
-router.post('/memory/save', authMiddleware, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const success = persistMemory();
-    res.json({
-      success,
-      message: success ? 'Memory saved' : 'Memory is disabled',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
+router.post(
+  '/memory/save',
+  authMiddleware,
+  requireAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const success = persistMemory();
+      res.json({
+        success,
+        message: success ? 'Memory saved' : 'Memory is disabled',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
-});
+);
 
 /**
  * Clear memory endpoint
  */
-router.post('/memory/clear', authMiddleware, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const { memory } = require('../../memory');
-  const success = memory.clearMemory();
-  res.json({
-    success,
-    message: success ? 'Memory cleared' : 'Memory is disabled',
-  });
-});
+router.post(
+  '/memory/clear',
+  authMiddleware,
+  requireAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    const success = clearMemory();
+    res.json({
+      success,
+      message: success ? 'Memory cleared' : 'Memory is disabled',
+    });
+  }
+);
 
 /**
  * Commands list endpoint
  */
 router.get('/commands', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   const registry = getCommandRegistry();
-  const commands = registry.getAll().map((cmd: any) => ({
-    name: cmd.name,
-    aliases: cmd.aliases || [],
-    description: cmd.description,
-    usage: cmd.usage,
-    category: (cmd as any).category || 'General',
-    permission: (cmd as any).permission?.level || 'guest',
-    adminOnly: cmd.adminOnly,
-    pmOnly: cmd.pmOnly,
-    hidden: (cmd as any).hidden || false,
-  }));
+  const commands = registry.getAll().map((cmd: unknown) => {
+    const c = cmd as Record<string, unknown>;
+    return {
+      name: c.name as string,
+      aliases: (c.aliases as string[]) || [],
+      description: c.description as string,
+      usage: c.usage as string,
+      category: (c.category as string) || 'General',
+      permission: (c.permission as { level?: string } | undefined)?.level || 'guest',
+      adminOnly: c.adminOnly as boolean | undefined,
+      pmOnly: c.pmOnly as boolean | undefined,
+      hidden: (c.hidden as boolean) || false,
+    };
+  });
 
   res.json({
     success: true,
@@ -601,59 +685,68 @@ router.get('/commands', authMiddleware, (req: AuthenticatedRequest, res: Respons
 /**
  * Execute command endpoint
  */
-router.post('/commands/execute', authMiddleware, rateLimiters.commands, async (req: AuthenticatedRequest, res: Response) => {
-  if (!botManager) {
-    return res.status(503).json({
-      success: false,
-      error: 'Bot manager not initialized',
-    });
+router.post(
+  '/commands/execute',
+  authMiddleware,
+  rateLimiters.commands,
+  async (req: AuthenticatedRequest, res: Response) => {
+    if (!botManager) {
+      return res.status(503).json({
+        success: false,
+        error: 'Bot manager not initialized',
+      });
+    }
+
+    const bot = botManager.getBot();
+    if (!bot) {
+      return res.status(503).json({
+        success: false,
+        error: 'Bot not connected',
+      });
+    }
+
+    const { command, args } = req.body;
+
+    if (!command) {
+      return res.status(400).json({
+        success: false,
+        error: 'Command required',
+      });
+    }
+
+    try {
+      const parsedArgs = Array.isArray(args) ? args : args ? [args] : [];
+      const registry = getCommandRegistry();
+
+      const context = createCommandContext(
+        bot,
+        req.user?.username || 'api',
+        parsedArgs,
+        req.user?.role === 'admin',
+        true,
+        () => {
+          /* HTTP response doesn't support streaming */
+        },
+        () => {
+          /* HTTP response doesn't support streaming */
+        }
+      );
+
+      const result = await registry.execute(command, context);
+
+      res.json({
+        success: result,
+        command,
+        message: result ? 'Command executed' : 'Command failed or not found',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
-
-  const bot = botManager.getBot();
-  if (!bot) {
-    return res.status(503).json({
-      success: false,
-      error: 'Bot not connected',
-    });
-  }
-
-  const { command, args, options } = req.body;
-
-  if (!command) {
-    return res.status(400).json({
-      success: false,
-      error: 'Command required',
-    });
-  }
-
-  try {
-    const parsedArgs = Array.isArray(args) ? args : (args ? [args] : []);
-    const registry = getCommandRegistry();
-
-    const context = createCommandContext(
-      bot,
-      req.user?.username || 'api',
-      parsedArgs,
-      req.user?.role === 'admin',
-      true,
-      (msg: string) => { /* HTTP response doesn't support streaming */ },
-      (msg: string) => { /* HTTP response doesn't support streaming */ }
-    );
-
-    const result = await registry.execute(command, context);
-
-    res.json({
-      success: result,
-      command,
-      message: result ? 'Command executed' : 'Command failed or not found',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-});
+);
 
 /**
  * Configuration endpoint
@@ -714,7 +807,9 @@ router.get('/stats', authMiddleware, (req: AuthenticatedRequest, res: Response) 
       },
       state: {
         logsCount: state.logs.length,
-        inventoryCount: state.inventory.filter((i: any) => i.name !== 'air').length,
+        inventoryCount: state.inventory.filter(
+          (i: unknown) => (i as Record<string, unknown>).name !== 'air'
+        ).length,
         favoritesCount: Object.keys(state.favorites).length,
         adminsCount: state.admins.length,
         usersCount: state.users.length,
@@ -751,8 +846,9 @@ router.get('/chat', authMiddleware, (req: AuthenticatedRequest, res: Response) =
   }
 
   const limit = parseInt(req.query.limit as string) || 50;
-  const logs = botManager.getState().logs
-    .filter((log: string) => log.includes('SERVER') || log.includes('CHAT'))
+  const logs = botManager
+    .getState()
+    .logs.filter((log: string) => log.includes('SERVER') || log.includes('CHAT'))
     .slice(-limit);
 
   res.json({
@@ -773,7 +869,7 @@ router.post('/chat', authMiddleware, requireTrusted, (req: AuthenticatedRequest,
   }
 
   const bot = botManager.getBot();
-  if (!bot || !botManager.getBot() !== null) {
+  if (!bot) {
     return res.status(503).json({
       success: false,
       error: 'Bot not online',
@@ -798,92 +894,107 @@ router.post('/chat', authMiddleware, requireTrusted, (req: AuthenticatedRequest,
 /**
  * Console command endpoint (admin only)
  */
-router.post('/console', authMiddleware, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  if (!botManager) {
-    return res.status(503).json({
-      success: false,
-      error: 'Bot manager not initialized',
+router.post(
+  '/console',
+  authMiddleware,
+  requireAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    if (!botManager) {
+      return res.status(503).json({
+        success: false,
+        error: 'Bot manager not initialized',
+      });
+    }
+
+    const bot = botManager.getBot();
+    if (!bot) {
+      return res.status(503).json({
+        success: false,
+        error: 'Bot not online',
+      });
+    }
+
+    const { command } = req.body;
+    if (!command) {
+      return res.status(400).json({
+        success: false,
+        error: 'Command required',
+      });
+    }
+
+    bot.chat(`/${command}`);
+    res.json({
+      success: true,
+      message: `Executed: /${command}`,
     });
   }
-
-  const bot = botManager.getBot();
-  if (!bot || !botManager.getBot() !== null) {
-    return res.status(503).json({
-      success: false,
-      error: 'Bot not online',
-    });
-  }
-
-  const { command } = req.body;
-  if (!command) {
-    return res.status(400).json({
-      success: false,
-      error: 'Command required',
-    });
-  }
-
-  bot.chat(`/${command}`);
-  res.json({
-    success: true,
-    message: `Executed: /${command}`,
-  });
-});
+);
 
 /**
  * Restart bot endpoint (admin only)
  */
-router.post('/bot/restart', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  if (!botManager) {
-    return res.status(503).json({
-      success: false,
-      error: 'Bot manager not initialized',
-    });
-  }
+router.post(
+  '/bot/restart',
+  authMiddleware,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    if (!botManager) {
+      return res.status(503).json({
+        success: false,
+        error: 'Bot manager not initialized',
+      });
+    }
 
-  try {
-    await botManager.shutdown();
-    botManager.connectBot();
-    res.json({
-      success: true,
-      message: 'Bot restart initiated',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    try {
+      await botManager.shutdown();
+      botManager.connectBot();
+      res.json({
+        success: true,
+        message: 'Bot restart initiated',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
-});
+);
 
 /**
  * Shutdown bot endpoint (admin only)
  */
-router.post('/bot/shutdown', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  if (!botManager) {
-    return res.status(503).json({
-      success: false,
-      error: 'Bot manager not initialized',
-    });
-  }
+router.post(
+  '/bot/shutdown',
+  authMiddleware,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    if (!botManager) {
+      return res.status(503).json({
+        success: false,
+        error: 'Bot manager not initialized',
+      });
+    }
 
-  try {
-    await botManager.shutdown();
-    res.json({
-      success: true,
-      message: 'Bot shut down',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    try {
+      await botManager.shutdown();
+      res.json({
+        success: true,
+        message: 'Bot shut down',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
-});
+);
 
 /**
  * Error handling middleware
  */
-router.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+router.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[API] Error:', err);
   res.status(500).json({
     success: false,

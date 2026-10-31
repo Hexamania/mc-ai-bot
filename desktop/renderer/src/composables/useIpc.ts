@@ -1,4 +1,12 @@
-import type { ElectronAPI, LogEntry, LogSearchQuery, LogExportOptions, BotStatus, BotState, Settings, UpdateInfo, Toast } from '../types';
+import type {
+  ElectronAPI,
+  LogEntry,
+  LogSearchQuery,
+  LogExportOptions,
+  BotState,
+  Settings,
+  UpdateInfo,
+} from '../types';
 
 /**
  * Typed IPC composable for communicating with main process
@@ -35,7 +43,9 @@ export function useIpc() {
   const openExternal = (url: string) => api.openExternal(url);
 
   // Event listeners
-  const onLifecycle = (callback: (data: { status: string; detail: string; running: boolean }) => void) => {
+  const onLifecycle = (
+    callback: (data: { status: string; detail: string; running: boolean }) => void
+  ) => {
     api.onLifecycle(callback);
   };
 
@@ -106,7 +116,7 @@ export function createIpcState() {
 
   return {
     // Event registration helpers
-    on: <T>(channel: string, callback: (data: T) => void) => {
+    on: <T>(_channel: string, _callback: (data: T) => void) => {
       // This would need to be implemented per channel
       console.warn('Direct event registration not implemented, use specific on* functions');
     },

@@ -10,7 +10,7 @@ import type {
   CommandContext,
   CommandResult,
   WebCommandConfig,
-  PermissionLevel
+  PermissionLevel,
 } from './types';
 import type { PermissionManager } from './permissions';
 
@@ -81,7 +81,12 @@ export class WebCommandHandler {
   /**
    * Initialize the web command handler
    */
-  initialize(io: Server, bot: Bot, registry: CommandRegistry, permissionManager: PermissionManager): void {
+  initialize(
+    io: Server,
+    bot: Bot,
+    registry: CommandRegistry,
+    permissionManager: PermissionManager
+  ): void {
     this.io = io;
     this.bot = bot;
     this.registry = registry;
@@ -143,7 +148,8 @@ export class WebCommandHandler {
    */
   private async handleCommand(socket: Socket, request: WebCommandRequest): Promise<void> {
     const startTime = Date.now();
-    const requestId = request.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const requestId =
+      request.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const username = request.username || 'dashboard';
 
     // Check if enabled
@@ -217,7 +223,6 @@ export class WebCommandHandler {
         timestamp: Date.now(),
         executionTime: result.executionTime,
       });
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('[WEB-COMMANDS] Error executing command:', error);
@@ -239,7 +244,8 @@ export class WebCommandHandler {
     const results: WebCommandResponse[] = [];
 
     for (const request of requests) {
-      const requestId = request.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const requestId =
+        request.requestId || `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       const startTime = Date.now();
 
       try {
@@ -299,9 +305,12 @@ export class WebCommandHandler {
       isTrusted,
       isPM: true, // Web commands are treated as PM
       hasPermission: true, // Registry will check
-      reply: (msg: string) => this.broadcastToDashboard('command_output', { message: msg, type: 'reply' }),
-      privateReply: (msg: string) => this.broadcastToDashboard('command_output', { message: msg, type: 'private' }),
-      error: (msg: string) => this.broadcastToDashboard('command_output', { message: msg, type: 'error' }),
+      reply: (msg: string) =>
+        this.broadcastToDashboard('command_output', { message: msg, type: 'reply' }),
+      privateReply: (msg: string) =>
+        this.broadcastToDashboard('command_output', { message: msg, type: 'private' }),
+      error: (msg: string) =>
+        this.broadcastToDashboard('command_output', { message: msg, type: 'error' }),
       permissionLevel,
       commandName: '',
       fullCommand: '',
@@ -392,7 +401,7 @@ export class WebCommandHandler {
    * Check if socket is authenticated
    * In a real implementation, this would check session/token
    */
-  private isAuthenticated(socket: Socket): boolean {
+  private isAuthenticated(_socket: Socket): boolean {
     // For now, assume authenticated if connected
     // In production, check socket.handshake.auth or session
     return true;
@@ -447,7 +456,7 @@ export class WebCommandHandler {
   }[] {
     if (!this.registry) return [];
 
-    return this.registry.getAll().map(cmd => ({
+    return this.registry.getAll().map((cmd) => ({
       name: cmd.name,
       aliases: cmd.aliases || [],
       description: cmd.description,
@@ -534,10 +543,19 @@ export function createWebCommandHandler(config?: Partial<WebCommandConfig>): Web
  * Web command middleware for Express/Socket.io integration
  */
 export function createWebCommandMiddleware(handler: WebCommandHandler) {
-  return (req: any, res: any, next: any) => {
+  return (req: Record<string, unknown>, _res: unknown, next: () => void) => {
     // Add helper to execute commands from HTTP endpoints
-    req.executeBotCommand = async (command: string, args: string[] = [], options: Record<string, unknown> = {}) => {
-      return handler.executeCommand(command, args, options, req.user?.username || 'api');
+    req.executeBotCommand = async (
+      command: string,
+      args: string[] = [],
+      options: Record<string, unknown> = {}
+    ) => {
+      return handler.executeCommand(
+        command,
+        args,
+        options,
+        (req.user as { username?: string } | undefined)?.username || 'api'
+      );
     };
     next();
   };
@@ -563,14 +581,14 @@ export const WebOnlyCommands = {
       const pos = context.bot.entity?.position;
       context.privateReply(
         `🤖 **Bot Status**\n` +
-        `Online: ${context.bot.entity ? 'Yes' : 'No'}\n` +
-        `Username: ${context.bot.username}\n` +
-        `Health: ${context.bot.health}/20\n` +
-        `Food: ${context.bot.food}/20\n` +
-        `Position: ${pos ? `X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}` : 'Unknown'}\n` +
-        `Dimension: ${context.bot.game?.dimension || 'Unknown'}\n` +
-        `Time: ${context.bot.time?.timeOfDay || 'Unknown'}\n` +
-        `Ping: ${context.bot._client?.getLatency() || 'Unknown'}ms`
+          `Online: ${context.bot.entity ? 'Yes' : 'No'}\n` +
+          `Username: ${context.bot.username}\n` +
+          `Health: ${context.bot.health}/20\n` +
+          `Food: ${context.bot.food}/20\n` +
+          `Position: ${pos ? `X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}` : 'Unknown'}\n` +
+          `Dimension: ${context.bot.game?.dimension || 'Unknown'}\n` +
+          `Time: ${context.bot.time?.timeOfDay || 'Unknown'}\n` +
+          `Ping: ${context.bot._client?.getLatency() || 'Unknown'}ms`
       );
     },
   },
@@ -607,7 +625,9 @@ export const WebOnlyCommands = {
       if (slotArg !== undefined && slotArg >= 0 && slotArg < 36) {
         const item = context.bot.inventory.slots[slotArg];
         if (item) {
-          context.privateReply(`📦 Slot ${slotArg}: ${item.count}x ${item.displayName || item.name}`);
+          context.privateReply(
+            `📦 Slot ${slotArg}: ${item.count}x ${item.displayName || item.name}`
+          );
         } else {
           context.privateReply(`📦 Slot ${slotArg}: Empty`);
         }
@@ -695,6 +715,6 @@ export const WebOnlyCommands = {
  */
 export function registerWebCommands(registry: CommandRegistry): void {
   for (const [, cmd] of Object.entries(WebOnlyCommands)) {
-    registry.register(cmd as any);
+    registry.register(cmd as Parameters<typeof registry.register>[0]);
   }
 }

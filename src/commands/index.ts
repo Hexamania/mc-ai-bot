@@ -7,9 +7,7 @@ import type { Bot } from 'mineflayer';
 import type {
   CommandDefinition,
   CommandContext,
-  CommandRegistry as CommandRegistryType} from '../types';
-import {
-  CommandRegistry
+  CommandRegistry as CommandRegistryType,
 } from '../types';
 
 /**
@@ -49,7 +47,9 @@ class CommandRegistryImpl implements CommandRegistryType {
       }
     }
 
-    console.log(`[COMMANDS] Registered: ${normalizedName}${command.aliases ? ` (aliases: ${command.aliases.join(', ')})` : ''}`);
+    console.log(
+      `[COMMANDS] Registered: ${normalizedName}${command.aliases ? ` (aliases: ${command.aliases.join(', ')})` : ''}`
+    );
   }
 
   unregister(name: string): void {
@@ -110,7 +110,9 @@ class CommandRegistryImpl implements CommandRegistryType {
       return true;
     } catch (error) {
       console.error(`[COMMANDS] Error executing "${name}":`, error);
-      context.privateReply(`❌ Command error: ${error instanceof Error ? error.message : String(error)}`);
+      context.privateReply(
+        `❌ Command error: ${error instanceof Error ? error.message : String(error)}`
+      );
       return true;
     }
   }
@@ -125,7 +127,8 @@ class CommandRegistryImpl implements CommandRegistryType {
     let help = `\n📋 **${command.name}**`;
     if (command.description) help += `\n${command.description}`;
     if (command.usage) help += `\nUsage: ${command.usage}`;
-    if (command.aliases && command.aliases.length > 0) help += `\nAliases: ${command.aliases.join(', ')}`;
+    if (command.aliases && command.aliases.length > 0)
+      help += `\nAliases: ${command.aliases.join(', ')}`;
     if (command.adminOnly) help += `\n⚠️ Admin only`;
     if (command.pmOnly) help += `\n📩 PM only`;
     return help;
@@ -181,7 +184,10 @@ export function createCommandContext(
 /**
  * Parse command arguments from a message string
  */
-export function parseCommand(message: string, prefix: string): { command: string; args: string[] } | null {
+export function parseCommand(
+  message: string,
+  prefix: string
+): { command: string; args: string[] } | null {
   const trimmed = message.trim();
 
   if (!trimmed.startsWith(prefix)) {
@@ -236,22 +242,22 @@ export function registerHelpCommand(registry: CommandRegistryType, prefix: strin
       }
 
       // Categorize commands
-      const publicCommands = allCommands.filter(c => !c.adminOnly && !c.pmOnly);
-      const adminCommands = allCommands.filter(c => c.adminOnly);
-      const pmCommands = allCommands.filter(c => c.pmOnly && !c.adminOnly);
+      const publicCommands = allCommands.filter((c) => !c.adminOnly && !c.pmOnly);
+      const adminCommands = allCommands.filter((c) => c.adminOnly);
+      const pmCommands = allCommands.filter((c) => c.pmOnly && !c.adminOnly);
 
       let helpText = `📋 **Available Commands** (Prefix: \`${prefix}\`)\n\n`;
 
       if (publicCommands.length > 0) {
-        helpText += `**Public:**\n${publicCommands.map(c => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
+        helpText += `**Public:**\n${publicCommands.map((c) => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
       }
 
       if (pmCommands.length > 0) {
-        helpText += `**PM Only:**\n${pmCommands.map(c => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
+        helpText += `**PM Only:**\n${pmCommands.map((c) => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
       }
 
       if (adminCommands.length > 0 && context.isAdmin) {
-        helpText += `**Admin:**\n${adminCommands.map(c => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
+        helpText += `**Admin:**\n${adminCommands.map((c) => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
       }
 
       helpText += `Use \`${prefix}help <command>\` for details on a specific command.`;
@@ -277,7 +283,10 @@ export function registerPingCommand(registry: CommandRegistryType): void {
 /**
  * Built-in status command
  */
-export function registerStatusCommand(registry: CommandRegistryType, getStatusReport: () => string): void {
+export function registerStatusCommand(
+  registry: CommandRegistryType,
+  getStatusReport: () => string
+): void {
   registry.register({
     name: 'status',
     description: 'Show bot status and progression info',
@@ -302,7 +311,9 @@ export function registerCoordsCommand(registry: CommandRegistryType): void {
         return;
       }
       const { x, y, z } = bot.entity.position;
-      context.reply(`📍 Current Location: X: ${Math.floor(x)}, Y: ${Math.floor(y)}, Z: ${Math.floor(z)}`);
+      context.reply(
+        `📍 Current Location: X: ${Math.floor(x)}, Y: ${Math.floor(y)}, Z: ${Math.floor(z)}`
+      );
     },
   });
 }

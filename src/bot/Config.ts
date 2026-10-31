@@ -6,7 +6,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { BotConfig, ConfigLoaderOptions } from './types';
-import { ReconnectConfig, PluginConfig } from './types';
 
 export class ConfigLoader {
   private options: Required<ConfigLoaderOptions>;
@@ -16,7 +15,7 @@ export class ConfigLoader {
     this.options = {
       configPath: options.configPath || path.join(process.cwd(), 'bot.config.json'),
       envPrefix: options.envPrefix || 'BOT_',
-      defaults: options.defaults || {}
+      defaults: options.defaults || {},
     };
 
     this.config = this.getDefaultConfig();
@@ -39,10 +38,10 @@ export class ConfigLoader {
         maxAttempts: 10,
         baseDelay: 1000,
         maxDelay: 60000,
-        exponentialBackoff: true
+        exponentialBackoff: true,
       },
       plugins: [],
-      ...this.options.defaults
+      ...this.options.defaults,
     };
   }
 
@@ -86,11 +85,13 @@ export class ConfigLoader {
 
     // Bot connection settings
     if (process.env[`${prefix}HOST`]) this.config.host = process.env[`${prefix}HOST`]!;
-    if (process.env[`${prefix}PORT`]) this.config.port = parseInt(process.env[`${prefix}PORT`]!, 10);
+    if (process.env[`${prefix}PORT`])
+      this.config.port = parseInt(process.env[`${prefix}PORT`]!, 10);
     if (process.env[`${prefix}USERNAME`]) this.config.username = process.env[`${prefix}USERNAME`]!;
     if (process.env[`${prefix}PASSWORD`]) this.config.password = process.env[`${prefix}PASSWORD`];
     if (process.env[`${prefix}VERSION`]) this.config.version = process.env[`${prefix}VERSION`]!;
-    if (process.env[`${prefix}AUTH`]) this.config.auth = process.env[`${prefix}AUTH`]! as BotConfig['auth'];
+    if (process.env[`${prefix}AUTH`])
+      this.config.auth = process.env[`${prefix}AUTH`]! as BotConfig['auth'];
     if (process.env[`${prefix}CHECK_TIMEOUT`]) {
       this.config.checkTimeoutInterval = parseInt(process.env[`${prefix}CHECK_TIMEOUT`]!, 10);
     }
@@ -100,7 +101,10 @@ export class ConfigLoader {
       this.config.reconnect.enabled = process.env[`${prefix}RECONNECT_ENABLED`] === 'true';
     }
     if (process.env[`${prefix}RECONNECT_MAX_ATTEMPTS`]) {
-      this.config.reconnect.maxAttempts = parseInt(process.env[`${prefix}RECONNECT_MAX_ATTEMPTS`]!, 10);
+      this.config.reconnect.maxAttempts = parseInt(
+        process.env[`${prefix}RECONNECT_MAX_ATTEMPTS`]!,
+        10
+      );
     }
     if (process.env[`${prefix}RECONNECT_BASE_DELAY`]) {
       this.config.reconnect.baseDelay = parseInt(process.env[`${prefix}RECONNECT_BASE_DELAY`]!, 10);
@@ -109,13 +113,14 @@ export class ConfigLoader {
       this.config.reconnect.maxDelay = parseInt(process.env[`${prefix}RECONNECT_MAX_DELAY`]!, 10);
     }
     if (process.env[`${prefix}RECONNECT_EXPONENTIAL`]) {
-      this.config.reconnect.exponentialBackoff = process.env[`${prefix}RECONNECT_EXPONENTIAL`] === 'true';
+      this.config.reconnect.exponentialBackoff =
+        process.env[`${prefix}RECONNECT_EXPONENTIAL`] === 'true';
     }
 
     // Load plugins from environment (comma-separated)
     if (process.env[`${prefix}PLUGINS`]) {
-      const pluginNames = process.env[`${prefix}PLUGINS`]!.split(',').map(s => s.trim());
-      this.config.plugins = pluginNames.map(name => ({ name, enabled: true }));
+      const pluginNames = process.env[`${prefix}PLUGINS`]!.split(',').map((s) => s.trim());
+      this.config.plugins = pluginNames.map((name) => ({ name, enabled: true }));
     }
   }
 
@@ -224,9 +229,9 @@ export class ConfigLoader {
         maxAttempts: 10,
         baseDelay: 1000,
         maxDelay: 60000,
-        exponentialBackoff: true
+        exponentialBackoff: true,
       },
-      plugins: []
+      plugins: [],
     };
 
     const dir = path.dirname(filePath);

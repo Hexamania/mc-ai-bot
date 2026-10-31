@@ -2,9 +2,10 @@
  * System tray service for minimize-to-tray functionality
  */
 
-import type { BrowserWindow} from 'electron';
+import type { BrowserWindow } from 'electron';
 import { app, Menu, Tray, nativeImage } from 'electron';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type { LogService } from './LogService';
 
 export interface TrayMenuOptions {
@@ -84,7 +85,7 @@ export class SystemTrayService {
     ];
 
     for (const p of possiblePaths) {
-      if (require('fs').existsSync(p)) {
+      if (fs.existsSync(p)) {
         return p;
       }
     }

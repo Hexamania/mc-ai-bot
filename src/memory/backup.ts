@@ -4,14 +4,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  MemoryData,
-  BackupMetadata,
-  RestoreOptions,
-  RestoreResult} from './types';
-import {
-  CleanupResult,
-} from './types';
+import type { MemoryData, BackupMetadata, RestoreOptions, RestoreResult } from './types';
 
 /**
  * Backup configuration
@@ -152,7 +145,7 @@ export class MemoryBackup {
 
     try {
       const files = fs.readdirSync(this.config.directory);
-      const metaFiles = files.filter(f => f.endsWith('.meta.json'));
+      const metaFiles = files.filter((f) => f.endsWith('.meta.json'));
 
       for (const metaFile of metaFiles) {
         try {
@@ -194,8 +187,11 @@ export class MemoryBackup {
    * Restore memory from a backup
    */
   restore(memory: MemoryData, options: RestoreOptions): RestoreResult {
-    const startTime = Date.now();
-    const { backupId, merge = false, categories = ['locations', 'players', 'facts', 'rules', 'tasks', 'metadata'] } = options;
+    const {
+      backupId,
+      merge = false,
+      categories = ['locations', 'players', 'facts', 'rules', 'tasks', 'metadata'],
+    } = options;
 
     const metaPath = path.join(this.config.directory, `${backupId}.meta.json`);
     const backupPath = path.join(this.config.directory, `${backupId}.json`);
@@ -266,7 +262,7 @@ export class MemoryBackup {
 
       if (categories.includes('rules') && backupData.rules) {
         if (merge) {
-          const existingIds = new Set(memory.rules.map(r => r.id));
+          const existingIds = new Set(memory.rules.map((r) => r.id));
           for (const rule of backupData.rules) {
             if (!existingIds.has(rule.id)) {
               memory.rules.push(rule);

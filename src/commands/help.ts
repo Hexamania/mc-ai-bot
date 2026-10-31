@@ -8,12 +8,8 @@ import type {
   CommandRegistry,
   PermissionLevel,
   CommandArgument,
-  CommandOption
+  CommandOption,
 } from './types';
-import {
-  CommandContext
-} from './types';
-import { Bot } from 'mineflayer';
 
 /**
  * Help theme configuration
@@ -237,7 +233,7 @@ export class HelpFormatter {
     let line = `${theme.bullet}${theme.command}${p}${command.name}${theme.command}`;
 
     if (command.aliases && command.aliases.length > 0) {
-      const aliases = command.aliases.map(a => `${p}${a}`).join(', ');
+      const aliases = command.aliases.map((a) => `${p}${a}`).join(', ');
       line += ` ${theme.description}(${aliases})`;
     }
 
@@ -319,8 +315,10 @@ export class HelpFormatter {
     // Permissions
     output += `${theme.subHeader}Permissions${theme.separator}\n`;
     output += `${theme.bullet}Level: ${theme.warning}${command.permission.level}${theme.description}\n`;
-    if (command.permission.pmOnly) output += `${theme.bullet}PM only: ${theme.warning}Yes${theme.description}\n`;
-    if (command.permission.publicOnly) output += `${theme.bullet}Public only: ${theme.warning}Yes${theme.description}\n`;
+    if (command.permission.pmOnly)
+      output += `${theme.bullet}PM only: ${theme.warning}Yes${theme.description}\n`;
+    if (command.permission.publicOnly)
+      output += `${theme.bullet}Public only: ${theme.warning}Yes${theme.description}\n`;
     if (command.permission.allowedUsers?.length) {
       output += `${theme.bullet}Allowed users: ${command.permission.allowedUsers.join(', ')}\n`;
     }
@@ -395,7 +393,7 @@ export class HelpFormatter {
     let usage = `${prefix}${command.name}`;
 
     if (command.arguments && command.arguments.length > 0) {
-      const argStrings = command.arguments.map(arg => {
+      const argStrings = command.arguments.map((arg) => {
         const bracket = arg.required ? '<' : '[';
         const endBracket = arg.required ? '>' : ']';
         let argStr = `${bracket}${arg.name}${endBracket}`;
@@ -424,7 +422,7 @@ export class HelpFormatter {
     };
     const userLevelValue = hierarchy[userLevel];
 
-    return allCommands.filter(cmd => {
+    return allCommands.filter((cmd) => {
       // Skip hidden unless showHidden
       if (cmd.hidden && !this.options.showHidden) return false;
       // Skip deprecated unless showDeprecated
@@ -545,7 +543,7 @@ export function createHelpCommand(
     },
     autocomplete: async (context, partial) => {
       const commands = registry.getCommandNames();
-      return commands.filter(cmd => cmd.startsWith(partial.toLowerCase()));
+      return commands.filter((cmd) => cmd.startsWith(partial.toLowerCase()));
     },
   };
 }
@@ -555,7 +553,7 @@ export function createHelpCommand(
  */
 export function createCategoriesCommand(
   registry: CommandRegistry,
-  prefix: string
+  _prefix: string
 ): CommandDefinition {
   return {
     name: 'categories',
@@ -633,7 +631,7 @@ export const HelpUtils = {
     let sig = `${prefix}${command.name}`;
 
     if (command.arguments?.length) {
-      const args = command.arguments.map(arg => {
+      const args = command.arguments.map((arg) => {
         const open = arg.required ? '<' : '[';
         const close = arg.required ? '>' : ']';
         let name = arg.name;

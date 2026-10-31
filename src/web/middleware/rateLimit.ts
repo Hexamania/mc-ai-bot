@@ -4,7 +4,6 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from './auth';
 
 interface RateLimitEntry {
   count: number;
@@ -12,10 +11,10 @@ interface RateLimitEntry {
 }
 
 interface RateLimitConfig {
-  windowMs: number;        // Time window in milliseconds
-  maxRequests: number;     // Maximum requests per window
-  message?: string;        // Custom error message
-  statusCode?: number;     // HTTP status code for rate limit
+  windowMs: number; // Time window in milliseconds
+  maxRequests: number; // Maximum requests per window
+  message?: string; // Custom error message
+  statusCode?: number; // HTTP status code for rate limit
   keyGenerator?: (req: Request) => string; // Custom key generator
   skipSuccessfulRequests?: boolean;
   skipFailedRequests?: boolean;
@@ -28,8 +27,8 @@ const store = new Map<string, RateLimitEntry>();
  * Default configuration
  */
 const DEFAULT_CONFIG: RateLimitConfig = {
-  windowMs: 60000,        // 1 minute
-  maxRequests: 100,       // 100 requests per minute
+  windowMs: 60000, // 1 minute
+  maxRequests: 100, // 100 requests per minute
   message: 'Too many requests, please try again later',
   statusCode: 429,
   keyGenerator: (req: Request) => req.ip || 'unknown',
@@ -77,7 +76,10 @@ export function createRateLimiter(config: Partial<RateLimitConfig> = {}) {
       res.set('Retry-After', String(retryAfter));
       res.set('X-RateLimit-Limit', String(options.maxRequests));
       res.set('X-RateLimit-Remaining', '0');
-      res.set('X-RateLimit-Reset', String(Math.ceil((entry.windowStart + options.windowMs) / 1000)));
+      res.set(
+        'X-RateLimit-Reset',
+        String(Math.ceil((entry.windowStart + options.windowMs) / 1000))
+      );
 
       res.status(options.statusCode!).json({
         success: false,
@@ -106,16 +108,16 @@ export function createRateLimiter(config: Partial<RateLimitConfig> = {}) {
 export const rateLimiters = {
   // Strict rate limiting for auth endpoints
   auth: createRateLimiter({
-    windowMs: 15 * 60 * 1000,  // 15 minutes
-    maxRequests: 5,            // 5 attempts per 15 minutes
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 5, // 5 attempts per 15 minutes
     message: 'Too many login attempts, please try again later',
     statusCode: 429,
   }),
 
   // Moderate rate limiting for API endpoints
   api: createRateLimiter({
-    windowMs: 60000,           // 1 minute
-    maxRequests: 60,           // 60 requests per minute
+    windowMs: 60000, // 1 minute
+    maxRequests: 60, // 60 requests per minute
     message: 'Too many API requests, please slow down',
   }),
 
@@ -149,8 +151,10 @@ export const rateLimiters = {
 export function createSocketRateLimiter(maxEventsPerMinute = 60) {
   const socketStore = new Map<string, { count: number; windowStart: number }>();
 
-  return (socket: any, next: (err?: Error) => void): void => {
-    const key = socket.user?.username || socket.id;
+  return (socket: unknown, next: (err?: Error) => void): void => {
+    const key =
+      (socket as { user?: { username: string }; id: string }).user?.username ||
+      (socket as { user?: { username: string }; id: string }).id;
     const now = Date.now();
     const windowMs = 60000;
 
@@ -172,7 +176,10 @@ export function createSocketRateLimiter(maxEventsPerMinute = 60) {
 /**
  * Get current rate limit status for a key
  */
-export function getRateLimitStatus(key: string, windowMs = 60000): { count: number; remaining: number; resetTime: number } | null {
+export function getRateLimitStatus(
+  key: string,
+  windowMs = 60000
+): { count: number; remaining: number; resetTime: number } | null {
   const entry = store.get(key);
   if (!entry) return null;
 

@@ -2,12 +2,11 @@
  * Auto-updater service using electron-updater
  */
 
-import type { BrowserWindow} from 'electron';
+import type { BrowserWindow } from 'electron';
 import { app, shell } from 'electron';
 import type { UpdateInfo } from 'electron-updater';
 import { autoUpdater } from 'electron-updater';
 import { EventEmitter } from 'events';
-import * as path from 'node:path';
 import type { LogService } from './LogService';
 
 export interface UpdateCheckResult {
@@ -42,7 +41,10 @@ export class AutoUpdaterService extends EventEmitter {
     });
 
     autoUpdater.on('update-available', (info: UpdateInfo) => {
-      this.logService.appendLog('system', `Update available: ${info.version} (current: ${app.getVersion()})`);
+      this.logService.appendLog(
+        'system',
+        `Update available: ${info.version} (current: ${app.getVersion()})`
+      );
       this.emit('update-available', info);
     });
 
@@ -57,8 +59,11 @@ export class AutoUpdaterService extends EventEmitter {
     });
 
     autoUpdater.on('download-progress', (progress) => {
-      const { percent, transferred, total, bytesPerSecond } = progress;
-      this.logService.appendLog('system', `Downloading update: ${percent.toFixed(1)}% (${this.formatBytes(transferred)}/${this.formatBytes(total)})`);
+      const { percent, transferred, total } = progress;
+      this.logService.appendLog(
+        'system',
+        `Downloading update: ${percent.toFixed(1)}% (${this.formatBytes(transferred)}/${this.formatBytes(total)})`
+      );
       this.emit('download-progress', percent);
     });
 

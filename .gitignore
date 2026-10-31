@@ -25,3 +25,4 @@ backup_full_*
 # others
 chat.json
 .claude/
+.editorconfig

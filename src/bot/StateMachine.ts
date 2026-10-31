@@ -3,7 +3,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { BotState, BotEvents } from './types';
+import { BotState } from './types';
 
 type StateHandler = (fromState: BotState, toState: BotState) => Promise<void> | void;
 type TransitionValidator = (fromState: BotState, toState: BotState) => boolean | Promise<boolean>;
@@ -70,7 +70,7 @@ export class StateMachine extends EventEmitter {
       // From SHUTDOWN (terminal state - no outgoing transitions)
     ];
 
-    transitions.forEach(t => this.addTransition(t));
+    transitions.forEach((t) => this.addTransition(t));
   }
 
   /**
@@ -79,7 +79,7 @@ export class StateMachine extends EventEmitter {
   addTransition(transition: Transition): this {
     const fromStates = Array.isArray(transition.from) ? transition.from : [transition.from];
 
-    fromStates.forEach(from => {
+    fromStates.forEach((from) => {
       const key = `${from}->${transition.to}`;
       if (!this.transitions.has(key)) {
         this.transitions.set(key, []);
@@ -166,7 +166,9 @@ export class StateMachine extends EventEmitter {
       if (transition.validator) {
         const result = await Promise.resolve(transition.validator(this.currentState, toState));
         if (!result) {
-          const error = new Error(`Transition validator failed: ${this.currentState} -> ${toState}`);
+          const error = new Error(
+            `Transition validator failed: ${this.currentState} -> ${toState}`
+          );
           this.emit('error', error);
           return false;
         }
@@ -226,7 +228,7 @@ export class StateMachine extends EventEmitter {
     this.transitionHistory.push({
       from,
       to,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     // Trim history
@@ -248,7 +250,7 @@ export class StateMachine extends EventEmitter {
   getAvailableTransitions(): BotState[] {
     const available: BotState[] = [];
 
-    for (const [key, transitions] of this.transitions) {
+    for (const [key] of this.transitions) {
       if (key.startsWith(`${this.currentState}->`)) {
         const toState = key.split('->')[1] as BotState;
         if (!available.includes(toState)) {
@@ -277,8 +279,8 @@ export class StateMachine extends EventEmitter {
   /**
    * Check if state is terminal (no outgoing transitions)
    */
-  isTerminalState(state?: BotState): boolean {
-    const checkState = state || this.currentState;
+  isTerminalState(_state?: BotState): boolean {
+    // _state parameter reserved for future use - currently checks current state
     return this.getAvailableTransitions().length === 0;
   }
 
@@ -314,7 +316,7 @@ export class StateMachine extends EventEmitter {
       currentState: this.currentState,
       availableTransitions: this.getAvailableTransitions(),
       isTransitioning: this.isTransitioning,
-      historySize: this.transitionHistory.length
+      historySize: this.transitionHistory.length,
     };
   }
 }

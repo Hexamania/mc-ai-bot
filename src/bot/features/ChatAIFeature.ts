@@ -3,10 +3,9 @@
  * Handles OpenAI integration for AI chat responses
  */
 
-import { Bot } from 'mineflayer';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
+import type { OpenAI } from 'openai';
 
 /**
  * ChatAI feature configuration
@@ -48,10 +47,11 @@ export class ChatAIFeature extends BaseFeature {
   public readonly description = 'OpenAI integration for AI chat responses';
   public readonly dependencies = ['core'];
 
-  private openai: any = null;
+  private openai: OpenAI | null = null;
   private apiKey = '';
   private model = 'gpt-4';
-  private systemPrompt = 'You are Airi, a Minecraft bot assistant. Use these persistent notes as context, but do not invent facts. Follow stored behavioral rules.';
+  private systemPrompt =
+    'You are Airi, a Minecraft bot assistant. Use these persistent notes as context, but do not invent facts. Follow stored behavioral rules.';
   private maxTokens = 500;
   private temperature = 0.7;
   private conversationHistory: ChatMessage[] = [];
@@ -108,10 +108,10 @@ export class ChatAIFeature extends BaseFeature {
    */
   private async initializeOpenAI(): Promise<void> {
     try {
-      const { OpenAI } = require('openai');
+      const { OpenAI } = await import('openai');
       this.openai = new OpenAI({ apiKey: this.apiKey });
       console.log('[ChatAIFeature] OpenAI client initialized');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[ChatAIFeature] Failed to initialize OpenAI:', error);
     }
   }
@@ -143,14 +143,14 @@ export class ChatAIFeature extends BaseFeature {
       const messages: ChatMessage[] = [
         { role: 'system', content: this.systemPrompt + '\n\n' + (context ?? '') },
         ...this.conversationHistory.slice(-10), // Keep last 10 messages for context
-        { role: 'user', content: message }
+        { role: 'user', content: message },
       ];
 
       const response = await this.openai.chat.completions.create({
         model: this.model,
         messages,
         max_tokens: this.maxTokens,
-        temperature: this.temperature
+        temperature: this.temperature,
       });
 
       const reply = response.choices[0]?.message?.content;
@@ -168,7 +168,7 @@ export class ChatAIFeature extends BaseFeature {
       }
 
       return reply ?? null;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[ChatAIFeature] Chat error:', error);
       return null;
     }
@@ -221,7 +221,7 @@ export class ChatAIFeature extends BaseFeature {
   setApiKey(apiKey: string): void {
     this.apiKey = apiKey;
     this.setOption('apiKey', apiKey);
-    this.initializeOpenAI();
+    void this.initializeOpenAI();
   }
 
   /**

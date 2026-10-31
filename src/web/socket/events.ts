@@ -9,11 +9,11 @@ import type { BotState, BotStatus, BotPosition } from '../../types';
  * Namespace identifiers
  */
 export const NAMESPACES = {
-  MAIN: '/',                    // Main dashboard namespace
-  ADMIN: '/admin',              // Admin-only namespace
-  BOT: '/bot',                  // Bot internal events
-  COMMANDS: '/commands',        // Command execution namespace
-  LOGS: '/logs',                // Log streaming namespace
+  MAIN: '/', // Main dashboard namespace
+  ADMIN: '/admin', // Admin-only namespace
+  BOT: '/bot', // Bot internal events
+  COMMANDS: '/commands', // Command execution namespace
+  LOGS: '/logs', // Log streaming namespace
 } as const;
 
 /**
@@ -156,9 +156,9 @@ export const CLIENT_EVENTS = {
  */
 
 // Server -> Client payloads
-export interface BotStatusPayload extends BotStatus {}
-export interface BotStatePayload extends BotState {}
-export interface BulkUpdatePayload extends BotState {}
+export type BotStatusPayload = BotStatus;
+export type BotStatePayload = BotState;
+export type BulkUpdatePayload = BotState;
 
 export interface HealthUpdatePayload {
   health: number;

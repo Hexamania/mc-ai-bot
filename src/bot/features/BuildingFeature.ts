@@ -55,10 +55,21 @@ export class BuildingFeature extends BaseFeature {
 
   private currentTask: BuildTask | null = null;
   private isBuilding = false;
-  private materialPriority: string[] = ['cobblestone', 'dirt', 'oak_planks', 'stone', 'netherrack', 'planks'];
+  private materialPriority: string[] = [
+    'cobblestone',
+    'dirt',
+    'oak_planks',
+    'stone',
+    'netherrack',
+    'planks',
+  ];
 
   constructor() {
-    super('building', '1.0.0', 'Building structures, roof construction, and block placement', ['core', 'movement', 'inventory']);
+    super('building', '1.0.0', 'Building structures, roof construction, and block placement', [
+      'core',
+      'movement',
+      'inventory',
+    ]);
   }
 
   /**
@@ -125,8 +136,10 @@ export class BuildingFeature extends BaseFeature {
       case 'schematic':
         if (Array.isArray(customData)) {
           const origin = bot.entity.position.floored();
-          blocks = customData.map(b => origin.offset(b.x, b.y, b.z));
-          console.log(`[BuildingFeature] Starting custom schematic build (${customData.length} blocks)...`);
+          blocks = customData.map((b) => origin.offset(b.x, b.y, b.z));
+          console.log(
+            `[BuildingFeature] Starting custom schematic build (${customData.length} blocks)...`
+          );
         }
         break;
     }
@@ -138,7 +151,7 @@ export class BuildingFeature extends BaseFeature {
       blocks,
       currentIndex: 0,
       total: blocks.length,
-      customData
+      customData,
     };
     this.isBuilding = true;
 
@@ -222,9 +235,12 @@ export class BuildingFeature extends BaseFeature {
     if (!material) throw new Error('Out of building materials');
 
     const neighbors = [
-      new Vec3(0, -1, 0), new Vec3(0, 1, 0),
-      new Vec3(1, 0, 0), new Vec3(-1, 0, 0),
-      new Vec3(0, 0, 1), new Vec3(0, 0, -1)
+      new Vec3(0, -1, 0),
+      new Vec3(0, 1, 0),
+      new Vec3(1, 0, 0),
+      new Vec3(-1, 0, 0),
+      new Vec3(0, 0, 1),
+      new Vec3(0, 0, -1),
     ];
 
     for (const d of neighbors) {
@@ -253,9 +269,9 @@ export class BuildingFeature extends BaseFeature {
    */
   private findBuildingMaterial() {
     const bot = this.getBot();
-    return bot.inventory.items().find(item =>
-      this.materialPriority.some(m => item.name.includes(m))
-    );
+    return bot.inventory
+      .items()
+      .find((item) => this.materialPriority.some((m) => item.name.includes(m)));
   }
 
   /**
@@ -266,8 +282,10 @@ export class BuildingFeature extends BaseFeature {
     console.log('[BuildingFeature] Out of building blocks! Gathering materials...');
 
     const targetBlocks = bot.registry.blocksArray
-      .filter(b => ['dirt', 'cobblestone', 'netherrack', 'deepslate', 'grass_block'].includes(b.name))
-      .map(b => b.id);
+      .filter((b) =>
+        ['dirt', 'cobblestone', 'netherrack', 'deepslate', 'grass_block'].includes(b.name)
+      )
+      .map((b) => b.id);
 
     for (let i = 0; i < 32; i++) {
       const block = bot.findBlock({ matching: targetBlocks, maxDistance: 32 });
@@ -275,7 +293,12 @@ export class BuildingFeature extends BaseFeature {
         try {
           const movementFeature = this.getMovementFeature();
           if (movementFeature) {
-            await movementFeature.moveToBlock(block.position.x, block.position.y, block.position.z, 4);
+            await movementFeature.moveToBlock(
+              block.position.x,
+              block.position.y,
+              block.position.z,
+              4
+            );
           } else {
             await bot.pathfinder.goto(new goals.GoalLookAtBlock(block.position, bot.world));
           }
@@ -295,19 +318,32 @@ export class BuildingFeature extends BaseFeature {
   private async equipToolForBlock(block: Block): Promise<void> {
     const bot = this.getBot();
     // const registry = bot.registry; // Available if needed
-    const pickaxes = ['netherite_pickaxe', 'diamond_pickaxe', 'iron_pickaxe', 'stone_pickaxe', 'wooden_pickaxe'];
+    const pickaxes = [
+      'netherite_pickaxe',
+      'diamond_pickaxe',
+      'iron_pickaxe',
+      'stone_pickaxe',
+      'wooden_pickaxe',
+    ];
 
     let minTier = 0;
     const name = block.name;
 
     if (name.includes('obsidian') || name.includes('ancient_debris')) minTier = 3;
-    else if (name.includes('diamond_ore') || name.includes('gold_ore') || name.includes('emerald_ore') || name.includes('redstone_ore')) minTier = 2;
-    else if (name.includes('iron_ore') || name.includes('copper_ore') || name.includes('lapis_ore')) minTier = 1;
+    else if (
+      name.includes('diamond_ore') ||
+      name.includes('gold_ore') ||
+      name.includes('emerald_ore') ||
+      name.includes('redstone_ore')
+    )
+      minTier = 2;
+    else if (name.includes('iron_ore') || name.includes('copper_ore') || name.includes('lapis_ore'))
+      minTier = 1;
 
-    const availablePicks = bot.inventory.items().filter(i => pickaxes.includes(i.name));
+    const availablePicks = bot.inventory.items().filter((i) => pickaxes.includes(i.name));
     availablePicks.sort((a, b) => pickaxes.indexOf(a.name) - pickaxes.indexOf(b.name));
 
-    const bestPick = availablePicks.find(p => {
+    const bestPick = availablePicks.find((p) => {
       const tier = 4 - pickaxes.indexOf(p.name);
       return tier >= minTier;
     });
@@ -330,7 +366,7 @@ export class BuildingFeature extends BaseFeature {
       return;
     }
 
-    const slab = bot.inventory.items().find(i => i.name.includes('slab'));
+    const slab = bot.inventory.items().find((i) => i.name.includes('slab'));
     if (!slab) {
       console.warn('[BuildingFeature] Need slabs to build roof');
       return;
@@ -347,7 +383,7 @@ export class BuildingFeature extends BaseFeature {
         const blockAtPos = bot.blockAt(pos);
         if (!blockAtPos || blockAtPos.name !== 'air') continue;
 
-        const material = bot.inventory.items().find(i => i.name.includes('slab'));
+        const material = bot.inventory.items().find((i) => i.name.includes('slab'));
         if (!material) {
           console.warn('[BuildingFeature] Out of slabs!');
           return;
@@ -362,8 +398,11 @@ export class BuildingFeature extends BaseFeature {
           }
 
           const neighbors = [
-            new Vec3(0, -1, 0), new Vec3(1, 0, 0), new Vec3(-1, 0, 0),
-            new Vec3(0, 0, 1), new Vec3(0, 0, -1)
+            new Vec3(0, -1, 0),
+            new Vec3(1, 0, 0),
+            new Vec3(-1, 0, 0),
+            new Vec3(0, 0, 1),
+            new Vec3(0, 0, -1),
           ];
 
           for (const d of neighbors) {
@@ -400,13 +439,21 @@ export class BuildingFeature extends BaseFeature {
     const flintId = bot.registry.itemsByName.flint_and_steel.id;
 
     const startPos = bot.entity.position.floored().offset(2, 0, 0);
-    console.log(`[BuildingFeature] Building Nether Portal at ${startPos.x}, ${startPos.y}, ${startPos.z}`);
+    console.log(
+      `[BuildingFeature] Building Nether Portal at ${startPos.x}, ${startPos.y}, ${startPos.z}`
+    );
 
     const frameOffsets = [
-      [1, 0, 0], [2, 0, 0],
-      [0, 1, 0], [0, 2, 0], [0, 3, 0],
-      [3, 1, 0], [3, 2, 0], [3, 3, 0],
-      [1, 4, 0], [2, 4, 0]
+      [1, 0, 0],
+      [2, 0, 0],
+      [0, 1, 0],
+      [0, 2, 0],
+      [0, 3, 0],
+      [3, 1, 0],
+      [3, 2, 0],
+      [3, 3, 0],
+      [1, 4, 0],
+      [2, 4, 0],
     ];
 
     for (const offset of frameOffsets) {
@@ -428,14 +475,21 @@ export class BuildingFeature extends BaseFeature {
         if (!item) return;
         await bot.equip(item, 'hand');
 
-        const neighbors: [number, number, number][] = [[0,-1,0], [0,1,0], [1,0,0], [-1,0,0], [0,0,1], [0,0,-1]];
+        const neighbors: [number, number, number][] = [
+          [0, -1, 0],
+          [0, 1, 0],
+          [1, 0, 0],
+          [-1, 0, 0],
+          [0, 0, 1],
+          [0, 0, -1],
+        ];
         for (const n of neighbors) {
           const ref = bot.blockAt(p.offset(n[0], n[1], n[2]));
           if (ref && ref.name !== 'air') {
             try {
               await bot.placeBlock(ref, new Vec3(n[0], n[1], n[2]).scaled(-1));
               break;
-            } catch (_e) {
+            } catch {
               // Ignore placement errors, try next neighbor
             }
           }

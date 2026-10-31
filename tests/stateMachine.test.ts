@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StateMachine, BotState } from '../src/bot/StateMachine';
-import { BotEvents } from '../src/bot/types';
 
 describe('StateMachine', () => {
   let stateMachine: StateMachine;

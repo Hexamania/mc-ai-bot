@@ -3,19 +3,14 @@
  * Handles combat mechanics, PvP, auto-defense, kill aura, and targeting
  */
 
-import { Bot, Player } from 'mineflayer';
 import type { Entity } from 'prismarine-entity';
-import { Vec3 } from 'vec3';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
 
 /**
  * Combat feature configuration
  */
-export interface CombatFeatureConfig extends FeaturePluginConfig {
-  // options is inherited from FeaturePluginConfig/PluginConfig as Record<string, unknown>
-}
+export type CombatFeatureConfig = FeaturePluginConfig;
 
 /**
  * Combat feature options
@@ -99,21 +94,23 @@ export class CombatFeature extends BaseFeature {
     damageDealt: 0,
     damageTaken: 0,
     longestKillStreak: 0,
-    currentKillStreak: 0
+    currentKillStreak: 0,
   };
   private targetChangeListeners: ((target: Entity | null) => void)[] = [];
   private attackCooldown = 500;
 
   constructor() {
-    super('combat', '1.0.0', 'Combat mechanics, PvP, auto-defense, and kill aura', ['core', 'movement', 'inventory']);
+    super('combat', '1.0.0', 'Combat mechanics, PvP, auto-defense, and kill aura', [
+      'core',
+      'movement',
+      'inventory',
+    ]);
   }
 
   /**
    * Initialize the combat feature
    */
   protected async onEnable(): Promise<void> {
-    const bot = this.getBot();
-
     // Configure from options
     this.configureFromOptions();
 
@@ -158,14 +155,14 @@ export class CombatFeature extends BaseFeature {
     // Physics tick for kill aura
     bot.on('physicsTick', () => {
       if (this.killAuraEnabled && this.isEnabled()) {
-        this.killAuraTick();
+        void this.killAuraTick();
       }
     });
 
     // Entity hurt event (for auto-defense)
     bot.on('entityHurt', (entity: Entity) => {
       if (entity.id === bot.entity.id && this.autoDefenseEnabled) {
-        this.onDamaged(entity);
+        void this.onDamaged(entity);
       }
     });
 
@@ -183,7 +180,7 @@ export class CombatFeature extends BaseFeature {
 
     // Health changes for auto-eat
     bot.on('health', () => {
-      this.checkAutoEat();
+      void this.checkAutoEat();
     });
   }
 
@@ -210,8 +207,7 @@ export class CombatFeature extends BaseFeature {
   /**
    * Kill aura tick - find and attack targets
    */
-  private killAuraTick(): void {
-    const bot = this.getBot();
+  private async killAuraTick(): Promise<void> {
     const now = Date.now();
 
     // Check attack cooldown
@@ -220,7 +216,7 @@ export class CombatFeature extends BaseFeature {
     // Find best target
     const target = this.findBestTarget();
     if (target) {
-      this.attackEntity(target.entity);
+      await this.attackEntity(target.entity);
     } else if (this.currentTarget) {
       this.clearTarget();
     }
@@ -269,7 +265,6 @@ export class CombatFeature extends BaseFeature {
     // Check entity type
     const kind = entity.kind;
     const isPlayer = kind === 'Player';
-    const isMob = kind === 'Hostile mob' || kind === 'Passive mob';
     const isAnimal = entity.nameType === 'animal' || entity.nameType === 'mob';
 
     if (isPlayer) {
@@ -307,7 +302,7 @@ export class CombatFeature extends BaseFeature {
       distance,
       health: entity.health,
       isPlayer,
-      priority
+      priority,
     };
   }
 
@@ -321,7 +316,7 @@ export class CombatFeature extends BaseFeature {
   /**
    * Check if player is teammate (simplified)
    */
-  private isTeammate(username: string): boolean {
+  private isTeammate(_username: string): boolean {
     // This would integrate with a teams/friends system
     return false;
   }
@@ -350,7 +345,7 @@ export class CombatFeature extends BaseFeature {
 
     try {
       // Look at entity
-      bot.lookAt(entity.position.offset(0, 1.6, 0), true);
+      void bot.lookAt(entity.position.offset(0, 1.6, 0), true);
 
       // Equip best weapon if enabled
       if (options?.autoEquipWeapon) {
@@ -373,7 +368,7 @@ export class CombatFeature extends BaseFeature {
       }
 
       // Attack
-      await bot.attack(entity);
+      bot.attack(entity);
       this.lastAttackTime = now;
       this.currentTarget = entity;
       this.notifyTargetChange(entity);
@@ -424,12 +419,12 @@ export class CombatFeature extends BaseFeature {
   /**
    * Called when bot takes damage
    */
-  private onDamaged(attacker: Entity): void {
+  private async onDamaged(attacker: Entity): Promise<void> {
     if (!this.autoDefenseEnabled) return;
 
     // Attack back
     if (attacker.id !== this.getBot().entity.id) {
-      this.attackEntity(attacker);
+      await this.attackEntity(attacker);
     }
   }
 
@@ -484,7 +479,7 @@ export class CombatFeature extends BaseFeature {
     if (bot.food >= threshold) return;
 
     // Find food in inventory
-    const food = bot.inventory.items().find(item => {
+    const food = bot.inventory.items().find((item) => {
       const foodData = bot.registry.itemsByName[item.name]?.food;
       return foodData && foodData > 0;
     });
@@ -642,7 +637,7 @@ export class CombatFeature extends BaseFeature {
       damageDealt: 0,
       damageTaken: 0,
       longestKillStreak: 0,
-      currentKillStreak: 0
+      currentKillStreak: 0,
     };
   }
 }

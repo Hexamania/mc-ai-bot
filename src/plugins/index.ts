@@ -29,7 +29,9 @@ class FeatureRegistryImpl implements FeatureRegistry {
     }
 
     this.features.set(normalizedName, feature);
-    console.log(`[PLUGINS] Registered: ${normalizedName} v${feature.version} - ${feature.description}`);
+    console.log(
+      `[PLUGINS] Registered: ${normalizedName} v${feature.version} - ${feature.description}`
+    );
   }
 
   unregister(name: string): void {
@@ -40,7 +42,7 @@ class FeatureRegistryImpl implements FeatureRegistry {
       // Shutdown if initialized
       if (this.initialized.has(normalizedName)) {
         try {
-          feature.shutdown?.();
+          void feature.shutdown?.();
         } catch (error) {
           console.error(`[PLUGINS] Error shutting down "${normalizedName}":`, error);
         }
@@ -48,7 +50,7 @@ class FeatureRegistryImpl implements FeatureRegistry {
       }
 
       this.features.delete(normalizedName);
-      this.initializationOrder = this.initializationOrder.filter(n => n !== normalizedName);
+      this.initializationOrder = this.initializationOrder.filter((n) => n !== normalizedName);
       console.log(`[PLUGINS] Unregistered: ${normalizedName}`);
     }
   }
@@ -84,10 +86,12 @@ class FeatureRegistryImpl implements FeatureRegistry {
 
       // Check dependencies
       const deps = feature.dependencies || [];
-      const missingDeps = deps.filter(dep => !this.initialized.has(dep.toLowerCase()));
+      const missingDeps = deps.filter((dep) => !this.initialized.has(dep.toLowerCase()));
 
       if (missingDeps.length > 0) {
-        console.error(`[PLUGINS] Cannot initialize "${name}": missing dependencies: ${missingDeps.join(', ')}`);
+        console.error(
+          `[PLUGINS] Cannot initialize "${name}": missing dependencies: ${missingDeps.join(', ')}`
+        );
         continue;
       }
 
@@ -219,7 +223,12 @@ export abstract class BaseFeature implements Feature {
 /**
  * Feature decorator for class-based features
  */
-export function feature(config: { name: string; version: string; description: string; dependencies?: string[] }) {
+export function feature(config: {
+  name: string;
+  version: string;
+  description: string;
+  dependencies?: string[];
+}) {
   return function <T extends new (...args: unknown[]) => Feature>(target: T): T {
     // Store metadata on the class
     (target as unknown as { _featureConfig: typeof config })._featureConfig = config;
@@ -230,7 +239,10 @@ export function feature(config: { name: string; version: string; description: st
 /**
  * Create a feature from a class with @feature decorator
  */
-export function createFeatureFromClass<T extends Feature>(FeatureClass: new (...args: unknown[]) => T, ...args: unknown[]): T {
+export function createFeatureFromClass<T extends Feature>(
+  FeatureClass: new (...args: unknown[]) => T,
+  ...args: unknown[]
+): T {
   const instance = new FeatureClass(...args);
   return instance;
 }
@@ -245,7 +257,7 @@ export const coreFeature: Feature = {
   version: '1.0.0',
   description: 'Core bot functionality and lifecycle management',
   dependencies: [],
-  initialize: async (bot: Bot) => {
+  initialize: async (_bot: Bot) => {
     console.log('[CORE] Core feature initialized');
   },
   shutdown: async () => {
@@ -259,7 +271,7 @@ export const movementFeature: Feature = {
   version: '1.0.0',
   description: 'Pathfinding, movement, and navigation utilities',
   dependencies: ['core'],
-  initialize: async (bot: Bot) => {
+  initialize: async (_bot: Bot) => {
     console.log('[MOVEMENT] Movement feature initialized');
   },
   shutdown: async () => {
@@ -273,7 +285,7 @@ export const combatFeature: Feature = {
   version: '1.0.0',
   description: 'Combat mechanics, PvP, and auto-defense',
   dependencies: ['core', 'movement'],
-  initialize: async (bot: Bot) => {
+  initialize: async (_bot: Bot) => {
     console.log('[COMBAT] Combat feature initialized');
   },
   shutdown: async () => {
@@ -287,7 +299,7 @@ export const automationFeature: Feature = {
   version: '1.0.0',
   description: 'Automation tasks: mining, farming, building, progression',
   dependencies: ['core', 'movement'],
-  initialize: async (bot: Bot) => {
+  initialize: async (_bot: Bot) => {
     console.log('[AUTOMATION] Automation feature initialized');
   },
   shutdown: async () => {
@@ -301,7 +313,7 @@ export const memoryFeature: Feature = {
   version: '1.0.0',
   description: 'Persistent memory system for locations, players, tasks',
   dependencies: ['core'],
-  initialize: async (bot: Bot, registry: FeatureRegistry) => {
+  initialize: async (_bot: Bot, _registry: FeatureRegistry) => {
     console.log('[MEMORY] Memory feature initialized');
   },
   shutdown: async () => {
@@ -315,7 +327,7 @@ export const webFeature: Feature = {
   version: '1.0.0',
   description: 'Web dashboard and Socket.io server',
   dependencies: ['core', 'memory'],
-  initialize: async (bot: Bot, registry: FeatureRegistry) => {
+  initialize: async (_bot: Bot, _registry: FeatureRegistry) => {
     console.log('[WEB] Web feature initialized');
   },
   shutdown: async () => {

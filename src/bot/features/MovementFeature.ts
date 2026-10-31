@@ -3,13 +3,11 @@
  * Wraps mineflayer-pathfinder for pathfinding, movement, and navigation utilities
  */
 
-import { Bot, Player } from 'mineflayer';
 import type { Entity } from 'prismarine-entity';
 import { Vec3 } from 'vec3';
 import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
 
 /**
  * Movement feature configuration
@@ -62,6 +60,14 @@ export interface MovementStatus {
   path: Vec3[] | null;
   progress: number;
   speed: number;
+}
+
+/**
+ * Path update results type
+ */
+interface PathUpdateResults {
+  path: Vec3[];
+  status: string;
 }
 
 /**
@@ -159,7 +165,7 @@ export class MovementFeature extends BaseFeature {
     const bot = this.getBot();
 
     // Path update event
-    bot.on('path_update', (results: any) => {
+    bot.on('path_update', (results: PathUpdateResults) => {
       this.path = results.path;
       this.pathIndex = 0;
       this.emitStatus();
@@ -183,7 +189,7 @@ export class MovementFeature extends BaseFeature {
 
     // Death event - stop movement
     bot.on('death', () => {
-      this.stop();
+      void this.stop();
     });
   }
 
@@ -191,8 +197,6 @@ export class MovementFeature extends BaseFeature {
    * Register movement-related commands
    */
   private registerCommands(): void {
-    const manager = this.getManager();
-
     // Commands will be registered via the command system
     // This is a placeholder for command registration
   }
@@ -269,6 +273,7 @@ export class MovementFeature extends BaseFeature {
       this.isMoving = true;
 
       let pathfinderGoal: goals.Goal;
+      let center: Vec3;
 
       switch (goal.type) {
         case 'block':
@@ -284,14 +289,16 @@ export class MovementFeature extends BaseFeature {
           pathfinderGoal = new goals.GoalFollow(goal.entity.id, goal.range);
           break;
         case 'wander':
-          const center = goal.center ?? bot.entity.position;
+          center = goal.center ?? bot.entity.position;
           pathfinderGoal = new goals.GoalRandom(center, goal.radius);
           break;
         case 'stop':
           await this.stop();
           return true;
-        default:
-          throw new Error(`Unknown goal type: ${(goal as any).type}`);
+        default: {
+          const _exhaustive: never = goal;
+          throw new Error(`Unknown goal type: ${_exhaustive}`);
+        }
       }
 
       // Set timeout
@@ -299,7 +306,7 @@ export class MovementFeature extends BaseFeature {
       this.moveTimeout = setTimeout(() => {
         if (this.isMoving) {
           console.warn('[MovementFeature] Pathfinding timeout');
-          this.stop();
+          void this.stop();
         }
       }, timeout);
 
@@ -349,8 +356,10 @@ export class MovementFeature extends BaseFeature {
       moving: this.isMoving,
       goal: this.currentGoal,
       path: this.path,
-      progress: progress ?? (this.path && this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 0),
-      speed: bot.entity.velocity.length()
+      progress:
+        progress ??
+        (this.path && this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 0),
+      speed: bot.entity.velocity.length(),
     };
 
     for (const listener of this.statusListeners) {
@@ -384,7 +393,7 @@ export class MovementFeature extends BaseFeature {
       goal: this.currentGoal,
       path: this.path,
       progress: this.path && this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 0,
-      speed: this.getBot().entity.velocity.length()
+      speed: this.getBot().entity.velocity.length(),
     };
   }
 
@@ -412,7 +421,7 @@ export class MovementFeature extends BaseFeature {
   /**
    * Move to a specific location by name (from memory)
    */
-  async moveToNamedLocation(name: string): Promise<boolean> {
+  async moveToNamedLocation(_name: string): Promise<boolean> {
     const memoryFeature = this.getFeature('memory');
     if (!memoryFeature) {
       console.warn('[MovementFeature] Memory feature not available');
@@ -429,7 +438,7 @@ export class MovementFeature extends BaseFeature {
    */
   lookAt(x: number, y: number, z: number): void {
     const bot = this.getBot();
-    bot.lookAt(new Vec3(x, y, z), true);
+    void bot.lookAt(new Vec3(x, y, z), true);
   }
 
   /**
@@ -437,7 +446,7 @@ export class MovementFeature extends BaseFeature {
    */
   lookAtEntity(entity: Entity): void {
     const bot = this.getBot();
-    bot.lookAt(entity.position.offset(0, 1.6, 0), true);
+    void bot.lookAt(entity.position.offset(0, 1.6, 0), true);
   }
 
   /**

@@ -3,13 +3,11 @@
  * Handles auto-farming wheat and other crops
  */
 
-import { Bot } from 'mineflayer';
 import type { Block } from 'prismarine-block';
 import { Vec3 } from 'vec3';
-import { goals, Movements } from 'mineflayer-pathfinder';
+import { goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
 
 /**
  * Farming feature configuration
@@ -56,15 +54,17 @@ export class FarmingFeature extends BaseFeature {
   private autoReplant = true;
 
   constructor() {
-    super('farming', '1.0.0', 'Auto-farming wheat and other crops', ['core', 'movement', 'inventory']);
+    super('farming', '1.0.0', 'Auto-farming wheat and other crops', [
+      'core',
+      'movement',
+      'inventory',
+    ]);
   }
 
   /**
    * Initialize the farming feature
    */
   protected async onEnable(): Promise<void> {
-    const bot = this.getBot();
-
     // Configure from options
     this.configureFromOptions();
 
@@ -108,7 +108,7 @@ export class FarmingFeature extends BaseFeature {
     if (this.getOption('autoFarmWhenHungry', true)) {
       bot.on('health', () => {
         if (bot.food < this.foodThreshold) {
-          this.autoFarmWheat();
+          void this.autoFarmWheat();
         }
       });
     }
@@ -132,14 +132,13 @@ export class FarmingFeature extends BaseFeature {
     if (this.isFarming) return;
 
     const bot = this.getBot();
-    const registry = bot.registry;
 
     // Find fully grown wheat (metadata 7)
     const wheatBlock = bot.findBlock({
       matching: (block) => {
         return block.name === 'wheat' && block.metadata === 7;
       },
-      maxDistance: this.getOption('maxSearchDistance', 32)
+      maxDistance: this.getOption('maxSearchDistance', 32),
     });
 
     if (wheatBlock) {
@@ -149,7 +148,12 @@ export class FarmingFeature extends BaseFeature {
       try {
         const movementFeature = this.getFeature('movement');
         if (movementFeature) {
-          await movementFeature.moveToBlock(wheatBlock.position.x, wheatBlock.position.y, wheatBlock.position.z, 4);
+          await movementFeature.moveToBlock(
+            wheatBlock.position.x,
+            wheatBlock.position.y,
+            wheatBlock.position.z,
+            4
+          );
         } else {
           await bot.pathfinder.goto(new goals.GoalLookAtBlock(wheatBlock.position, bot.world));
         }
@@ -158,7 +162,7 @@ export class FarmingFeature extends BaseFeature {
 
         // Replant logic
         if (this.autoReplant) {
-          const seeds = bot.inventory.items().find(i => i.name === 'wheat_seeds');
+          const seeds = bot.inventory.items().find((i) => i.name === 'wheat_seeds');
           if (seeds) {
             const farmland = bot.blockAt(wheatBlock.position.offset(0, -1, 0));
             if (farmland && farmland.name === 'farmland') {

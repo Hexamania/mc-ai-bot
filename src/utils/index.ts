@@ -3,7 +3,6 @@
  */
 
 import type { Bot } from 'mineflayer';
-import { goals } from 'mineflayer-pathfinder';
 import type { Vec3 } from 'vec3';
 import type { BotPosition } from '../types';
 
@@ -11,7 +10,7 @@ import type { BotPosition } from '../types';
  * Sleep/delay utility
  */
 export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -97,23 +96,21 @@ export function lerp(a: number, b: number, t: number): number {
 /**
  * Check if a position is within bounds
  */
-export function inBounds(
-  pos: BotPosition,
-  min: BotPosition,
-  max: BotPosition
-): boolean {
+export function inBounds(pos: BotPosition, min: BotPosition, max: BotPosition): boolean {
   return (
-    pos.x >= min.x && pos.x <= max.x &&
-    pos.y >= min.y && pos.y <= max.y &&
-    pos.z >= min.z && pos.z <= max.z
+    pos.x >= min.x &&
+    pos.x <= max.x &&
+    pos.y >= min.y &&
+    pos.y <= max.y &&
+    pos.z >= min.z &&
+    pos.z <= max.z
   );
 }
 
 /**
  * Get the best tool for a block
  */
-export function getBestToolForBlock(bot: Bot, blockName: string): any | null {
-  const registry = bot.registry;
+export function getBestToolForBlock(bot: Bot, blockName: string): unknown | null {
   const pickaxes = [
     'netherite_pickaxe',
     'diamond_pickaxe',
@@ -126,13 +123,20 @@ export function getBestToolForBlock(bot: Bot, blockName: string): any | null {
   const name = blockName;
 
   if (name.includes('obsidian') || name.includes('ancient_debris')) minTier = 3;
-  else if (name.includes('diamond_ore') || name.includes('gold_ore') || name.includes('emerald_ore') || name.includes('redstone_ore')) minTier = 2;
-  else if (name.includes('iron_ore') || name.includes('copper_ore') || name.includes('lapis_ore')) minTier = 1;
+  else if (
+    name.includes('diamond_ore') ||
+    name.includes('gold_ore') ||
+    name.includes('emerald_ore') ||
+    name.includes('redstone_ore')
+  )
+    minTier = 2;
+  else if (name.includes('iron_ore') || name.includes('copper_ore') || name.includes('lapis_ore'))
+    minTier = 1;
 
-  const availablePicks = bot.inventory.items().filter(i => pickaxes.includes(i.name));
+  const availablePicks = bot.inventory.items().filter((i) => pickaxes.includes(i.name));
   availablePicks.sort((a, b) => pickaxes.indexOf(a.name) - pickaxes.indexOf(b.name));
 
-  const bestPick = availablePicks.find(p => {
+  const bestPick = availablePicks.find((p) => {
     const tier = 4 - pickaxes.indexOf(p.name);
     return tier >= minTier;
   });
@@ -143,9 +147,9 @@ export function getBestToolForBlock(bot: Bot, blockName: string): any | null {
 /**
  * Find the best item of a category
  */
-export function findBestItem(bot: Bot, category: 'weapon' | 'shield'): any | null {
+export function findBestItem(bot: Bot, category: 'weapon' | 'shield'): unknown | null {
   const items = bot.inventory.items();
-  let bestItem = null;
+  let bestItem: unknown = null;
   let bestTier = -1;
 
   const weaponTiers: Record<string, number> = {
@@ -217,7 +221,7 @@ export function autoArmor(bot: Bot): void {
   };
 
   for (const [slot, ids] of Object.entries(armorSlots)) {
-    const items = bot.inventory.items().filter(i => ids.includes(i.type));
+    const items = bot.inventory.items().filter((i) => ids.includes(i.type));
     if (items.length === 0) continue;
 
     items.sort((a, b) => ids.indexOf(a.type) - ids.indexOf(b.type));
@@ -225,7 +229,7 @@ export function autoArmor(bot: Bot): void {
 
     const current = bot.inventory.slots[bot.getEquipmentDestSlot(slot)];
     if (!current || current.type !== best.type) {
-      bot.equip(best, slot).catch(() => {});
+      void bot.equip(best, slot).catch(() => undefined);
     }
   }
 }
@@ -249,14 +253,14 @@ export async function forceEat(bot: Bot): Promise<boolean> {
   ];
 
   const inventory = bot.inventory.items();
-  const food = foodItems.map(name => inventory.find(item => item.name === name)).find(Boolean);
+  const food = foodItems.map((name) => inventory.find((item) => item.name === name)).find(Boolean);
 
   if (food) {
     try {
       await bot.equip(food, 'hand');
       await bot.consume();
       return true;
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -287,10 +291,10 @@ export function getNearbyEntities(
   bot: Bot,
   type: string,
   maxDistance: number,
-  filter?: (entity: any) => boolean
-): any[] {
+  filter?: (entity: unknown) => boolean
+): unknown[] {
   return Object.values(bot.entities)
-    .filter(e => e.name === type && e.position.distanceTo(bot.entity.position) < maxDistance)
+    .filter((e) => e.name === type && e.position.distanceTo(bot.entity.position) < maxDistance)
     .filter(filter || (() => true));
 }
 
@@ -299,10 +303,10 @@ export function getNearbyEntities(
  */
 export function getNearestEntity(
   bot: Bot,
-  filter: (entity: any) => boolean,
+  filter: (entity: unknown) => boolean,
   maxDistance = 64
-): any | null {
-  let nearest: any = null;
+): unknown | null {
+  let nearest: unknown = null;
   let nearestDist = maxDistance;
 
   for (const entity of Object.values(bot.entities)) {
@@ -320,11 +324,7 @@ export function getNearestEntity(
 /**
  * Safe pathfinder goto with timeout
  */
-export async function safeGoto(
-  bot: Bot,
-  goal: any,
-  timeout = 30000
-): Promise<boolean> {
+export async function safeGoto(bot: Bot, goal: unknown, timeout = 30000): Promise<boolean> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       bot.pathfinder.setGoal(null);
@@ -390,7 +390,7 @@ export function deepClone<T>(obj: T): T {
 /**
  * Debounce function
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -405,7 +405,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle function
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -456,8 +456,6 @@ export function hasInventorySpace(bot: Bot, slots = 1): boolean {
 /**
  * Get all items of a type in inventory
  */
-export function getItemsByType(bot: Bot, type: number): any[] {
-  return bot.inventory.slots
-    .filter(slot => slot && slot.type === type)
-    .map(slot => slot!);
+export function getItemsByType(bot: Bot, type: number): unknown[] {
+  return bot.inventory.slots.filter((slot) => slot && slot.type === type).map((slot) => slot!);
 }

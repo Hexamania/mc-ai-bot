@@ -9,11 +9,9 @@ import type {
   ExtendedPlayerInfo,
   FactEntry,
   RuleEntry,
-  ExtendedTaskInfo} from './types';
-import {
-  CURRENT_SCHEMA_VERSION,
-  createDefaultMemoryData
+  ExtendedTaskInfo,
 } from './types';
+import { CURRENT_SCHEMA_VERSION } from './types';
 
 /**
  * Migration function type
@@ -57,7 +55,9 @@ export async function migrateMemory(data: Record<string, unknown>): Promise<{
   }
 
   // Apply migrations sequentially
-  const versions = getMigrationVersions().filter(v => v > fromVersion && v <= CURRENT_SCHEMA_VERSION);
+  const versions = getMigrationVersions().filter(
+    (v) => v > fromVersion && v <= CURRENT_SCHEMA_VERSION
+  );
 
   for (const version of versions) {
     const migration = migrations.get(version);
@@ -83,7 +83,10 @@ export async function migrateMemory(data: Record<string, unknown>): Promise<{
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[MEMORY-SCHEMA] Migration from v${startVersion} to v${version} failed:`, errorMessage);
+      console.error(
+        `[MEMORY-SCHEMA] Migration from v${startVersion} to v${version} failed:`,
+        errorMessage
+      );
 
       results.push({
         fromVersion: startVersion,
@@ -109,7 +112,6 @@ export async function migrateMemory(data: Record<string, unknown>): Promise<{
  * Normalize data to current schema structure
  */
 function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
-  const defaultMemory = createDefaultMemoryData();
   const now = new Date().toISOString();
 
   // Ensure all required fields exist
@@ -159,9 +161,10 @@ function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
   }
 
   // Build metadata
-  const metadata = data.metadata && typeof data.metadata === 'object'
-    ? normalizeMetadata(data.metadata, now)
-    : createDefaultMetadata(now);
+  const metadata =
+    data.metadata && typeof data.metadata === 'object'
+      ? normalizeMetadata(data.metadata, now)
+      : createDefaultMetadata(now);
 
   // Update stats
   metadata.stats = {
@@ -211,21 +214,28 @@ function normalizeMetadata(data: Record<string, unknown>, now: string): MemoryDa
   const defaultMeta = createDefaultMetadata(now);
 
   return {
-    schemaVersion: typeof data.schemaVersion === 'number' ? data.schemaVersion : CURRENT_SCHEMA_VERSION,
+    schemaVersion:
+      typeof data.schemaVersion === 'number' ? data.schemaVersion : CURRENT_SCHEMA_VERSION,
     createdAt: typeof data.createdAt === 'string' ? data.createdAt : now,
     updatedAt: now,
-    migrationHistory: Array.isArray(data.migrationHistory) ? data.migrationHistory as MemoryData['metadata']['migrationHistory'] : [],
-    stats: data.stats && typeof data.stats === 'object'
-      ? {
-          totalLocations: typeof data.stats.totalLocations === 'number' ? data.stats.totalLocations : 0,
-          totalPlayers: typeof data.stats.totalPlayers === 'number' ? data.stats.totalPlayers : 0,
-          totalFacts: typeof data.stats.totalFacts === 'number' ? data.stats.totalFacts : 0,
-          totalRules: typeof data.stats.totalRules === 'number' ? data.stats.totalRules : 0,
-          totalTasks: typeof data.stats.totalTasks === 'number' ? data.stats.totalTasks : 0,
-          lastCleanupAt: typeof data.stats.lastCleanupAt === 'string' ? data.stats.lastCleanupAt : undefined,
-          lastBackupAt: typeof data.stats.lastBackupAt === 'string' ? data.stats.lastBackupAt : undefined,
-        }
-      : defaultMeta.stats,
+    migrationHistory: Array.isArray(data.migrationHistory)
+      ? (data.migrationHistory as MemoryData['metadata']['migrationHistory'])
+      : [],
+    stats:
+      data.stats && typeof data.stats === 'object'
+        ? {
+            totalLocations:
+              typeof data.stats.totalLocations === 'number' ? data.stats.totalLocations : 0,
+            totalPlayers: typeof data.stats.totalPlayers === 'number' ? data.stats.totalPlayers : 0,
+            totalFacts: typeof data.stats.totalFacts === 'number' ? data.stats.totalFacts : 0,
+            totalRules: typeof data.stats.totalRules === 'number' ? data.stats.totalRules : 0,
+            totalTasks: typeof data.stats.totalTasks === 'number' ? data.stats.totalTasks : 0,
+            lastCleanupAt:
+              typeof data.stats.lastCleanupAt === 'string' ? data.stats.lastCleanupAt : undefined,
+            lastBackupAt:
+              typeof data.stats.lastBackupAt === 'string' ? data.stats.lastBackupAt : undefined,
+          }
+        : defaultMeta.stats,
   };
 }
 
@@ -254,7 +264,7 @@ function normalizeLocation(key: string, loc: ExtendedLocationInfo): ExtendedLoca
     type: typeof loc.type === 'string' ? loc.type : 'waypoint',
     description: typeof loc.description === 'string' ? loc.description : undefined,
     dimension: typeof loc.dimension === 'string' ? loc.dimension : 'overworld',
-    tags: Array.isArray(loc.tags) ? loc.tags.filter(t => typeof t === 'string') : [],
+    tags: Array.isArray(loc.tags) ? loc.tags.filter((t) => typeof t === 'string') : [],
     visitCount: typeof loc.visitCount === 'number' ? loc.visitCount : 0,
     lastVisitedAt: typeof loc.lastVisitedAt === 'string' ? loc.lastVisitedAt : undefined,
     updatedAt: typeof loc.updatedAt === 'string' ? loc.updatedAt : now,
@@ -280,7 +290,8 @@ function normalizePlayer(key: string, player: ExtendedPlayerInfo): ExtendedPlaye
   return {
     username: player.username,
     role: ['guest', 'trusted', 'admin'].includes(player.role) ? player.role : 'guest',
-    preferences: player.preferences && typeof player.preferences === 'object' ? player.preferences : {},
+    preferences:
+      player.preferences && typeof player.preferences === 'object' ? player.preferences : {},
     displayName: typeof player.displayName === 'string' ? player.displayName : undefined,
     notes: typeof player.notes === 'string' ? player.notes : undefined,
     totalInteractions: typeof player.totalInteractions === 'number' ? player.totalInteractions : 0,
@@ -300,7 +311,7 @@ function normalizeTask(task: Record<string, unknown>): ExtendedTaskInfo | null {
   }
 
   const validStatuses = ['active', 'completed', 'stopped', 'failed'] as const;
-  const status = validStatuses.includes(task.status as typeof validStatuses[0])
+  const status = validStatuses.includes(task.status as (typeof validStatuses)[0])
     ? task.status
     : 'active';
 
@@ -310,9 +321,9 @@ function normalizeTask(task: Record<string, unknown>): ExtendedTaskInfo | null {
     status,
     progress: typeof task.progress === 'number' ? task.progress : null,
     priority: ['low', 'medium', 'high', 'critical'].includes(task.priority as string)
-      ? task.priority as ExtendedTaskInfo['priority']
+      ? (task.priority as ExtendedTaskInfo['priority'])
       : 'medium',
-    tags: Array.isArray(task.tags) ? task.tags.filter(t => typeof t === 'string') : [],
+    tags: Array.isArray(task.tags) ? task.tags.filter((t) => typeof t === 'string') : [],
     startedAt: typeof task.startedAt === 'string' ? task.startedAt : now,
     completedAt: typeof task.completedAt === 'string' ? task.completedAt : undefined,
     updatedAt: typeof task.updatedAt === 'string' ? task.updatedAt : now,

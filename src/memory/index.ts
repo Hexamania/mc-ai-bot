@@ -4,7 +4,6 @@
  */
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type { MemoryData, LocationInfo, PlayerInfo, TaskInfo } from '../types';
 import { getConfig } from '../config';
 
@@ -36,7 +35,12 @@ function normalizeMemory(value: unknown): MemoryData {
   const locations: Record<string, LocationInfo> = {};
   if (isRecord(value.locations)) {
     for (const [key, loc] of Object.entries(value.locations)) {
-      if (isRecord(loc) && typeof loc.x === 'number' && typeof loc.y === 'number' && typeof loc.z === 'number') {
+      if (
+        isRecord(loc) &&
+        typeof loc.x === 'number' &&
+        typeof loc.y === 'number' &&
+        typeof loc.z === 'number'
+      ) {
         locations[key] = {
           x: loc.x,
           y: loc.y,
@@ -56,8 +60,10 @@ function normalizeMemory(value: unknown): MemoryData {
           username: player.username,
           role: (player.role as PlayerInfo['role']) || 'guest',
           preferences: isRecord(player.preferences) ? player.preferences : {},
-          firstSeen: typeof player.firstSeen === 'string' ? player.firstSeen : new Date().toISOString(),
-          lastSeen: typeof player.lastSeen === 'string' ? player.lastSeen : new Date().toISOString(),
+          firstSeen:
+            typeof player.firstSeen === 'string' ? player.firstSeen : new Date().toISOString(),
+          lastSeen:
+            typeof player.lastSeen === 'string' ? player.lastSeen : new Date().toISOString(),
         };
       }
     }
@@ -77,7 +83,7 @@ function normalizeMemory(value: unknown): MemoryData {
   }
 
   const rules: string[] = Array.isArray(value.rules)
-    ? value.rules.filter(rule => typeof rule === 'string').slice(0, 100)
+    ? value.rules.filter((rule) => typeof rule === 'string').slice(0, 100)
     : [];
 
   const learnedFacts: Record<string, string> = {};
@@ -120,7 +126,9 @@ export function loadMemory(filePath?: string): MemoryData {
     memoryCache = normalizeMemory(parsed);
     return memoryCache;
   } catch (error) {
-    console.error(`[MEMORY] Could not load memory file: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `[MEMORY] Could not load memory file: ${error instanceof Error ? error.message : String(error)}`
+    );
     return { ...DEFAULT_MEMORY };
   }
 }
@@ -152,7 +160,9 @@ export function saveMemory(data: MemoryData, filePath?: string): boolean {
         fs.unlinkSync(temporaryPath);
       }
     } catch (cleanupError) {
-      console.error(`[MEMORY] Could not remove temporary memory file: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+      console.error(
+        `[MEMORY] Could not remove temporary memory file: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`
+      );
     }
     throw error;
   }
@@ -183,7 +193,9 @@ export function queueMemorySave(): void {
     try {
       saveMemory(memoryCache!);
     } catch (error) {
-      console.error(`[MEMORY] Could not save memory: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[MEMORY] Could not save memory: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }, 1000);
 }
@@ -202,7 +214,11 @@ export function persistMemory(): boolean {
 /**
  * Remember a location
  */
-export function rememberLocation(name: string, position: { x: number; y: number; z: number }, type = 'waypoint'): boolean {
+export function rememberLocation(
+  name: string,
+  position: { x: number; y: number; z: number },
+  type = 'waypoint'
+): boolean {
   const config = getConfig();
   if (!config.memory.enabled || !name || !position) return false;
 
@@ -217,11 +233,13 @@ export function rememberLocation(name: string, position: { x: number; y: number;
   const memory = getMemory();
   const existing = memory.locations[name];
 
-  if (existing &&
+  if (
+    existing &&
     existing.x === coordinates.x &&
     existing.y === coordinates.y &&
     existing.z === coordinates.z &&
-    existing.type === type) {
+    existing.type === type
+  ) {
     return true;
   }
 
@@ -249,7 +267,8 @@ export function rememberPlayer(username: string, role: PlayerInfo['role'] = 'gue
     ...(existing || {}),
     username,
     role,
-    preferences: existing?.preferences && isRecord(existing.preferences) ? existing.preferences : {},
+    preferences:
+      existing?.preferences && isRecord(existing.preferences) ? existing.preferences : {},
     firstSeen: existing?.firstSeen || now,
     lastSeen: now,
   };
@@ -268,8 +287,12 @@ export function rememberFact(key: string, fact: string): boolean {
   const config = getConfig();
   if (!config.memory.enabled) return false;
 
-  const cleanKey = String(key || '').trim().slice(0, 80);
-  const cleanFact = String(fact || '').trim().slice(0, 500);
+  const cleanKey = String(key || '')
+    .trim()
+    .slice(0, 80);
+  const cleanFact = String(fact || '')
+    .trim()
+    .slice(0, 500);
 
   if (!cleanKey || !cleanFact) return false;
 
@@ -298,7 +321,11 @@ export function forgetFact(key: string): boolean {
 /**
  * Remember current task
  */
-export function rememberTask(goal: string, status: TaskInfo['status'] = 'active', progress: number | null = null): boolean {
+export function rememberTask(
+  goal: string,
+  status: TaskInfo['status'] = 'active',
+  progress: number | null = null
+): boolean {
   const config = getConfig();
   if (!config.memory.enabled) return false;
 
@@ -326,7 +353,7 @@ export function getMemoryContext(): string {
   const memory = getMemory();
   const context = {
     locations: Object.fromEntries(Object.entries(memory.locations).slice(-30)),
-    rules: memory.rules.slice(-30).map(rule => rule.slice(0, 300)),
+    rules: memory.rules.slice(-30).map((rule) => rule.slice(0, 300)),
     currentTask: memory.currentTask,
     learnedFacts: Object.fromEntries(Object.entries(memory.learnedFacts).slice(-50)),
   };
@@ -341,7 +368,9 @@ export function addRule(rule: string): boolean {
   const config = getConfig();
   if (!config.memory.enabled) return false;
 
-  const cleanRule = String(rule || '').trim().slice(0, 300);
+  const cleanRule = String(rule || '')
+    .trim()
+    .slice(0, 300);
   if (!cleanRule) return false;
 
   const memory = getMemory();

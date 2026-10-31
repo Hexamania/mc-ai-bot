@@ -3,12 +3,10 @@
  * Handles guarding a location - stays at a position using GoalBlock
  */
 
-import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import { FeatureRegistry } from '../../types/index.js';
 
 /**
  * Guard feature configuration
@@ -83,7 +81,6 @@ export class GuardFeature extends BaseFeature {
    */
   private registerCommands(): void {
     const manager = this.getManager();
-    const bot = this.getBot();
 
     // Guard command - start guarding at current or specified position
     manager.registerCommand?.({
@@ -91,7 +88,7 @@ export class GuardFeature extends BaseFeature {
       description: 'Start guarding at current position or specified coordinates',
       usage: 'guard [x] [y] [z]',
       adminOnly: true,
-      execute: async (context: any) => {
+      execute: async (context: { args: string[]; reply: (msg: string) => void }) => {
         const { args, reply } = context;
 
         if (args.length === 0) {
@@ -114,7 +111,7 @@ export class GuardFeature extends BaseFeature {
         } else {
           reply('❌ Usage: guard [x] [y] [z]');
         }
-      }
+      },
     });
 
     // Stop guard command
@@ -123,11 +120,11 @@ export class GuardFeature extends BaseFeature {
       description: 'Stop guarding',
       usage: 'stopguard',
       adminOnly: true,
-      execute: async (context: any) => {
+      execute: async (context: { reply: (msg: string) => void }) => {
         const { reply } = context;
         await this.stopGuarding();
         reply('🛑 Stopped guarding');
-      }
+      },
     });
 
     // Guard status command
@@ -136,7 +133,7 @@ export class GuardFeature extends BaseFeature {
       description: 'Get current guard status',
       usage: 'guardstatus',
       adminOnly: true,
-      execute: async (context: any) => {
+      execute: async (context: { reply: (msg: string) => void }) => {
         const { reply } = context;
         const pos = this.getGuardPosition();
         const status = this.isGuardingNow() ? 'Guarding' : 'Not guarding';
@@ -146,7 +143,7 @@ export class GuardFeature extends BaseFeature {
         } else {
           reply(`🛡️ ${status}`);
         }
-      }
+      },
     });
   }
 
@@ -155,7 +152,6 @@ export class GuardFeature extends BaseFeature {
    * @param position - Optional position to guard. If not provided, uses current position.
    */
   async startGuarding(position?: Vec3): Promise<void> {
-    const bot = this.getBot();
     const movementFeature = this.getFeature('movement');
 
     if (!movementFeature) {
@@ -163,6 +159,7 @@ export class GuardFeature extends BaseFeature {
     }
 
     // Use provided position or current position
+    const bot = this.getBot();
     this.guardPosition = position ?? bot.entity.position.clone();
     this.isGuarding = true;
 
@@ -172,7 +169,9 @@ export class GuardFeature extends BaseFeature {
     // Start the guard loop
     this.guardLoop();
 
-    console.log(`[GuardFeature] Started guarding at ${Math.floor(this.guardPosition.x)}, ${Math.floor(this.guardPosition.y)}, ${Math.floor(this.guardPosition.z)}`);
+    console.log(
+      `[GuardFeature] Started guarding at ${Math.floor(this.guardPosition.x)}, ${Math.floor(this.guardPosition.y)}, ${Math.floor(this.guardPosition.z)}`
+    );
   }
 
   /**

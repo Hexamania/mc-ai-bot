@@ -20,13 +20,15 @@ export const useLogStore = defineStore('logs', () => {
   const hasEntries = computed(() => filteredEntries.value.length > 0);
   const summary = computed(() => {
     const total = entries.value.length;
-    const errors = entries.value.filter(e => e.stream === 'error' || e.stream === 'stderr').length;
+    const errors = entries.value.filter(
+      (e) => e.stream === 'error' || e.stream === 'stderr'
+    ).length;
     if (total === 0) return 'Startup and bot events appear here';
     return `${total} recent events${errors ? ` · ${errors} ${errors === 1 ? 'error' : 'errors'}` : ''}`;
   });
 
   // Actions
-  async function loadLogs(query: LogQuery = {}) {
+  async function loadLogs(_query: LogQuery = {}) {
     isLoading.value = true;
     try {
       const logs = await ipc.getLogs();
@@ -74,16 +76,19 @@ export const useLogStore = defineStore('logs', () => {
   }
 
   function copyLogs() {
-    const text = filteredEntries.value.map(entry =>
-      `${new Date(entry.time).toLocaleTimeString([], { hour12: false })} [${entry.stream}] ${entry.line}`
-    ).join('\n');
+    const text = filteredEntries.value
+      .map(
+        (entry) =>
+          `${new Date(entry.time).toLocaleTimeString([], { hour12: false })} [${entry.stream}] ${entry.line}`
+      )
+      .join('\n');
     ipc.copyLogs(text);
   }
 
   function appendLog(entry: LogEntry) {
     // Check for duplicates
     const key = entry.id || `${entry.time}|${entry.stream}|${entry.line}`;
-    if (entries.value.some(e => (e.id || `${e.time}|${e.stream}|${e.line}`) === key)) {
+    if (entries.value.some((e) => (e.id || `${e.time}|${e.stream}|${e.line}`) === key)) {
       return;
     }
 
@@ -105,17 +110,16 @@ export const useLogStore = defineStore('logs', () => {
 
     // Apply filter
     if (activeFilter.value === 'errors') {
-      result = result.filter(e => e.stream === 'error' || e.stream === 'stderr');
+      result = result.filter((e) => e.stream === 'error' || e.stream === 'stderr');
     } else if (activeFilter.value === 'system') {
-      result = result.filter(e => e.stream === 'system');
+      result = result.filter((e) => e.stream === 'system');
     }
 
     // Apply search query
     if (searchQuery.value.trim()) {
       const query = searchQuery.value.toLowerCase().trim();
-      result = result.filter(e =>
-        e.line.toLowerCase().includes(query) ||
-        e.stream.toLowerCase().includes(query)
+      result = result.filter(
+        (e) => e.line.toLowerCase().includes(query) || e.stream.toLowerCase().includes(query)
       );
     }
 

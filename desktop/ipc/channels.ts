@@ -2,7 +2,16 @@
  * Typed IPC channel definitions for main <-> renderer communication
  */
 
-import type { Settings, BotStatus, BotState, LogEntry, LogQuery, LogSearchQuery, LogExportOptions, UpdateInfo } from '../renderer/src/types';
+import type {
+  Settings,
+  BotStatus,
+  BotState,
+  LogEntry,
+  LogQuery,
+  LogSearchQuery,
+  LogExportOptions,
+  UpdateInfo,
+} from '../renderer/src/types';
 
 // Channel definition type
 export interface ChannelDefinition<TRequest, TResponse> {
@@ -11,32 +20,35 @@ export interface ChannelDefinition<TRequest, TResponse> {
 }
 
 // Settings channels
-export interface SettingsGetChannel extends ChannelDefinition<void, Settings & { portableMode: boolean; dataDirectory: string }> {}
-export interface SettingsSaveChannel extends ChannelDefinition<Partial<Settings>, Settings> {}
+export type SettingsGetChannel = ChannelDefinition<
+  void,
+  Settings & { portableMode: boolean; dataDirectory: string }
+>;
+export type SettingsSaveChannel = ChannelDefinition<Partial<Settings>, Settings>;
 
 // Bot control channels
-export interface BotStartChannel extends ChannelDefinition<void, { status: string }> {}
-export interface BotStopChannel extends ChannelDefinition<void, { status: string }> {}
-export interface BotRestartChannel extends ChannelDefinition<void, { success: boolean; error?: string }> {}
-export interface BotStatusChannel extends ChannelDefinition<void, BotStatus> {}
+export type BotStartChannel = ChannelDefinition<void, { status: string }>;
+export type BotStopChannel = ChannelDefinition<void, { status: string }>;
+export type BotRestartChannel = ChannelDefinition<void, { success: boolean; error?: string }>;
+export type BotStatusChannel = ChannelDefinition<void, BotStatus>;
 
 // Logs channels
-export interface LogsGetChannel extends ChannelDefinition<LogQuery | undefined, LogEntry[]> {}
-export interface LogsSearchChannel extends ChannelDefinition<LogSearchQuery, LogEntry[]> {}
-export interface LogsExportChannel extends ChannelDefinition<LogExportOptions, { path: string }> {}
-export interface LogsClearChannel extends ChannelDefinition<void, void> {}
-export interface LogsCopyChannel extends ChannelDefinition<string, void> {}
+export type LogsGetChannel = ChannelDefinition<LogQuery | undefined, LogEntry[]>;
+export type LogsSearchChannel = ChannelDefinition<LogSearchQuery, LogEntry[]>;
+export type LogsExportChannel = ChannelDefinition<LogExportOptions, { path: string }>;
+export type LogsClearChannel = ChannelDefinition<void, void>;
+export type LogsCopyChannel = ChannelDefinition<string, void>;
 
 // Updater channels
-export interface UpdaterCheckChannel extends ChannelDefinition<void, UpdateInfo> {}
-export interface UpdaterDownloadChannel extends ChannelDefinition<void, { progress: number }> {}
-export interface UpdaterInstallChannel extends ChannelDefinition<void, void> {}
+export type UpdaterCheckChannel = ChannelDefinition<void, UpdateInfo>;
+export type UpdaterDownloadChannel = ChannelDefinition<void, { progress: number }>;
+export type UpdaterInstallChannel = ChannelDefinition<void, void>;
 
 // System channels
-export interface SystemMinimizeToTrayChannel extends ChannelDefinition<void, void> {}
-export interface SystemShowWindowChannel extends ChannelDefinition<void, void> {}
-export interface SystemQuitChannel extends ChannelDefinition<void, void> {}
-export interface ShellOpenExternalChannel extends ChannelDefinition<string, void> {}
+export type SystemMinimizeToTrayChannel = ChannelDefinition<void, void>;
+export type SystemShowWindowChannel = ChannelDefinition<void, void>;
+export type SystemQuitChannel = ChannelDefinition<void, void>;
+export type ShellOpenExternalChannel = ChannelDefinition<string, void>;
 
 // Event payloads (main -> renderer)
 export interface AppLifecycleEvent {
@@ -45,21 +57,21 @@ export interface AppLifecycleEvent {
   running: boolean;
 }
 
-export interface AppLogEvent extends LogEntry {}
+export type AppLogEvent = LogEntry;
 
-export interface AppBotStateEvent extends BotState {}
+export type AppBotStateEvent = BotState;
 
 export interface AppDashboardReadyEvent {
   url: string;
 }
 
-export interface UpdaterUpdateAvailableEvent extends UpdateInfo {}
+export type UpdaterUpdateAvailableEvent = UpdateInfo;
 
-export interface UpdaterDownloadProgressEvent extends ChannelDefinition<void, number> {}
+export type UpdaterDownloadProgressEvent = ChannelDefinition<void, number>;
 
-export interface UpdaterUpdateDownloadedEvent extends UpdateInfo {}
+export type UpdaterUpdateDownloadedEvent = UpdateInfo;
 
-export interface UpdaterErrorEvent extends ChannelDefinition<void, string> {}
+export type UpdaterErrorEvent = ChannelDefinition<void, string>;
 
 // Type maps for channel names to request/response types
 export interface ChannelMap {

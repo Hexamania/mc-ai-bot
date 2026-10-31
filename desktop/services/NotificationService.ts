@@ -5,6 +5,7 @@
 import type { BrowserWindow } from 'electron';
 import { app, nativeImage, Notification } from 'electron';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type { LogService } from './LogService';
 
 export interface NotificationOptions {
@@ -30,7 +31,7 @@ export class NotificationService {
 
   private loadDefaultIcon(): void {
     const iconPath = path.join(app.getAppPath(), 'assets', 'icon.png');
-    if (require('fs').existsSync(iconPath)) {
+    if (fs.existsSync(iconPath)) {
       this.defaultIcon = nativeImage.createFromPath(iconPath);
     }
   }
@@ -73,7 +74,10 @@ export class NotificationService {
     });
 
     notification.on('action', (event, index) => {
-      this.logService.appendLog('system', `Notification action ${index} triggered: ${options.title}`);
+      this.logService.appendLog(
+        'system',
+        `Notification action ${index} triggered: ${options.title}`
+      );
     });
 
     notification.on('close', () => {

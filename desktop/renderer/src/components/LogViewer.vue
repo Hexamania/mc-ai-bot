@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useLogStore } from '../stores/logStore';
 import { useUIStore } from '../stores/uiStore';
 
@@ -9,6 +9,7 @@ const uiStore = useUIStore();
 const logContainer = ref<HTMLDivElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
 const isExporting = ref(false);
+const showExportMenu = ref(false);
 
 const activeFilter = computed(() => logStore.activeFilter);
 const searchQuery = computed(() => logStore.searchQuery);
@@ -29,7 +30,7 @@ async function handleClear() {
   try {
     await logStore.clearLogs();
     uiStore.success('Log history cleared');
-  } catch (error) {
+  } catch {
     uiStore.error('Failed to clear logs');
   }
 }
@@ -38,7 +39,7 @@ async function handleCopy() {
   try {
     logStore.copyLogs();
     uiStore.success('Logs copied to clipboard');
-  } catch (error) {
+  } catch {
     uiStore.error('Failed to copy logs');
   }
 }
@@ -48,7 +49,7 @@ async function handleExport(format: 'json' | 'csv' | 'txt') {
   try {
     const path = await logStore.exportLogs({ format, filter: activeFilter.value });
     uiStore.success(`Logs exported to ${path}`);
-  } catch (error) {
+  } catch {
     uiStore.error('Failed to export logs');
   } finally {
     isExporting.value = false;
@@ -57,11 +58,16 @@ async function handleExport(format: 'json' | 'csv' | 'txt') {
 
 function getStreamClass(stream: string) {
   switch (stream) {
-    case 'stdout': return 'log--stdout';
-    case 'stderr': return 'log--stderr';
-    case 'error': return 'log--error';
-    case 'system': return 'log--system';
-    default: return '';
+    case 'stdout':
+      return 'log--stdout';
+    case 'stderr':
+      return 'log--stderr';
+    case 'error':
+      return 'log--error';
+    case 'system':
+      return 'log--system';
+    default:
+      return '';
   }
 }
 
@@ -71,11 +77,24 @@ function formatTime(time: string) {
 
 function getStreamLabel(stream: string) {
   switch (stream) {
-    case 'stdout': return 'BOT';
-    case 'stderr': return 'ERR';
-    case 'error': return 'ERR';
-    case 'system': return 'SYS';
-    default: return stream.toUpperCase();
+    case 'stdout':
+      return 'BOT';
+    case 'stderr':
+      return 'ERR';
+    case 'error':
+      return 'ERR';
+    case 'system':
+      return 'SYS';
+    default:
+      return stream.toUpperCase();
+  }
+}
+
+function scrollToBottom() {
+  const container = logContainer.value;
+  if (container) {
+    container.scrollTop = container.scrollHeight;
+    logStore.setAutoScroll(true);
   }
 }
 
@@ -122,12 +141,7 @@ onUnmounted(() => {
     <div class="log-toolbar">
       <div class="log-title">
         <div class="logs-icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
             <polyline points="14 2 14 8 20 8" />
           </svg>
@@ -177,59 +191,26 @@ onUnmounted(() => {
             placeholder="Search logs... (Ctrl+F)"
             @input="handleSearchChange"
             @keydown.ctrl.f.prevent="() => searchInput.value?.focus()"
-          >
+          />
           <span class="search-icon">🔍</span>
         </div>
 
-        <button
-          class="btn btn--quiet"
-          title="Copy visible logs (Ctrl+Shift+C)"
-          @click="handleCopy"
-        >
-          Copy
-        </button>
-        <button
-          class="btn btn--quiet"
-          title="Clear log history"
-          @click="handleClear"
-        >
-          Clear
-        </button>
+        <button class="btn btn--quiet" title="Copy visible logs (Ctrl+Shift+C)" @click="handleCopy">Copy</button>
+        <button class="btn btn--quiet" title="Clear log history" @click="handleClear">Clear</button>
         <div class="export-dropdown">
-          <button
-            class="btn btn--quiet"
-            @click="showExportMenu = !showExportMenu"
-          >
-            Export ▼
-          </button>
-          <div
-            v-if="showExportMenu"
-            class="export-menu"
-          >
-            <button @click="handleExport('json')">
-              JSON
-            </button>
-            <button @click="handleExport('csv')">
-              CSV
-            </button>
-            <button @click="handleExport('txt')">
-              Text
-            </button>
+          <button class="btn btn--quiet" @click="showExportMenu = !showExportMenu">Export ▼</button>
+          <div v-if="showExportMenu" class="export-menu">
+            <button @click="handleExport('json')">JSON</button>
+            <button @click="handleExport('csv')">CSV</button>
+            <button @click="handleExport('txt')">Text</button>
           </div>
         </div>
       </div>
     </div>
 
-    <div
-      ref="logContainer"
-      class="log-stream"
-      :class="{ 'log-stream--loading': isLoading }"
-    >
+    <div ref="logContainer" class="log-stream" :class="{ 'log-stream--loading': isLoading }">
       <div class="log-entries">
-        <div
-          v-if="filteredEntries.length === 0"
-          class="empty-logs"
-        >
+        <div v-if="filteredEntries.length === 0" class="empty-logs">
           <span class="empty-glyph">⌁</span>
           <span>
             {{ activeFilter === 'errors' ? 'No errors recorded.' : 'Waiting for application output...' }}
@@ -249,33 +230,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div
-        v-if="!logStore.autoScroll && filteredEntries.length > 0"
-        class="scroll-indicator"
-      >
-        <button
-          class="scroll-to-bottom"
-          @click="scrollToBottom"
-        >
-          ↓ New logs
-        </button>
+      <div v-if="!logStore.autoScroll && filteredEntries.length > 0" class="scroll-indicator">
+        <button class="scroll-to-bottom" @click="scrollToBottom">↓ New logs</button>
       </div>
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue';
-const showExportMenu = ref(false);
-
-function scrollToBottom() {
-  const container = logContainer.value;
-  if (container) {
-    container.scrollTop = container.scrollHeight;
-    logStore.setAutoScroll(true);
-  }
-}
-</script>
 
 <style scoped>
 .log-viewer {
@@ -357,7 +317,9 @@ function scrollToBottom() {
   cursor: pointer;
   font-size: 9px;
   font-weight: 500;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .filter-button:hover {
@@ -387,7 +349,10 @@ function scrollToBottom() {
   color: #e6edf7;
   font-size: 10px;
   font-family: inherit;
-  transition: border 0.2s, box-shadow 0.2s, background 0.2s;
+  transition:
+    border 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
 }
 
 .search-input:focus {
@@ -419,7 +384,12 @@ function scrollToBottom() {
   font-size: 9px;
   font-weight: 600;
   font-family: inherit;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
+  transition:
+    transform 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s,
+    opacity 0.15s;
 }
 
 .btn:hover:not(:disabled) {
@@ -478,7 +448,9 @@ function scrollToBottom() {
   border-radius: 4px;
   text-align: left;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .export-menu button:hover {
@@ -490,7 +462,10 @@ function scrollToBottom() {
   flex: 1;
   overflow: auto;
   padding: 8px 0;
-  font: 10px/1.6 "Cascadia Code", Consolas, monospace;
+  font:
+    10px/1.6 'Cascadia Code',
+    Consolas,
+    monospace;
   scrollbar-color: #303c4e transparent;
   scrollbar-width: thin;
 }
@@ -507,8 +482,12 @@ function scrollToBottom() {
 }
 
 @keyframes loading-bar {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .log-entries {
@@ -573,7 +552,9 @@ function scrollToBottom() {
   justify-content: center;
   gap: 10px;
   color: #657287;
-  font: 11px "Segoe UI", sans-serif;
+  font:
+    11px 'Segoe UI',
+    sans-serif;
 }
 
 .empty-glyph {
@@ -602,7 +583,9 @@ function scrollToBottom() {
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 
 .scroll-to-bottom:hover {

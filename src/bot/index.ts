@@ -7,24 +7,10 @@ import type { Bot } from 'mineflayer';
 import mineflayer from 'mineflayer';
 import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
 import mcDataLoader from 'minecraft-data';
-import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
 import { getConfig } from '../config';
-import type {
-  BotConfig,
-  BotState,
-  BotStatus,
-  BotPosition,
-  MapBlock,
-  MapEntity} from '../types';
-import {
-  BotVitals,
-  InventoryItem,
-  Equipment,
-  MapData,
-  PlayerInfo,
-} from '../types';
-import { loadMemory, rememberLocation, rememberPlayer, getMemoryContext, persistMemory } from '../memory';
+import type { BotConfig, BotState, BotStatus, BotPosition, MapBlock, MapEntity } from '../types';
+import { loadMemory, rememberLocation, rememberPlayer, persistMemory } from '../memory';
 import { getCommandRegistry, createCommandContext, parseCommand } from '../commands';
 import { getFeatureRegistry } from '../plugins';
 
@@ -34,7 +20,7 @@ import { getFeatureRegistry } from '../plugins';
 export class BotManager extends EventEmitter {
   private bot: Bot | null = null;
   private client: mineflayer.Bot | null = null;
-  private mcData: any = null;
+  private mcData: unknown = null;
   private movements: Movements | null = null;
 
   // Connection state
@@ -97,7 +83,7 @@ export class BotManager extends EventEmitter {
   adminSessions: Record<string, boolean> = {};
 
   // Socket.io reference
-  private io: any = null;
+  private io: unknown = null;
 
   constructor(private config: BotConfig) {
     super();
@@ -107,7 +93,7 @@ export class BotManager extends EventEmitter {
   /**
    * Set Socket.io instance for real-time updates
    */
-  setSocketIO(io: any): void {
+  setSocketIO(io: unknown): void {
     this.io = io;
   }
 
@@ -216,7 +202,13 @@ export class BotManager extends EventEmitter {
   /**
    * Schedule reconnection with exponential backoff
    */
-  private scheduleReconnect(instance: mineflayer.Bot, reason: string, detail: string, status = 'Reconnecting', event = 'end'): void {
+  private scheduleReconnect(
+    instance: mineflayer.Bot,
+    reason: string,
+    detail: string,
+    status = 'Reconnecting',
+    event = 'end'
+  ): void {
     if (instance !== this.client) return;
 
     this.isOnline = false;
@@ -237,12 +229,15 @@ export class BotManager extends EventEmitter {
     this.statusReason = reason;
     this.statusError = status === 'Error' ? detail || reason : null;
 
-    const retryInMs = Math.min(1000 * (2 ** this.reconnectAttempt), 60000);
+    const retryInMs = Math.min(1000 * 2 ** this.reconnectAttempt, 60000);
     this.reconnectAttempt += 1;
     this.retryAt = Date.now() + retryInMs;
 
     this.emitBotStatus();
-    this.log('RECONNECT', `${reason}${detail ? `: ${detail}` : ''}. Retrying in ${Math.round(retryInMs / 1000)}s.`);
+    this.log(
+      'RECONNECT',
+      `${reason}${detail ? `: ${detail}` : ''}. Retrying in ${Math.round(retryInMs / 1000)}s.`
+    );
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -282,13 +277,21 @@ export class BotManager extends EventEmitter {
 
       // Re-attach any registered listeners
       // (In a full implementation, you'd store and re-attach listeners here)
-
     } catch (error) {
       this.isOnline = false;
       this.state.status = 'Offline';
       this.emitBotStatus({ reason: 'Connection setup failed' });
-      this.log('ERROR', `Unable to create bot connection: ${error instanceof Error ? error.message : String(error)}`);
-      this.scheduleReconnect(this.client!, 'Connection setup failed', error instanceof Error ? error.message : String(error), 'Error', 'error');
+      this.log(
+        'ERROR',
+        `Unable to create bot connection: ${error instanceof Error ? error.message : String(error)}`
+      );
+      this.scheduleReconnect(
+        this.client!,
+        'Connection setup failed',
+        error instanceof Error ? error.message : String(error),
+        'Error',
+        'error'
+      );
     }
   }
 
@@ -311,7 +314,13 @@ export class BotManager extends EventEmitter {
     instance.on('end', (reason) => {
       if (instance !== this.client) return;
       this.clearSpawnLookInterval();
-      this.scheduleReconnect(instance, 'Disconnected', this.formatConnectionReason(reason), 'Reconnecting', 'end');
+      this.scheduleReconnect(
+        instance,
+        'Disconnected',
+        this.formatConnectionReason(reason),
+        'Reconnecting',
+        'end'
+      );
     });
 
     instance.on('kicked', (kickReason) => {
@@ -380,7 +389,7 @@ export class BotManager extends EventEmitter {
     this.setupSpawnLookInterval(instance);
 
     // Initialize features
-    this.initializeFeatures(instance);
+    void this.initializeFeatures(instance);
 
     // Start dashboard updates
     this.startDashboardInterval(instance);
@@ -395,8 +404,9 @@ export class BotManager extends EventEmitter {
     let lookDirection = 1;
     const nudgeLook = () => {
       if (!this.isOnline || !instance.entity) return;
-      instance.look(instance.entity.yaw + lookDirection * Math.PI / 90, instance.entity.pitch, true)
-        .catch(error => this.log('LOOK-ERR', `Spawn look update failed: ${error.message}`));
+      instance
+        .look(instance.entity.yaw + (lookDirection * Math.PI) / 90, instance.entity.pitch, true)
+        .catch((error) => this.log('LOOK-ERR', `Spawn look update failed: ${error.message}`));
       lookDirection *= -1;
     };
     this.clearSpawnLookInterval();
@@ -450,7 +460,6 @@ export class BotManager extends EventEmitter {
     };
 
     // Update inventory
-    const registry = instance.registry;
     this.state.inventory = instance.inventory.slots.map((item, index) => {
       if (!item) return { slot: index, name: 'air', count: 0, displayName: 'Empty' };
       return {
@@ -472,7 +481,7 @@ export class BotManager extends EventEmitter {
     };
 
     // Update users and admins
-    this.state.admins = Object.keys(this.adminSessions).filter(u => this.adminSessions[u]);
+    this.state.admins = Object.keys(this.adminSessions).filter((u) => this.adminSessions[u]);
     this.state.users = Object.keys(instance.players);
 
     // Generate map data
@@ -480,8 +489,9 @@ export class BotManager extends EventEmitter {
     const mapBlocks: MapBlock[] = [];
     for (let x = -mapRadius; x <= mapRadius; x++) {
       for (let z = -mapRadius; z <= mapRadius; z++) {
-        const b = instance.blockAt(instance.entity.position.offset(x, -1, z)) ||
-                  instance.blockAt(instance.entity.position.offset(x, -2, z));
+        const b =
+          instance.blockAt(instance.entity.position.offset(x, -1, z)) ||
+          instance.blockAt(instance.entity.position.offset(x, -2, z));
         if (b && b.name !== 'air') {
           mapBlocks.push({ x, z, name: b.name });
         }
@@ -489,8 +499,10 @@ export class BotManager extends EventEmitter {
     }
 
     const entities: MapEntity[] = Object.values(instance.entities)
-      .filter(e => e !== instance.entity && e.position.distanceTo(instance.entity.position) < mapRadius)
-      .map(e => ({
+      .filter(
+        (e) => e !== instance.entity && e.position.distanceTo(instance.entity.position) < mapRadius
+      )
+      .map((e) => ({
         x: e.position.x - instance.entity.position.x,
         z: e.position.z - instance.entity.position.z,
         name: e.username || e.displayName || e.name,
@@ -506,8 +518,8 @@ export class BotManager extends EventEmitter {
   /**
    * Handle incoming chat messages
    */
-  private onMessage(instance: mineflayer.Bot, msg: any): void {
-    const raw = msg.toString();
+  private onMessage(instance: mineflayer.Bot, msg: unknown): void {
+    const raw = String(msg);
     this.log('SERVER', raw);
 
     const parsed = this.parseMessage(raw);
@@ -594,7 +606,12 @@ export class BotManager extends EventEmitter {
   /**
    * Process command
    */
-  private processCommand(user: string, content: string, type: 'chat' | 'pm', isAdmin: boolean): void {
+  private processCommand(
+    user: string,
+    content: string,
+    type: 'chat' | 'pm',
+    isAdmin: boolean
+  ): void {
     const isPublic = content.startsWith(this.config.prefix.public);
     const isAdminCmd = content.startsWith(this.config.prefix.admin);
 
@@ -617,7 +634,7 @@ export class BotManager extends EventEmitter {
       (msg) => this.pm(user, msg)
     );
 
-    registry.execute(command, context);
+    void registry.execute(command, context);
   }
 
   /**

@@ -18,12 +18,12 @@ export class PermissionManager {
   private bot: Bot | null = null;
   private adminPassword = '';
   private adminSessions = new Map<string, boolean>();
-  private memory: any = null; // Will be set to memory module
+  private memory: unknown = null; // Will be set to memory module
 
   /**
    * Initialize the permission manager
    */
-  initialize(bot: Bot, adminPassword = '', memory?: any): void {
+  initialize(bot: Bot, adminPassword = '', memory?: unknown): void {
     this.bot = bot;
     this.adminPassword = adminPassword;
     this.memory = memory;
@@ -34,8 +34,14 @@ export class PermissionManager {
    * Load permissions from memory
    */
   private loadFromMemory(): void {
-    if (this.memory && this.memory.players) {
-      for (const [username, info] of Object.entries(this.memory.playters)) {
+    if (
+      this.memory &&
+      typeof this.memory === 'object' &&
+      this.memory !== null &&
+      'players' in this.memory
+    ) {
+      const mem = this.memory as { players: Record<string, PlayerInfo> };
+      for (const [username, info] of Object.entries(mem.players)) {
         const playerInfo = info as PlayerInfo;
         this.players.set(username.toLowerCase(), playerInfo);
         if (playerInfo.role === 'admin') this.admins.add(username.toLowerCase());
@@ -48,11 +54,12 @@ export class PermissionManager {
    * Save permissions to memory
    */
   private saveToMemory(): void {
-    if (this.memory) {
-      this.memory.players = Object.fromEntries(this.players);
+    if (this.memory && typeof this.memory === 'object' && this.memory !== null) {
+      const mem = this.memory as { players?: Record<string, PlayerInfo>; save?: () => void };
+      mem.players = Object.fromEntries(this.players);
       // Trigger memory save
-      if (typeof this.memory.save === 'function') {
-        this.memory.save();
+      if (typeof mem.save === 'function') {
+        mem.save();
       }
     }
   }
@@ -258,7 +265,10 @@ export class PermissionManager {
   /**
    * Check command permission
    */
-  checkCommandPermission(username: string, config: PermissionConfig): { allowed: boolean; reason?: string } {
+  checkCommandPermission(
+    username: string,
+    config: PermissionConfig
+  ): { allowed: boolean; reason?: string } {
     const userLevel = this.getPermissionLevel(username);
 
     // Check denied users
@@ -368,7 +378,7 @@ export function canExecute(
   userLevel: PermissionLevel,
   config: PermissionConfig,
   isPM: boolean,
-  isAdmin: boolean
+  _isAdmin: boolean
 ): { allowed: boolean; reason?: string } {
   // Check denied users
   if (config.deniedUsers?.includes(username)) {
@@ -406,26 +416,32 @@ export function canExecute(
  * Permission decorator for command classes
  */
 export function RequirePermission(level: PermissionLevel, options?: Partial<PermissionConfig>) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function (target: object, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
-    descriptor.value = async function (context: any) {
-      const permissionManager = (this as any).permissionManager;
+    descriptor.value = async function (context: unknown, ...args: unknown[]) {
+      const permissionManager = (this as { permissionManager?: PermissionManager })
+        .permissionManager;
       if (!permissionManager) {
         console.warn('[PERMISSIONS] No permission manager available');
-        return originalMethod.apply(this, arguments);
+        return originalMethod.apply(this, args);
       }
 
-      const check = permissionManager.checkCommandPermission(context.username, {
-        level,
-        ...options,
-      });
+      const check = permissionManager.checkCommandPermission(
+        (context as { username?: string }).username || '',
+        {
+          level,
+          ...options,
+        }
+      );
 
       if (!check.allowed) {
-        context.error(`❌ ${check.reason || 'Access denied'}`);
+        (context as { error?: (msg: string) => void }).error?.(
+          `❌ ${check.reason || 'Access denied'}`
+        );
         return;
       }
 
-      return originalMethod.apply(this, arguments);
+      return originalMethod.apply(this, args);
     };
     return descriptor;
   };
@@ -444,8 +460,8 @@ export class PermissionMixin {
   protected checkPermission(
     username: string,
     config: PermissionConfig,
-    isPM: boolean,
-    isAdmin: boolean
+    _isPM: boolean,
+    _isAdmin: boolean
   ): { allowed: boolean; reason?: string } {
     if (!this.permissionManager) {
       return { allowed: true };

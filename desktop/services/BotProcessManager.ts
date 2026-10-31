@@ -68,7 +68,6 @@ export class BotProcessManager extends EventEmitter {
     this.updateState({ status: 'starting', error: null });
 
     const config = this.settings;
-    const webUrl = `http://127.0.0.1:${config.webPort}`;
 
     const childEnv = {
       ...process.env,
@@ -86,7 +85,10 @@ export class BotProcessManager extends EventEmitter {
 
     const entry = path.join(app.getAppPath(), 'desktop', 'bot-worker', 'main.js');
 
-    this.logService.appendLog('system', `Starting bot worker for ${config.host}:${config.port} (Minecraft ${config.version}).`);
+    this.logService.appendLog(
+      'system',
+      `Starting bot worker for ${config.host}:${config.port} (Minecraft ${config.version}).`
+    );
 
     this.botProcess = utilityProcess.fork(entry, [], {
       cwd: app.getPath('userData'),
@@ -124,7 +126,10 @@ export class BotProcessManager extends EventEmitter {
     });
 
     this.botProcess.on('error', (error: Error) => {
-      this.logService.appendLog('error', `Bot worker failed to start: ${error.stack || error.message}`);
+      this.logService.appendLog(
+        'error',
+        `Bot worker failed to start: ${error.stack || error.message}`
+      );
       this.updateState({ status: 'error', error: error.message });
       this.handleCrash();
     });
@@ -172,7 +177,7 @@ export class BotProcessManager extends EventEmitter {
     if (this.isRunning()) {
       await this.stop();
       // Wait for process to fully stop
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     try {
@@ -183,7 +188,11 @@ export class BotProcessManager extends EventEmitter {
     }
   }
 
-  private pipeChildOutput(stream: 'stdout' | 'stderr', data: Buffer, buffers: { stdout: string; stderr: string }): void {
+  private pipeChildOutput(
+    stream: 'stdout' | 'stderr',
+    data: Buffer,
+    buffers: { stdout: string; stderr: string }
+  ): void {
     buffers[stream] = (buffers[stream] || '') + data.toString();
     const lines = buffers[stream].split(/\r?\n/);
     buffers[stream] = lines.pop() || '';
@@ -236,13 +245,22 @@ export class BotProcessManager extends EventEmitter {
     this.state.lastRestart = Date.now();
 
     if (this.state.restartCount > this.maxRestarts) {
-      this.logService.appendLog('error', `Max restart attempts (${this.maxRestarts}) reached. Bot will not auto-restart.`);
+      this.logService.appendLog(
+        'error',
+        `Max restart attempts (${this.maxRestarts}) reached. Bot will not auto-restart.`
+      );
       this.updateState({ status: 'error', error: 'Max restart attempts reached' });
       return;
     }
 
-    const delay = Math.min(this.restartDelay * Math.pow(2, this.state.restartCount - 1), this.maxRestartDelay);
-    this.logService.appendLog('system', `Bot crashed. Restarting in ${delay}ms (attempt ${this.state.restartCount}/${this.maxRestarts})...`);
+    const delay = Math.min(
+      this.restartDelay * Math.pow(2, this.state.restartCount - 1),
+      this.maxRestartDelay
+    );
+    this.logService.appendLog(
+      'system',
+      `Bot crashed. Restarting in ${delay}ms (attempt ${this.state.restartCount}/${this.maxRestarts})...`
+    );
 
     this.updateState({ status: 'restarting' });
 

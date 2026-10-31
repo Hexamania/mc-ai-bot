@@ -10,7 +10,6 @@ import type {
   CommandRegistry as CommandRegistryType,
   CommandResult,
   PermissionLevel,
-  ParsedArguments,
 } from '../types';
 
 /**
@@ -237,7 +236,7 @@ class CommandRegistryImpl implements CommandRegistryType {
       category: 'General',
       permission: { level: 'guest' },
       execute: async (context) => {
-        const { rawArgs, reply, privateReply, isAdmin } = context;
+        const { rawArgs, privateReply, isAdmin } = context;
         const userLevel: PermissionLevel = isAdmin ? 'admin' : 'guest';
 
         if (rawArgs.length > 0) {

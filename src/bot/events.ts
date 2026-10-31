@@ -116,7 +116,10 @@ export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
   /**
    * Typed on
    */
-  on<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  on<K extends string & keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.emitter.on(event, listener);
     return this;
   }
@@ -124,7 +127,10 @@ export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
   /**
    * Typed once
    */
-  once<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  once<K extends string & keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.emitter.once(event, listener);
     return this;
   }
@@ -132,7 +138,10 @@ export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
   /**
    * Typed off
    */
-  off<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  off<K extends string & keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.emitter.off(event, listener);
     return this;
   }
@@ -177,7 +186,10 @@ export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
   /**
    * Prepend listener
    */
-  prependListener<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  prependListener<K extends string & keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.emitter.prependListener(event, listener);
     return this;
   }
@@ -185,7 +197,10 @@ export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
   /**
    * Prepend once listener
    */
-  prependOnceListener<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  prependOnceListener<K extends string & keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.emitter.prependOnceListener(event, listener);
     return this;
   }
@@ -261,12 +276,12 @@ export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
         } else {
           queue.push(args);
         }
-      };
+      }
     };
 
     this.on(event, handler);
-    // Capture reference to 'this' (the BotEventEmitter instance) for cleanup
-    const emitter = this;
+    // Store off method for cleanup in return method (avoids ESLint no-this-alias)
+    const offHandler = this.off.bind(this);
 
     return {
       [Symbol.asyncIterator]() {
@@ -285,7 +300,7 @@ export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
       },
       async return(): Promise<IteratorResult<BotEvents[K]>> {
         closed = true;
-        emitter.off(event, handler);
+        offHandler(event, handler);
         if (resolve) {
           resolve({ value: undefined, done: true });
         }

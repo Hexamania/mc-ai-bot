@@ -6,6 +6,7 @@
 import type { Entity } from 'prismarine-entity';
 import { Vec3 } from 'vec3';
 import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
+import type { PartiallyComputedPath } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
 
@@ -50,14 +51,6 @@ export interface MovementStatus {
   path: Vec3[] | null;
   progress: number;
   speed: number;
-}
-
-/**
- * Path update results type
- */
-interface PathUpdateResults {
-  path: Vec3[];
-  status: string;
 }
 
 /**
@@ -150,9 +143,10 @@ export class MovementFeature extends BaseFeature {
   private setupEventListeners(): void {
     const bot = this.getBot();
 
-    // Path update event
-    bot.on('path_update', (results: PathUpdateResults) => {
-      this.path = results.path;
+    // Path update event - the callback receives PartiallyComputedPath
+    bot.on('path_update', (results: PartiallyComputedPath) => {
+      // PartiallyComputedPath has a path property that's Move[], need to convert to Vec3[]
+      this.path = results.path.map((move) => new Vec3(move.x, move.y, move.z));
       this.pathIndex = 0;
       this.emitStatus();
     });
@@ -263,18 +257,31 @@ export class MovementFeature extends BaseFeature {
 
       switch (goal.type) {
         case 'block':
-          pathfinderGoal = new goals.GoalBlock(goal.x, goal.y, goal.z, goal.range ?? 1);
+          // GoalBlock takes 3 args: x, y, z (range is not a parameter)
+          pathfinderGoal = new goals.GoalBlock(goal.x, goal.y, goal.z);
           break;
-        case 'entity':
-          pathfinderGoal = new goals.GoalFollow(goal.entityId, goal.range ?? 2);
+        case 'entity': {
+          // GoalFollow takes an Entity, not an entity ID
+          // We need to find the entity by ID
+          const entity = bot.entities[goal.entityId];
+          if (entity) {
+            pathfinderGoal = new goals.GoalFollow(entity, goal.range ?? 2);
+          } else {
+            throw new Error(`Entity with ID ${goal.entityId} not found`);
+          }
           break;
-        case 'position':
+        }
+        case 'position': {
+          // GoalNear takes 4 args: x, y, z, range
           pathfinderGoal = new goals.GoalNear(goal.x, goal.y, goal.z, goal.range ?? 1);
           break;
-        case 'follow':
-          pathfinderGoal = new goals.GoalFollow(goal.entity.id, goal.range);
+        }
+        case 'follow': {
+          // GoalFollow takes an Entity
+          pathfinderGoal = new goals.GoalFollow(goal.entity, goal.range);
           break;
-        case 'wander':
+        }
+        case 'wander': {
           center = goal.center ?? bot.entity.position;
           // GoalRandom was removed, implement custom wander goal using GoalNear with random offset
           const randomOffset = new Vec3(
@@ -285,6 +292,7 @@ export class MovementFeature extends BaseFeature {
           const wanderTarget = center.offset(randomOffset.x, randomOffset.y, randomOffset.z);
           pathfinderGoal = new goals.GoalNear(wanderTarget.x, wanderTarget.y, wanderTarget.z, 1);
           break;
+        }
         case 'stop':
           await this.stop();
           return true;
@@ -304,8 +312,8 @@ export class MovementFeature extends BaseFeature {
       }, timeout);
 
       // Start pathfinding
-      const result = await bot.pathfinder.goto(pathfinderGoal);
-      return result === 'success';
+      await bot.pathfinder.goto(pathfinderGoal);
+      return true; // goto() returns void, so we assume success if no error thrown
     } catch (error) {
       this.isMoving = false;
       this.currentGoal = null;
@@ -352,7 +360,7 @@ export class MovementFeature extends BaseFeature {
       progress:
         progress ??
         (this.path && this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 0),
-      speed: bot.entity.velocity.length(),
+      speed: bot.entity.velocity.distanceTo(new Vec3(0, 0, 0)),
     };
 
     for (const listener of this.statusListeners) {
@@ -386,7 +394,7 @@ export class MovementFeature extends BaseFeature {
       goal: this.currentGoal,
       path: this.path,
       progress: this.path && this.path.length > 0 ? this.pathIndex / (this.path.length - 1) : 0,
-      speed: this.getBot().entity.velocity.length(),
+      speed: this.getBot().entity.velocity.distanceTo(new Vec3(0, 0, 0)),
     };
   }
 
@@ -487,14 +495,14 @@ export class MovementFeature extends BaseFeature {
   /**
    * Check if position is reachable
    */
-  async isReachable(x: number, y: number, z: number, range = 1): Promise<boolean> {
+  async isReachable(x: number, y: number, z: number, _range = 1): Promise<boolean> {
     const bot = this.getBot();
 
     if (!this.movements) return false;
 
-    const goal = new goals.GoalBlock(x, y, z, range);
-    const result = await bot.pathfinder.goto(goal);
-    return result === 'success';
+    const goal = new goals.GoalBlock(x, y, z);
+    await bot.pathfinder.goto(goal);
+    return true; // goto() returns void, so we assume success if no error thrown
   }
 
   /**

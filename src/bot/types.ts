@@ -3,7 +3,6 @@
  */
 
 import type { Bot } from 'mineflayer';
-import type { EventEmitter } from 'events';
 import type { Vec3 } from 'vec3';
 import type { Window } from 'prismarine-windows';
 
@@ -156,6 +155,12 @@ export interface TypedEventEmitter<TEvents> {
   getMaxListeners(): number;
   listenerCount(eventName: string | symbol): number;
   eventNames(): (string | symbol)[];
-  prependListener<K extends string & keyof TEvents>(event: K, listener: (...args: unknown[]) => void): this;
-  prependOnceListener<K extends string & keyof TEvents>(event: K, listener: (...args: unknown[]) => void): this;
+  prependListener<K extends string & keyof TEvents>(
+    event: K,
+    listener: (...args: unknown[]) => void
+  ): this;
+  prependOnceListener<K extends string & keyof TEvents>(
+    event: K,
+    listener: (...args: unknown[]) => void
+  ): this;
 }

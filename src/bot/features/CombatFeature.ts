@@ -4,9 +4,9 @@
  */
 
 import type { Entity } from 'prismarine-entity';
+import type { Block } from 'prismarine-block';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import type { Movements } from 'mineflayer-pathfinder';
 import type { IndexedData } from 'minecraft-data';
 
 /**
@@ -283,7 +283,7 @@ export class CombatFeature extends BaseFeature {
 
     // Must be visible (not through walls) - use raycast to check line of sight
     const targetPos = entity.position.offset(0, 1.6, 0);
-    const blockAtCursor = bot.blockAtCursor(5, (block) => {
+    const blockAtCursor = bot.blockAtCursor(5, (block: Block) => {
       return block.position.equals(targetPos);
     });
     if (!blockAtCursor) {

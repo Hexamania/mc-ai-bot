@@ -202,9 +202,7 @@ export function registerBotCommands(botManager: BotCommandManager): void {
         return;
       }
       const { x, y, z } = bot.entity.position;
-      reply(
-        `📍 Current Location: X: ${Math.floor(x)}, Y: ${Math.floor(y)}, Z: ${Math.floor(z)}`
-      );
+      reply(`📍 Current Location: X: ${Math.floor(x)}, Y: ${Math.floor(y)}, Z: ${Math.floor(z)}`);
     },
   });
 
@@ -245,7 +243,9 @@ export function registerBotCommands(botManager: BotCommandManager): void {
       }
       setCurrentObjective('Returning to home base');
       bot.pathfinder.setGoal(null);
-      bot.pathfinder.setGoal(new goals.GoalBlock(currentBaseLocation.x, currentBaseLocation.y, currentBaseLocation.z));
+      bot.pathfinder.setGoal(
+        new goals.GoalBlock(currentBaseLocation.x, currentBaseLocation.y, currentBaseLocation.z)
+      );
       reply('🏃 Heading home to base location.');
     },
   });
@@ -293,7 +293,9 @@ export function registerBotCommands(botManager: BotCommandManager): void {
     description: 'Rescue nearest injured player',
     execute: async (context) => {
       const { bot, reply } = context;
-      const rescueTarget = bot.nearestEntity((e: Entity) => e.type === 'player' && (e.health ?? 20) < 20);
+      const rescueTarget = bot.nearestEntity(
+        (e: Entity) => e.type === 'player' && (e.health ?? 20) < 20
+      );
       if (!rescueTarget) {
         reply('🆘 No injured players found nearby.');
         return;
@@ -398,7 +400,9 @@ export function registerBotCommands(botManager: BotCommandManager): void {
         return;
       }
       bot.pathfinder.setGoal(null);
-      bot.pathfinder.setGoal(new goals.GoalBlock(miningBaseLocation.x, miningBaseLocation.y, miningBaseLocation.z));
+      bot.pathfinder.setGoal(
+        new goals.GoalBlock(miningBaseLocation.x, miningBaseLocation.y, miningBaseLocation.z)
+      );
       reply('🏃 Heading to mining operations base.');
     },
   });
@@ -597,7 +601,7 @@ export function registerBotCommands(botManager: BotCommandManager): void {
     description: 'Toggle stealth mode',
     adminOnly: true,
     execute: async (context) => {
-      const { bot, reply } = context;
+      const { reply } = context;
       // stealthMode = !stealthMode; // would need mutable reference
       // bot.setControlState('sneak', stealthMode);
       reply('👻 Stealth Mode Toggled');

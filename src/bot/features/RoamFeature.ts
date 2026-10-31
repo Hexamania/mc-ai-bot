@@ -33,14 +33,6 @@ export interface RoamFeatureOptions {
 type MinecraftData = ReturnType<typeof mcDataLoader>;
 
 /**
- * Command context type
- */
-interface CommandContext {
-  args: string[];
-  reply: (message: string) => void;
-}
-
-/**
  * Roam Feature Class
  * Ported from original bot.js roam() function
  */
@@ -153,7 +145,9 @@ export class RoamFeature extends BaseFeature {
     this.isRoaming = true;
 
     // Set the objective for tracking
-    console.log(`[RoamFeature] Started roaming (radius: ${effectiveRadius}, interval: ${effectiveInterval}ms)`);
+    console.log(
+      `[RoamFeature] Started roaming (radius: ${effectiveRadius}, interval: ${effectiveInterval}ms)`
+    );
 
     // Start the roam loop
     this.roamLoop(effectiveRadius, effectiveInterval);

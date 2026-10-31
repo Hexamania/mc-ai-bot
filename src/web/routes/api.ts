@@ -293,40 +293,28 @@ router.get('/map', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
     }
   }
 
-  // Fix the Entity type overlap issue by using proper typing
+  // Get entities using proper Entity types
+  // bot.entities is Record<number, Entity>, so Object.values gives Entity[]
+  // Entity has position: Vec3 with distanceTo(other: Vec3)
   const entities = Object.values(bot.entities)
     .filter((e) => {
       if (!e || e === bot.entity) return false;
-      // Check if entity has position with distanceTo method
-      const ent = e as { position?: { distanceTo?: (pos: { x: number; y: number; z: number }) => number } };
-      return (
-        ent.position?.distanceTo &&
-        ent.position.distanceTo(bot.entity.position) < radius
-      );
+      return e.position != null && typeof e.position.distanceTo === 'function';
     })
-    .map((e) => {
-      const ent = e as {
-        id: number;
-        username?: string;
-        displayName?: string;
-        name?: string;
-        type?: string;
-        position: { x: number; y: number; z: number; distanceTo: (pos: { x: number; y: number; z: number }) => number };
-      };
-      return {
-        id: ent.id,
-        username: ent.username,
-        name: ent.displayName || ent.name || ent.username,
-        position: {
-          x: ent.position.x,
-          y: ent.position.y,
-          z: ent.position.z,
-        },
-        type: ent.type || 'unknown',
-        isPlayer: ent.type === 'player',
-        distance: ent.position.distanceTo(bot.entity.position),
-      };
-    });
+    .filter((e) => e.position!.distanceTo(bot.entity.position) < radius)
+    .map((e) => ({
+      id: e.id,
+      username: e.username,
+      name: e.displayName || e.name || e.username,
+      position: {
+        x: e.position!.x,
+        y: e.position!.y,
+        z: e.position!.z,
+      },
+      type: e.type || 'unknown',
+      isPlayer: e.type === 'player',
+      distance: e.position!.distanceTo(bot.entity.position),
+    }));
 
   res.json({
     success: true,
@@ -832,7 +820,8 @@ router.get('/stats', authMiddleware, (req: AuthenticatedRequest, res: Response) 
         autoDefense: (botManager as unknown as Record<string, unknown>).autoDefense as boolean,
         autoArmor: (botManager as unknown as Record<string, unknown>).autoArmorEnabled as boolean,
         stealth: (botManager as unknown as Record<string, unknown>).stealthMode as boolean,
-        progression: (botManager as unknown as Record<string, unknown>).progressionActive as boolean,
+        progression: (botManager as unknown as Record<string, unknown>)
+          .progressionActive as boolean,
         mining: (botManager as unknown as Record<string, unknown>).minerActive as boolean,
         farming: (botManager as unknown as Record<string, unknown>).isFarming as boolean,
         lumberjack: (botManager as unknown as Record<string, unknown>).lumberjackActive as boolean,

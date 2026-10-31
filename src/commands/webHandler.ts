@@ -15,20 +15,10 @@ import type {
 import type { PermissionManager } from './permissions';
 
 // Extended Bot type to include properties used in web commands
-interface ExtendedBot extends Bot {
-  _client?: {
-    latency?: number;
-  };
-  game?: {
-    dimension?: string;
-  };
-  time?: {
-    timeOfDay?: number;
-  };
-  entity?: {
-    position?: { x: number; y: number; z: number };
-  } | null;
-}
+// Note: We don't override any existing Bot properties.
+// The base Bot type already has _client, game, time, entity with their proper types.
+// We just use the base Bot type and access properties with type assertions when needed.
+type ExtendedBot = Bot;
 
 /**
  * Web command request from dashboard
@@ -597,8 +587,9 @@ export const WebOnlyCommands = {
       }
       const pos = bot.entity?.position;
       const latency = bot._client?.latency;
-      const dimension = bot.game?.dimension;
-      const timeOfDay = bot.time?.timeOfDay;
+      // Use type assertions for properties that exist on Bot but with different types
+      const dimension = (bot as unknown as { game?: { dimension?: string } }).game?.dimension;
+      const timeOfDay = (bot as unknown as { time?: { timeOfDay?: number } }).time?.timeOfDay;
 
       context.privateReply(
         `🤖 **Bot Status**\n` +

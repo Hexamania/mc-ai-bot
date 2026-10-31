@@ -6,10 +6,10 @@
 import type { Bot } from 'mineflayer';
 import * as mineflayer from 'mineflayer';
 import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
-import mcDataLoader = require('minecraft-data');
+import mcDataLoader from 'minecraft-data';
 import { EventEmitter } from 'events';
 import { getConfig } from '../config';
-import type { BotConfig, BotState, BotStatus, BotPosition, MapBlock, MapEntity, Equipment, AppConfig } from '../types';
+import type { BotConfig, BotState, BotStatus, BotPosition, MapBlock, MapEntity } from '../types';
 import { loadMemory, rememberLocation, rememberPlayer, persistMemory } from '../memory';
 import { getCommandRegistry, createCommandContext, parseCommand } from '../commands';
 import { getFeatureRegistry } from '../plugins';
@@ -35,7 +35,7 @@ export class BotManager extends EventEmitter {
   // Connection state
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempt = 0;
-  private isOnline = false;
+  private _isOnline = false;
   private statusEvent = 'connecting';
   private statusReason: string | null = null;
   private statusError: string | null = null;
@@ -132,9 +132,9 @@ export class BotManager extends EventEmitter {
    * Get current bot status
    */
   getStatus(): BotStatus {
-    const fullConfig = getConfig();
+    getConfig();
     return {
-      online: this.isOnline,
+      online: this._isOnline,
       username: this.client?.username || this.config.username,
       status: this.state.status,
       event: this.statusEvent,
@@ -182,7 +182,7 @@ export class BotManager extends EventEmitter {
    */
   say(message: string): void {
     console.log('[BOT SAY]', message);
-    if (this.isOnline && this.bot?.entity) {
+    if (this._isOnline && this.bot?.entity) {
       this.bot.chat(message);
     }
   }
@@ -229,7 +229,7 @@ export class BotManager extends EventEmitter {
   ): void {
     if (instance !== this.client) return;
 
-    this.isOnline = false;
+    this._isOnline = false;
 
     if (this.reconnectTimer) {
       if (status === 'Error' && (this.state.status !== 'Error' || event === 'kicked')) {
@@ -272,7 +272,7 @@ export class BotManager extends EventEmitter {
     this.statusReason = null;
     this.statusError = null;
     this.retryAt = null;
-    this.isOnline = false;
+    this._isOnline = false;
     this.emitBotStatus();
 
     try {
@@ -296,7 +296,7 @@ export class BotManager extends EventEmitter {
       // Re-attach any registered listeners
       // (In a full implementation, you'd store and re-attach listeners here)
     } catch (error) {
-      this.isOnline = false;
+      this._isOnline = false;
       this.state.status = 'Offline';
       this.emitBotStatus({ reason: 'Connection setup failed' });
       this.log(
@@ -382,7 +382,7 @@ export class BotManager extends EventEmitter {
     if (instance !== this.client) return;
 
     this.log('SPAWN', 'Bot online');
-    this.isOnline = true;
+    this._isOnline = true;
     this.reconnectAttempt = 0;
     this.state.status = 'Online';
     this.statusEvent = 'spawn';
@@ -419,7 +419,7 @@ export class BotManager extends EventEmitter {
   private setupSpawnLookInterval(instance: mineflayer.Bot): void {
     let lookDirection = 1;
     const nudgeLook = () => {
-      if (!this.isOnline || !instance.entity) return;
+      if (!this._isOnline || !instance.entity) return;
       instance
         .look(instance.entity.yaw + (lookDirection * Math.PI) / 90, instance.entity.pitch, true)
         .catch((error) => this.log('LOOK-ERR', `Spawn look update failed: ${error.message}`));
@@ -515,14 +515,19 @@ export class BotManager extends EventEmitter {
     }
 
     // Type the entities properly - use unknown to avoid type overlap issues
-    const entities = Object.values(instance.entities) as unknown as Array<{
-      position: { x: number; y: number; z: number; distanceTo: (pos: { x: number; y: number; z: number }) => number };
+    const entities = Object.values(instance.entities) as unknown as {
+      position: {
+        x: number;
+        y: number;
+        z: number;
+        distanceTo: (pos: { x: number; y: number; z: number }) => number;
+      };
       username?: string;
       displayName?: string;
       name?: string;
       type?: string;
       id: number;
-    }>;
+    }[];
 
     const botEntityId = instance.entity.id;
     const mapEntities: MapEntity[] = entities
@@ -668,16 +673,180 @@ export class BotManager extends EventEmitter {
   }
 
   /**
-   * Follow loop
+   * Internal follow loop
    */
-  private followLoop(): void {
+  private _followLoop(): void {
     if (!this.following || !this.followTarget || !this.bot) return;
     const target = this.bot.players[this.followTarget]?.entity;
     if (!target) return;
 
     this.bot.pathfinder.setMovements(this.movements!);
     this.bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true);
-    setTimeout(() => this.followLoop(), 2000);
+    setTimeout(() => this._followLoop(), 2000);
+  }
+
+  /**
+   * Public wrapper for follow loop
+   */
+  followLoop(): void {
+    this.following = true;
+    this._followLoop();
+  }
+
+  /**
+   * Check if bot is online
+   */
+  isOnline(): boolean {
+    return this._isOnline;
+  }
+
+  /**
+   * Set current objective
+   */
+  setCurrentObjective(objective: string): void {
+    this.currentObjective = objective;
+    this.state.status = objective;
+    this.emitBotStatus();
+  }
+
+  /**
+   * Miner loop - delegate to mining feature
+   */
+  minerLoop(dir: string, len: number, _progress: number): void {
+    const miningFeature = this.getFeature('mining');
+    if (miningFeature && typeof miningFeature['mineTunnel'] === 'function') {
+      (miningFeature as any).mineTunnel(dir, len);
+    } else {
+      this.log('MINER', 'Mining feature not available');
+    }
+  }
+
+  /**
+   * Medic loop - delegate to combat feature
+   */
+  medicLoop(): void {
+    const combatFeature = this.getFeature('combat');
+    if (combatFeature && typeof combatFeature['setMedicMode'] === 'function') {
+      (combatFeature as any).setMedicMode(this.medicTarget);
+    } else {
+      this.log('MEDIC', 'Combat feature not available');
+    }
+  }
+
+  /**
+   * Refuel - find and mine coal
+   */
+  refuel(): void {
+    const miningFeature = this.getFeature('mining');
+    if (miningFeature && typeof miningFeature['findFuel'] === 'function') {
+      (miningFeature as any).findFuel();
+    } else {
+      this.log('REFUEL', 'Mining feature not available');
+    }
+  }
+
+  /**
+   * Auto-sort chest - delegate to inventory feature
+   */
+  autoSortChest(): void {
+    const inventoryFeature = this.getFeature('inventory');
+    if (inventoryFeature && typeof inventoryFeature['sortChest'] === 'function') {
+      (inventoryFeature as any).sortChest();
+    } else {
+      this.log('SORT', 'Inventory feature not available');
+    }
+  }
+
+  /**
+   * Deposit all items - delegate to inventory feature
+   */
+  depositAllItems(): void {
+    const inventoryFeature = this.getFeature('inventory');
+    if (inventoryFeature && typeof inventoryFeature['depositAll'] === 'function') {
+      (inventoryFeature as any).depositAll();
+    } else {
+      this.log('DEPOSIT', 'Inventory feature not available');
+    }
+  }
+
+  /**
+   * Build roof - delegate to building feature
+   */
+  buildRoof(radius: number): void {
+    const buildingFeature = this.getFeature('building');
+    if (buildingFeature && typeof buildingFeature['buildRoof'] === 'function') {
+      (buildingFeature as any).buildRoof(radius);
+    } else {
+      this.log('BUILD', 'Building feature not available');
+    }
+  }
+
+  /**
+   * Roam - delegate to roam feature
+   */
+  roam(): void {
+    const roamFeature = this.getFeature('roam');
+    if (roamFeature && typeof roamFeature['startRoaming'] === 'function') {
+      (roamFeature as any).startRoaming();
+    } else {
+      this.log('ROAM', 'Roam feature not available');
+    }
+  }
+
+  /**
+   * Mine block - delegate to mining feature
+   */
+  mineBlock(blockName: string): void {
+    const miningFeature = this.getFeature('mining');
+    if (miningFeature && typeof miningFeature['mineBlock'] === 'function') {
+      (miningFeature as any).mineBlock(blockName);
+    } else {
+      this.log('MINE', 'Mining feature not available');
+    }
+  }
+
+  /**
+   * Activate panic mode
+   */
+  activatePanicMode(): void {
+    const combatFeature = this.getFeature('combat');
+    if (combatFeature && typeof combatFeature['activatePanicMode'] === 'function') {
+      (combatFeature as any).activatePanicMode();
+    } else {
+      this.log('PANIC', 'Combat feature not available');
+    }
+  }
+
+  /**
+   * Guard loop - delegate to guard feature
+   */
+  guardLoop(): void {
+    const guardFeature = this.getFeature('guard');
+    if (guardFeature && typeof guardFeature['startGuarding'] === 'function') {
+      (guardFeature as any).startGuarding(this.bot?.entity.position);
+    } else {
+      this.log('GUARD', 'Guard feature not available');
+    }
+  }
+
+  /**
+   * PVP loop - delegate to combat feature
+   */
+  pvpLoop(): void {
+    const combatFeature = this.getFeature('combat');
+    if (combatFeature && typeof combatFeature['startPvp'] === 'function') {
+      (combatFeature as any).startPvp(this.pvpTarget);
+    } else {
+      this.log('PVP', 'Combat feature not available');
+    }
+  }
+
+  /**
+   * Get feature by name
+   */
+  private getFeature(name: string): any {
+    const featureRegistry = getFeatureRegistry();
+    return featureRegistry.get(name);
   }
 
   /**

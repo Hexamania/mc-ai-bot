@@ -5,10 +5,9 @@
 
 import type { Player } from 'mineflayer';
 import type { Entity } from 'prismarine-entity';
-import { goals, Movements } from 'mineflayer-pathfinder';
+import { goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import type { MovementFeature } from './MovementFeature.js';
 
 /**
  * Follow feature configuration

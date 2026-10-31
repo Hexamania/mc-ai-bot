@@ -155,7 +155,10 @@ export async function createApp(): Promise<Application> {
 }
 
 // Auto-start if this is the main module
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Using CommonJS check since TypeScript compiles to CommonJS output
+const isMainModule = typeof require !== 'undefined' && require.main === module;
+
+if (isMainModule) {
   createApp().catch((error) => {
     console.error('[APP] Failed to start:', error);
     process.exit(1);

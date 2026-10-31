@@ -3,7 +3,7 @@
  * Handles guarding a location - stays at a position using GoalNear
  */
 
-import { Vec3 } from 'vec3';
+import type { Vec3 } from 'vec3';
 import { goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';

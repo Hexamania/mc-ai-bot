@@ -211,7 +211,7 @@ export abstract class BaseFeature implements Feature {
   public readonly version: string;
   public readonly description: string;
   public readonly dependencies: string[];
-  public enabled: boolean = true;
+  public enabled = true;
 
   constructor(name: string, version: string, description: string, dependencies: string[] = []) {
     this.name = name;

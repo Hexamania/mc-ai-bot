@@ -4,8 +4,7 @@
  */
 
 import type { Item } from 'prismarine-item';
-import type { Recipe, RecipeItem } from 'prismarine-recipe';
-import type { Block } from 'prismarine-block';
+import type { Recipe } from 'prismarine-recipe';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
 
@@ -509,9 +508,9 @@ export class InventoryFeature extends BaseFeature {
       }
 
       // craft() expects a Block for craftingTable, not a boolean
-      // For now, pass null (will craft in inventory)
+      // For now, pass undefined (will craft in inventory)
       // A full implementation would find and place a crafting table block
-      await bot.craft(actualRecipe, count, null);
+      await bot.craft(actualRecipe, count, undefined);
       return true;
     } catch (error) {
       console.error('[InventoryFeature] Craft error:', error);
@@ -541,8 +540,8 @@ export class InventoryFeature extends BaseFeature {
     if (!actualRecipe) throw new Error(`No recipe for ${recipe.name}`);
 
     // craft() expects a Block for craftingTable, not a boolean
-    // For now, pass null - a full implementation would place and use a crafting table block
-    await bot.craft(actualRecipe, count, null);
+    // For now, pass undefined - a full implementation would place and use a crafting table block
+    await bot.craft(actualRecipe, count, undefined);
   }
 
   /**

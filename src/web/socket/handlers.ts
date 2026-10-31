@@ -8,7 +8,7 @@ import { Vec3 } from 'vec3';
 import { Movements, goals } from 'mineflayer-pathfinder';
 import type { Entity } from 'prismarine-entity';
 import type { BotManager } from '../../bot';
-import type { FeatureRegistry, Feature } from '../../types';
+import type { FeatureRegistry } from '../../types';
 import { getFeatureRegistry } from '../../plugins';
 import {
   getMemory,
@@ -56,7 +56,7 @@ function setSocketUser(socket: Socket, user: SocketUser): void {
 /**
  * Get feature registry from bot manager
  */
-function getRegistry(botManager: BotManager): FeatureRegistry {
+function getRegistry(_botManager: BotManager): FeatureRegistry {
   // The new BotManager has a plugins property that returns PluginManager
   // which has the feature registry. We also have a global getFeatureRegistry.
   return getFeatureRegistry();
@@ -329,11 +329,7 @@ function sendInitialState(socket: Socket, botManager: BotManager): void {
 /**
  * Set up individual socket event handlers for bot control
  */
-function setupSocketEventHandlers(
-  socket: Socket,
-  botManager: BotManager,
-  io: Server
-): void {
+function setupSocketEventHandlers(socket: Socket, botManager: BotManager, io: Server): void {
   // Authentication
   socket.on(CLIENT_EVENTS.AUTHENTICATE, (_data: AuthenticatePayload) => {
     // Handled by middleware, but can re-authenticate
@@ -423,7 +419,9 @@ function setupSocketEventHandlers(
 
     currentBot.pathfinder.setMovements(movements);
     currentBot.pathfinder.setGoal(goal);
-    botManager.say?.(`📍 Dashboard: Heading to ${Math.floor(x)}, ${Math.floor(y)}, ${Math.floor(z)}`);
+    botManager.say?.(
+      `📍 Dashboard: Heading to ${Math.floor(x)}, ${Math.floor(y)}, ${Math.floor(z)}`
+    );
   });
 
   socket.on(CLIENT_EVENTS.FOLLOW_PLAYER, async (data: FollowPlayerPayload) => {

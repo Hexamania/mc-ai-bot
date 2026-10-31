@@ -4,7 +4,6 @@
  */
 
 import type { Block } from 'prismarine-block';
-import type { Entity } from 'prismarine-entity';
 import { Vec3 } from 'vec3';
 import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';

@@ -329,6 +329,125 @@ export interface Objective {
 }
 
 /**
+ * Bot Configuration types
+ */
+export interface BotConfig {
+  host: string;
+  port: number;
+  username: string;
+  password?: string;
+  version: string;
+  auth: 'offline' | 'microsoft' | 'mojang';
+  checkTimeoutInterval: number;
+}
+
+export interface WebConfig {
+  port: number;
+  host?: string;
+}
+
+export interface OpenAIConfig {
+  apiKey: string;
+  model: string;
+}
+
+export interface MemoryConfig {
+  enabled: boolean;
+  filePath: string;
+}
+
+export interface AdminConfig {
+  prefix: string;
+  password: string;
+}
+
+export interface BotPrefixConfig {
+  public: string;
+  admin: string;
+}
+
+/**
+ * Application configuration
+ */
+export interface AppConfig {
+  bot: BotConfig;
+  web: WebConfig;
+  openai: OpenAIConfig;
+  memory: MemoryConfig;
+  admin: AdminConfig;
+  prefix: BotPrefixConfig;
+}
+
+/**
+ * Bot state types
+ */
+export interface Equipment {
+  head: string;
+  chest: string;
+  legs: string;
+  feet: string;
+  hand: string;
+  offhand: string;
+}
+
+export interface MapBlock {
+  x: number;
+  z: number;
+  name: string;
+}
+
+export interface MapEntity {
+  x: number;
+  z: number;
+  name: string;
+  isPlayer: boolean;
+}
+
+export interface BotState {
+  status: string;
+  users: string[];
+  admins: string[];
+  logs: string[];
+  settings: {
+    theme: string;
+    autoDefense: boolean;
+    autoArmor: boolean;
+    stealth: boolean;
+  };
+  botData: {
+    health: number;
+    food: number;
+    pos: BotPosition;
+  };
+  inventory: {
+    slot: number;
+    name: string;
+    displayName: string;
+    count: number;
+  }[];
+  currentPath: BotPosition[];
+  favorites: Record<string, BotPosition>;
+  equipment: Equipment;
+  mapData: {
+    blocks: MapBlock[];
+    entities: MapEntity[];
+  };
+  // Index signature for dynamic property access (used by web socket handlers)
+  [key: string]: unknown;
+}
+
+export interface BotStatus {
+  online: boolean;
+  username: string;
+  status: string;
+  event: string;
+  reason: string | null;
+  error: string | null;
+  retryAt: number | null;
+  retryInMs: number | null;
+}
+
+/**
  * Utility types
  */
 export type DeepPartial<T> = {

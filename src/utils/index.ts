@@ -326,7 +326,11 @@ export function getNearestEntity(
 /**
  * Safe pathfinder goto with timeout
  */
-export async function safeGoto(bot: Bot, goal: goals.Goal | null, timeout = 30000): Promise<boolean> {
+export async function safeGoto(
+  bot: Bot,
+  goal: goals.Goal | null,
+  timeout = 30000
+): Promise<boolean> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       bot.pathfinder.setGoal(null);

@@ -402,7 +402,9 @@ export function isExtendedTaskInfo(value: unknown): value is ExtendedTaskInfo {
     value !== null &&
     typeof (value as ExtendedTaskInfo).goal === 'string' &&
     (Object.values(TaskStatus).includes((value as ExtendedTaskInfo).status as TaskStatus) ||
-      ['active', 'completed', 'stopped', 'failed'].includes((value as ExtendedTaskInfo).status as string))
+      ['active', 'completed', 'stopped', 'failed'].includes(
+        (value as ExtendedTaskInfo).status as string
+      ))
   );
 }
 

@@ -125,7 +125,13 @@ export class BotManager implements BotManagerInterface {
     });
 
     this.stateMachine.addTransition({
-      from: [BotState.CONNECTING, BotState.CONNECTED, BotState.RECONNECTING, BotState.ERROR, BotState.DISCONNECTED],
+      from: [
+        BotState.CONNECTING,
+        BotState.CONNECTED,
+        BotState.RECONNECTING,
+        BotState.ERROR,
+        BotState.DISCONNECTED,
+      ],
       to: BotState.SHUTTING_DOWN,
       onEnter: async () => {
         this.isShuttingDown = true;
@@ -678,12 +684,18 @@ export class BotManager implements BotManagerInterface {
     return this.emitter.eventNames();
   }
 
-  prependListener<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  prependListener<K extends keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.emitter.prependListener(event as string, listener as (...args: unknown[]) => void);
     return this;
   }
 
-  prependOnceListener<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+  prependOnceListener<K extends keyof BotEvents>(
+    event: K,
+    listener: (...args: BotEvents[K]) => void
+  ): this {
     this.emitter.prependOnceListener(event as string, listener as (...args: unknown[]) => void);
     return this;
   }

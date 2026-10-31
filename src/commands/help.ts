@@ -530,7 +530,10 @@ export function createHelpCommand(
         const oldOptions = formatter.getOptions();
         formatter.setOptions({ showHidden: true, showDeprecated: true });
         privateReply(formatter.getFullHelp(permissionLevel));
-        formatter.setOptions({ showHidden: oldOptions.showHidden, showDeprecated: oldOptions.showDeprecated });
+        formatter.setOptions({
+          showHidden: oldOptions.showHidden,
+          showDeprecated: oldOptions.showDeprecated,
+        });
         return;
       }
 

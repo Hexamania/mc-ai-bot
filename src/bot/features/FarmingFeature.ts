@@ -155,7 +155,9 @@ export class FarmingFeature extends BaseFeature {
             4
           );
         } else {
-          await bot.pathfinder.goto(new goals.GoalBlock(wheatBlock.position.x, wheatBlock.position.y, wheatBlock.position.z));
+          await bot.pathfinder.goto(
+            new goals.GoalBlock(wheatBlock.position.x, wheatBlock.position.y, wheatBlock.position.z)
+          );
         }
 
         await bot.dig(wheatBlock);

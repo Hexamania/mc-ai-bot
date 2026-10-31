@@ -26,3 +26,6 @@ backup_full_*
 chat.json
 .claude/
 .editorconfig
+
+# Minecraft server
+mcserver/

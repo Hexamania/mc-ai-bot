@@ -25,28 +25,31 @@ export const useSettingsStore = defineStore('settings', () => {
   // Computed
   const isValid = computed(() => {
     const s = formSettings.value;
+    const port = s.port ?? 25565;
+    const webPort = s.webPort ?? 3000;
     return !!(
       s.host?.trim() &&
-      s.port >= 1 &&
-      s.port <= 65535 &&
+      port >= 1 &&
+      port <= 65535 &&
       s.username?.trim() &&
       s.version?.trim() &&
-      s.webPort >= 1 &&
-      s.webPort <= 65535 &&
-      s.port !== s.webPort
+      webPort >= 1 &&
+      webPort <= 65535 &&
+      port !== webPort
     );
   });
 
   const validationErrors = computed(() => {
     const errors: string[] = [];
     const s = formSettings.value;
+    const port = s.port ?? 25565;
+    const webPort = s.webPort ?? 3000;
     if (!s.host?.trim()) errors.push('Server address is required');
-    if (!s.port || s.port < 1 || s.port > 65535) errors.push('Port must be 1-65535');
+    if (port < 1 || port > 65535) errors.push('Port must be 1-65535');
     if (!s.username?.trim()) errors.push('Username is required');
     if (!s.version?.trim()) errors.push('Minecraft version is required');
-    if (!s.webPort || s.webPort < 1 || s.webPort > 65535)
-      errors.push('Dashboard port must be 1-65535');
-    if (s.port === s.webPort) errors.push('Minecraft and dashboard ports must differ');
+    if (webPort < 1 || webPort > 65535) errors.push('Dashboard port must be 1-65535');
+    if (port === webPort) errors.push('Minecraft and dashboard ports must differ');
     return errors;
   });
 

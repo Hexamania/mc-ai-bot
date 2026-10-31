@@ -49,7 +49,7 @@ export function useIpc() {
     api.onLifecycle(callback);
   };
 
-  const onLog = (callback: (entry: LogEntry) => void) => {
+  const onLog = (callback: (entry: LogEntry | string) => void) => {
     api.onLog(callback);
   };
 

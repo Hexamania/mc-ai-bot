@@ -6,6 +6,8 @@
 // This file will be bundled by the frontend build system
 // For now, it's a placeholder showing the structure
 
+import type { LogEntry } from './renderer/src/types';
+
 interface BotStatus {
   online: boolean;
   username: string;
@@ -95,8 +97,9 @@ function setupApiListeners(): void {
   });
 
   // Log updates
-  window.api.onLog((log: string) => {
-    appendLog(log);
+  window.api.onLog((entry: LogEntry | string) => {
+    const message = typeof entry === 'string' ? entry : entry.line;
+    appendLog(message);
   });
 
   // Path updates
@@ -323,6 +326,7 @@ function updateSettings(settings: BotState['settings']): void {
 function updateMap(mapData: BotState['mapData']): void {
   // Map rendering would go here
   // For now, just log
+  if (!mapData) return;
   console.log('Map update:', mapData.blocks.length, 'blocks,', mapData.entities.length, 'entities');
 }
 

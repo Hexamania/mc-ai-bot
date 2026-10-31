@@ -22,7 +22,7 @@ export interface NotificationOptions {
 export class NotificationService {
   private logService: LogService;
   private mainWindow: BrowserWindow | null = null;
-  private defaultIcon: Electron.NativeImage | null = null;
+  private defaultIcon: Electron.NativeImage | undefined;
 
   constructor(logService: LogService) {
     this.logService = logService;

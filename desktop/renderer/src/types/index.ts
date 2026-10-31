@@ -109,6 +109,7 @@ export interface ElectronAPI {
   stopBot: () => Promise<{ status: string }>;
   restartBot: () => Promise<{ success: boolean; error?: string }>;
   getBotStatus: () => Promise<BotStatus>;
+  getBotState: () => Promise<BotState>;
   // Logs
   getLogs: () => Promise<LogEntry[]>;
   searchLogs: (query: LogSearchQuery) => Promise<LogEntry[]>;
@@ -127,18 +128,32 @@ export interface ElectronAPI {
   // Events
   onLifecycle: (
     callback: (data: { status: string; detail: string; running: boolean }) => void
-  ) => void;
-  onLog: (callback: (entry: LogEntry) => void) => void;
-  onBotState: (callback: (state: BotState) => void) => void;
-  onDashboardReady: (callback: (data: { url: string }) => void) => void;
-  onUpdateAvailable: (callback: (info: UpdateInfo) => void) => void;
-  onUpdateProgress: (callback: (progress: number) => void) => void;
+  ) => () => void;
+  onLog: (callback: (entry: LogEntry | string) => void) => () => void;
+  onBotState: (callback: (state: BotState) => void) => () => void;
+  onBotStatus: (callback: (status: BotStatus) => void) => () => void;
+  onBulkUpdate: (callback: (state: BotState) => void) => () => void;
+  onPathUpdate: (callback: (path: { x: number; y: number; z: number }[]) => void) => () => void;
+  onDashboardReady: (callback: (data: { url: string }) => void) => () => void;
+  onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void;
+  onUpdateProgress: (callback: (progress: number) => void) => () => void;
   removeAllListeners: (channel: string) => void;
+  // Commands
+  sendCommand: (command: string, args?: string) => Promise<void>;
+  // Platform info
+  platform: NodeJS.Platform;
+  versions: NodeJS.ProcessVersions;
+  isPortable: boolean;
 }
 
 // Extend Window interface
 declare global {
   interface Window {
     api: ElectronAPI;
+    app: {
+      sendCommand: (input: string) => void;
+      getState: () => BotState | null;
+      getStatus: () => BotStatus | null;
+    };
   }
 }

@@ -5,7 +5,6 @@
 import type {
   Settings,
   BotStatus,
-  BotState,
   LogEntry,
   LogQuery,
   LogSearchQuery,
@@ -59,7 +58,15 @@ export interface AppLifecycleEvent {
 
 export type AppLogEvent = LogEntry;
 
-export type AppBotStateEvent = BotState;
+// Simplified bot state from process manager (not full bot state from web socket)
+export interface AppBotStateEvent {
+  connected: boolean;
+  status: string;
+  error: string | null;
+  pid: number | null;
+  restartCount: number;
+  lastRestart: number | null;
+}
 
 export interface AppDashboardReadyEvent {
   url: string;
@@ -101,6 +108,7 @@ export interface EventMap {
   'app:bot-state': AppBotStateEvent;
   'app:dashboard-ready': AppDashboardReadyEvent;
   'updater:update-available': UpdaterUpdateAvailableEvent;
+  'updater:update-not-available': UpdaterUpdateAvailableEvent; // Same payload as update-available
   'updater:download-progress': number;
   'updater:update-downloaded': UpdaterUpdateDownloadedEvent;
   'updater:error': string;

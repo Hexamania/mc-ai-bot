@@ -47,6 +47,11 @@ export class BotProcessManager extends EventEmitter {
     this.settings = settings;
   }
 
+  setMainWindow(_window: Electron.BrowserWindow): void {
+    // Store reference for potential future use (e.g., sending notifications)
+    // Currently a no-op since bot runs in separate process
+  }
+
   getState(): BotProcessState {
     return { ...this.state };
   }
@@ -125,7 +130,8 @@ export class BotProcessManager extends EventEmitter {
       this.startHealthCheck();
     });
 
-    this.botProcess.on('error', (error: Error) => {
+    // Handle error events (UtilityProcess extends EventEmitter but TypeScript types don't include 'error')
+    (this.botProcess as EventEmitter).on('error', (error: Error) => {
       this.logService.appendLog(
         'error',
         `Bot worker failed to start: ${error.stack || error.message}`
@@ -220,7 +226,7 @@ export class BotProcessManager extends EventEmitter {
   private startHealthCheck(): void {
     this.stopHealthCheck();
     this.healthCheckTimer = setInterval(() => {
-      if (this.botProcess && !this.botProcess.killed) {
+      if (this.botProcess && this.state.running) {
         // Process is alive
         this.emit('health-check', { alive: true, pid: this.botProcess.pid });
       } else if (this.state.running) {

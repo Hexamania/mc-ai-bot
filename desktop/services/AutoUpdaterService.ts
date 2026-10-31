@@ -71,11 +71,6 @@ export class AutoUpdaterService extends EventEmitter {
       this.logService.appendLog('system', `Update downloaded: ${info.version}. Ready to install.`);
       this.emit('update-downloaded', info);
     });
-
-    // Handle before quit to install update
-    autoUpdater.on('before-quit-for-update', () => {
-      this.logService.appendLog('system', 'Installing update before quit...');
-    });
   }
 
   async checkForUpdates(): Promise<UpdateCheckResult> {
@@ -118,12 +113,26 @@ export class AutoUpdaterService extends EventEmitter {
   }
 
   setFeedUrl(feedUrl: string): void {
-    autoUpdater.setFeedURL({ url: feedUrl });
+    // electron-updater expects a configuration object with provider
+    // For custom servers, we use 'generic' provider
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: feedUrl,
+    });
     this.logService.appendLog('system', `Auto-updater feed URL set to: ${feedUrl}`);
   }
 
   getFeedUrl(): string | null {
-    return autoUpdater.getFeedURL()?.url ?? null;
+    const feedUrl = autoUpdater.getFeedURL();
+    if (typeof feedUrl === 'string') {
+      return feedUrl;
+    }
+    // Handle object case with type assertion
+    if (feedUrl && typeof feedUrl === 'object') {
+      const feedUrlObj = feedUrl as { url?: string };
+      return feedUrlObj.url ?? null;
+    }
+    return null;
   }
 
   private formatBytes(bytes: number): string {

@@ -47,7 +47,8 @@ export class PortableService {
 
         // Override app paths for portable mode
         app.setPath('userData', portableDataDir);
-        app.setPath('userConfig', portableConfigDir);
+        // Note: 'userConfig' is not a valid path name in Electron, using userData for both
+        app.setPath('userData', portableConfigDir);
         app.setPath('logs', path.join(portableDataDir, 'logs'));
 
         dataDir = portableDataDir;
@@ -85,7 +86,8 @@ export class PortableService {
   }
 
   getConfigDirectory(): string {
-    return this.portableInfo?.configDir ?? app.getPath('userConfig');
+    // Note: 'userConfig' is not a valid path name in Electron, fallback to userData
+    return this.portableInfo?.configDir ?? app.getPath('userData');
   }
 
   getError(): string | null {
@@ -154,7 +156,7 @@ export class PortableService {
       dataDir: info.dataDir,
       configDir: info.configDir,
       userData: app.getPath('userData'),
-      userConfig: app.getPath('userConfig'),
+      userConfig: app.getPath('userData'), // Note: 'userConfig' is not valid, using userData
       logs: app.getPath('logs'),
       temp: app.getPath('temp'),
       home: app.getPath('home'),

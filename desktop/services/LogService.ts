@@ -158,7 +158,9 @@ export class LogService {
         content =
           'id,time,stream,line\n' +
           logs
-            .map((e) => `"${e.id}","${e.time}","${e.stream}","${e.line.replace(/"/g, '""')}"`)
+            .map(
+              (e): string => `"${e.id}","${e.time}","${e.stream}","${e.line.replace(/"/g, '""')}"`
+            )
             .join('\n');
         break;
       case 'txt':
@@ -202,7 +204,14 @@ export class LogService {
         try {
           return [JSON.parse(line) as LogEntry];
         } catch {
-          return [{ time: new Date().toISOString(), stream: 'system' as const, line }];
+          return [
+            {
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              time: new Date().toISOString(),
+              stream: 'system' as const,
+              line,
+            },
+          ];
         }
       });
     } catch (error) {

@@ -2,9 +2,8 @@
  * Main process entry point for Airi OS desktop app
  */
 
-import { app, BrowserWindow, ipcMain, shell, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, protocol, clipboard } from 'electron';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 // Services
 import { SettingsService } from './services/SettingsService';
@@ -17,8 +16,7 @@ import { PortableService } from './services/PortableService';
 
 // IPC Channels
 import type { EventName, EventPayload } from './ipc/channels';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import type { Settings } from './renderer/src/types';
 
 // Global references
 let mainWindow: BrowserWindow | null = null;
@@ -35,11 +33,12 @@ const portableService = new PortableService(logService);
 
 // Initialize services
 function initializeServices(): void {
-  // Set main window references
+  // Set main window references (mainWindow is guaranteed to exist at this point)
+  if (!mainWindow) return;
   botManager.setMainWindow?.(mainWindow);
-  autoUpdater.setMainWindow(mainWindow!);
-  systemTray.setMainWindow(mainWindow!);
-  notifications.setMainWindow(mainWindow!);
+  autoUpdater.setMainWindow(mainWindow);
+  systemTray.setMainWindow(mainWindow);
+  notifications.setMainWindow(mainWindow);
   systemTray.setOptions({
     showWindow,
     hideWindow,
@@ -55,7 +54,10 @@ function initializeServices(): void {
       connected: state.running,
       status: state.status,
       error: state.error,
-    } as EventPayload<'app:bot-state'>);
+      pid: state.pid,
+      restartCount: state.restartCount,
+      lastRestart: state.lastRestart,
+    });
   });
 
   // Forward auto-updater events
@@ -95,9 +97,9 @@ function createWindow(): void {
     minWidth: 760,
     minHeight: 520,
     title: 'Airi OS',
-    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(app.getAppPath(), 'dist', 'desktop', 'preload.js'),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
@@ -197,7 +199,7 @@ function setupIpcHandlers(): void {
     return settingsService.load();
   });
 
-  ipcMain.handle('settings:save', async (_event, config: unknown) => {
+  ipcMain.handle('settings:save', async (_event, config: Partial<Settings>) => {
     return settingsService.save(config);
   });
 
@@ -246,7 +248,7 @@ function setupIpcHandlers(): void {
   });
 
   ipcMain.handle('logs:copy', async (_event, text) => {
-    await shell.writeToClipboard(text);
+    clipboard.writeText(text);
   });
 
   // Auto-updater
@@ -326,6 +328,7 @@ app.on('web-contents-created', (_event, contents) => {
 protocol.handle('airi-os', (request) => {
   const url = request.url.replace('airi-os://', '');
   shell.openExternal(url);
+  return new Response(null, { status: 204 });
 });
 
 // Log startup

@@ -2,12 +2,65 @@
  * Extended type definitions for the enhanced memory system
  */
 
-import type { LocationInfo, PlayerInfo, TaskInfo, MemoryData as BaseMemoryData } from '../types';
-
 /**
  * Memory schema version - increment when making breaking changes
  */
 export const CURRENT_SCHEMA_VERSION = 2;
+
+/**
+ * Player role enum - also used as union type for backward compatibility
+ */
+export enum PlayerRole {
+  Guest = 'guest',
+  Trusted = 'trusted',
+  Admin = 'admin',
+}
+
+/**
+ * Player role type - accepts enum or string literals for backward compatibility
+ */
+export type PlayerRoleType = PlayerRole | 'guest' | 'trusted' | 'admin';
+
+/**
+ * Task status enum - also used as union type for backward compatibility
+ */
+export enum TaskStatus {
+  Active = 'active',
+  Completed = 'completed',
+  Stopped = 'stopped',
+  Failed = 'failed',
+}
+
+/**
+ * Task status type - accepts enum or string literals for backward compatibility
+ */
+export type TaskStatusType = TaskStatus | 'active' | 'completed' | 'stopped' | 'failed';
+
+/**
+ * Task priority enum - also used as union type for backward compatibility
+ */
+export enum TaskPriority {
+  Low = 'low',
+  Medium = 'medium',
+  High = 'high',
+  Critical = 'critical',
+}
+
+/**
+ * Task priority type - accepts enum or string literals for backward compatibility
+ */
+export type TaskPriorityType = TaskPriority | 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * Base LocationInfo
+ */
+export interface LocationInfo {
+  x: number;
+  y: number;
+  z: number;
+  type: string;
+  updatedAt: string;
+}
 
 /**
  * Extended LocationInfo with additional metadata
@@ -18,6 +71,17 @@ export interface ExtendedLocationInfo extends LocationInfo {
   tags?: string[];
   visitCount?: number;
   lastVisitedAt?: string;
+}
+
+/**
+ * Base PlayerInfo
+ */
+export interface PlayerInfo {
+  username: string;
+  role: PlayerRoleType;
+  preferences: Record<string, unknown>;
+  firstSeen: string;
+  lastSeen: string;
 }
 
 /**
@@ -32,10 +96,20 @@ export interface ExtendedPlayerInfo extends PlayerInfo {
 }
 
 /**
+ * Base TaskInfo
+ */
+export interface TaskInfo {
+  goal: string;
+  status: TaskStatusType;
+  progress: number | null;
+  updatedAt: string;
+}
+
+/**
  * Extended TaskInfo with additional metadata
  */
 export interface ExtendedTaskInfo extends TaskInfo {
-  priority?: 'low' | 'medium' | 'high' | 'critical';
+  priority?: TaskPriorityType;
   tags?: string[];
   startedAt?: string;
   completedAt?: string;
@@ -91,15 +165,27 @@ export interface MemoryMetadata {
     totalFacts: number;
     totalRules: number;
     totalTasks: number;
-    lastCleanupAt?: string;
-    lastBackupAt?: string;
+    lastCleanupAt: string;
+    lastBackupAt: string;
   };
+}
+
+/**
+ * Base MemoryData (legacy structure)
+ */
+export interface BaseMemoryData {
+  schemaVersion: number;
+  locations: Record<string, LocationInfo>;
+  players: Record<string, PlayerInfo>;
+  currentTask: TaskInfo | null;
+  rules: string[];
+  learnedFacts: Record<string, string>;
 }
 
 /**
  * Complete enhanced memory data structure
  */
-export interface MemoryData extends BaseMemoryData {
+export interface MemoryData {
   schemaVersion: number;
   locations: Record<string, ExtendedLocationInfo>;
   players: Record<string, ExtendedPlayerInfo>;
@@ -257,6 +343,8 @@ export function createDefaultMemoryData(): MemoryData {
         totalFacts: 0,
         totalRules: 0,
         totalTasks: 0,
+        lastCleanupAt: now,
+        lastBackupAt: now,
       },
     },
   };
@@ -279,7 +367,9 @@ export function isExtendedPlayerInfo(value: unknown): value is ExtendedPlayerInf
   return (
     typeof value === 'object' &&
     value !== null &&
-    typeof (value as ExtendedPlayerInfo).username === 'string'
+    typeof (value as ExtendedPlayerInfo).username === 'string' &&
+    (Object.values(PlayerRole).includes((value as ExtendedPlayerInfo).role as PlayerRole) ||
+      ['guest', 'trusted', 'admin'].includes((value as ExtendedPlayerInfo).role as string))
   );
 }
 
@@ -288,7 +378,9 @@ export function isFactEntry(value: unknown): value is FactEntry {
     typeof value === 'object' &&
     value !== null &&
     typeof (value as FactEntry).key === 'string' &&
-    typeof (value as FactEntry).value === 'string'
+    typeof (value as FactEntry).value === 'string' &&
+    typeof (value as FactEntry).createdAt === 'string' &&
+    typeof (value as FactEntry).updatedAt === 'string'
   );
 }
 
@@ -297,6 +389,52 @@ export function isRuleEntry(value: unknown): value is RuleEntry {
     typeof value === 'object' &&
     value !== null &&
     typeof (value as RuleEntry).id === 'string' &&
-    typeof (value as RuleEntry).rule === 'string'
+    typeof (value as RuleEntry).rule === 'string' &&
+    typeof (value as RuleEntry).enabled === 'boolean' &&
+    typeof (value as RuleEntry).createdAt === 'string' &&
+    typeof (value as RuleEntry).updatedAt === 'string'
+  );
+}
+
+export function isExtendedTaskInfo(value: unknown): value is ExtendedTaskInfo {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ExtendedTaskInfo).goal === 'string' &&
+    (Object.values(TaskStatus).includes((value as ExtendedTaskInfo).status as TaskStatus) ||
+      ['active', 'completed', 'stopped', 'failed'].includes((value as ExtendedTaskInfo).status as string))
+  );
+}
+
+export function isMemoryData(value: unknown): value is MemoryData {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as MemoryData).schemaVersion === 'number' &&
+    typeof (value as MemoryData).locations === 'object' &&
+    typeof (value as MemoryData).players === 'object' &&
+    Array.isArray((value as MemoryData).rules) &&
+    typeof (value as MemoryData).learnedFacts === 'object' &&
+    typeof (value as MemoryData).metadata === 'object'
+  );
+}
+
+export function isMemoryMetadata(value: unknown): value is MemoryMetadata {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as MemoryMetadata).schemaVersion === 'number' &&
+    typeof (value as MemoryMetadata).createdAt === 'string' &&
+    typeof (value as MemoryMetadata).updatedAt === 'string' &&
+    Array.isArray((value as MemoryMetadata).migrationHistory) &&
+    typeof (value as MemoryMetadata).stats === 'object' &&
+    (value as MemoryMetadata).stats !== null &&
+    typeof (value as MemoryMetadata).stats.totalLocations === 'number' &&
+    typeof (value as MemoryMetadata).stats.totalPlayers === 'number' &&
+    typeof (value as MemoryMetadata).stats.totalFacts === 'number' &&
+    typeof (value as MemoryMetadata).stats.totalRules === 'number' &&
+    typeof (value as MemoryMetadata).stats.totalTasks === 'number' &&
+    typeof (value as MemoryMetadata).stats.lastCleanupAt === 'string' &&
+    typeof (value as MemoryMetadata).stats.lastBackupAt === 'string'
   );
 }

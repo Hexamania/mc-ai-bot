@@ -365,7 +365,7 @@ export const LocationQueries = {
     queryLocations(memory).filter((loc) => loc.dimension === dimension),
 
   byTag: (memory: MemoryData, tag: string) =>
-    queryLocations(memory).filter((loc) => loc.tags?.includes(tag) ?? false),
+    queryLocations(memory).filter((loc) => (loc.tags ?? []).includes(tag)),
 
   nearby: (memory: MemoryData, center: { x: number; y: number; z: number }, radius: number) =>
     queryLocations(memory).filter((loc) => {
@@ -377,7 +377,7 @@ export const LocationQueries = {
 
   recentlyVisited: (memory: MemoryData, since: Date) =>
     queryLocations(memory).filter(
-      (loc) => loc.lastVisitedAt && new Date(loc.lastVisitedAt) >= since
+      (loc) => !!loc.lastVisitedAt && new Date(loc.lastVisitedAt) >= since
     ),
 
   mostVisited: (memory: MemoryData, limit = 10) =>
@@ -397,7 +397,7 @@ export const PlayerQueries = {
   admins: (memory: MemoryData) => queryPlayers(memory).filter((p) => p.role === 'admin'),
 
   recentlySeen: (memory: MemoryData, since: Date) =>
-    queryPlayers(memory).filter((p) => p.lastSeen && new Date(p.lastSeen) >= since),
+    queryPlayers(memory).filter((p) => !!p.lastSeen && new Date(p.lastSeen) >= since),
 
   byReputation: (memory: MemoryData, minReputation: number) =>
     queryPlayers(memory).filter((p) => (p.reputation ?? 0) >= minReputation),
@@ -420,7 +420,7 @@ export const FactQueries = {
     queryFacts(memory).filter((f) => f.source === source),
 
   recentlyAccessed: (memory: MemoryData, since: Date) =>
-    queryFacts(memory).filter((f) => f.lastAccessedAt && new Date(f.lastAccessedAt) >= since),
+    queryFacts(memory).filter((f) => !!f.lastAccessedAt && new Date(f.lastAccessedAt) >= since),
 
   mostAccessed: (memory: MemoryData, limit = 10) =>
     queryFacts(memory)
@@ -430,7 +430,7 @@ export const FactQueries = {
 
 // Rule queries
 export const RuleQueries = {
-  enabled: (memory: MemoryData) => queryRules(memory).filter((r) => r.enabled),
+  enabled: (memory: MemoryData) => queryRules(memory).filter((r) => r.enabled === true),
 
   byCategory: (memory: MemoryData, category: string) =>
     queryRules(memory).filter((r) => r.category === category),
@@ -439,7 +439,7 @@ export const RuleQueries = {
     queryRules(memory).filter((r) => r.author === author),
 
   recentlyAdded: (memory: MemoryData, since: Date) =>
-    queryRules(memory).filter((r) => r.createdAt && new Date(r.createdAt) >= since),
+    queryRules(memory).filter((r) => !!r.createdAt && new Date(r.createdAt) >= since),
 };
 
 /**

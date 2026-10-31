@@ -4,11 +4,12 @@
  */
 
 import type { Block } from 'prismarine-block';
+import type { Entity } from 'prismarine-entity';
 import { Vec3 } from 'vec3';
-import { goals, Movements } from 'mineflayer-pathfinder';
+import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import * as mcDataLoader from 'minecraft-data';
+import mcDataLoader from 'minecraft-data';
 
 /**
  * Mining feature configuration
@@ -97,9 +98,12 @@ export class MiningFeature extends BaseFeature {
 
     // Initialize minecraft-data and movements
     this.mcData = this.getMinecraftData();
-    this.movements = new Movements(bot, this.mcData);
+    // Load pathfinder plugin if not already loaded
+    if (!bot.pathfinder) {
+      bot.loadPlugin(pathfinder);
+    }
+    this.movements = new Movements(bot);
     this.movements.canDig = true;
-    this.movements.allowBridging = true;
     this.movements.allowParkour = true;
     this.movements.allowSprinting = true;
     bot.pathfinder.setMovements(this.movements);
@@ -143,7 +147,7 @@ export class MiningFeature extends BaseFeature {
    */
   private getMinecraftData(): MinecraftData {
     const bot = this.getBot();
-    return mcDataLoader(bot.version) || mcDataLoader(process.env.MC_VERSION || '1.21.1');
+    return mcDataLoader(bot.version) ?? mcDataLoader(process.env.MC_VERSION || '1.21.1');
   }
 
   // ========================================================================

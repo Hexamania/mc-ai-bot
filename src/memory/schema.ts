@@ -10,8 +10,10 @@ import type {
   FactEntry,
   RuleEntry,
   ExtendedTaskInfo,
+  MemoryMetadata,
 } from './types';
 import { CURRENT_SCHEMA_VERSION } from './types';
+import { isFactEntry, isRuleEntry } from './types';
 
 /**
  * Migration function type
@@ -116,8 +118,9 @@ function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
 
   // Ensure all required fields exist
   const locations: Record<string, ExtendedLocationInfo> = {};
-  if (data.locations && typeof data.locations === 'object') {
-    for (const [key, loc] of Object.entries(data.locations as Record<string, unknown>)) {
+  if (data.locations && typeof data.locations === 'object' && !Array.isArray(data.locations)) {
+    const locs = data.locations as Record<string, unknown>;
+    for (const [key, loc] of Object.entries(locs)) {
       if (isValidLocation(loc)) {
         locations[key] = normalizeLocation(key, loc);
       }
@@ -125,8 +128,9 @@ function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
   }
 
   const players: Record<string, ExtendedPlayerInfo> = {};
-  if (data.players && typeof data.players === 'object') {
-    for (const [key, player] of Object.entries(data.players as Record<string, unknown>)) {
+  if (data.players && typeof data.players === 'object' && !Array.isArray(data.players)) {
+    const plrs = data.players as Record<string, unknown>;
+    for (const [key, player] of Object.entries(plrs)) {
       if (isValidPlayer(player)) {
         players[key] = normalizePlayer(key, player);
       }
@@ -134,8 +138,8 @@ function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
   }
 
   let currentTask: ExtendedTaskInfo | null = null;
-  if (data.currentTask && typeof data.currentTask === 'object') {
-    currentTask = normalizeTask(data.currentTask);
+  if (data.currentTask && typeof data.currentTask === 'object' && !Array.isArray(data.currentTask)) {
+    currentTask = normalizeTask(data.currentTask as Record<string, unknown>);
   }
 
   const rules: RuleEntry[] = [];
@@ -150,8 +154,9 @@ function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
   }
 
   const learnedFacts: Record<string, FactEntry> = {};
-  if (data.learnedFacts && typeof data.learnedFacts === 'object') {
-    for (const [key, fact] of Object.entries(data.learnedFacts as Record<string, unknown>)) {
+  if (data.learnedFacts && typeof data.learnedFacts === 'object' && !Array.isArray(data.learnedFacts)) {
+    const facts = data.learnedFacts as Record<string, unknown>;
+    for (const [key, fact] of Object.entries(facts)) {
       if (typeof fact === 'string') {
         learnedFacts[key] = normalizeFact(key, fact);
       } else if (isFactEntry(fact)) {
@@ -161,9 +166,9 @@ function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
   }
 
   // Build metadata
-  const metadata =
-    data.metadata && typeof data.metadata === 'object'
-      ? normalizeMetadata(data.metadata, now)
+  const metadata: MemoryMetadata =
+    data.metadata && typeof data.metadata === 'object' && !Array.isArray(data.metadata)
+      ? normalizeMetadata(data.metadata as Record<string, unknown>, now)
       : createDefaultMetadata(now);
 
   // Update stats
@@ -191,7 +196,7 @@ function normalizeToCurrentSchema(data: Record<string, unknown>): MemoryData {
 /**
  * Create default metadata
  */
-function createDefaultMetadata(now: string): MemoryData['metadata'] {
+function createDefaultMetadata(now: string): MemoryMetadata {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     createdAt: now,
@@ -210,8 +215,22 @@ function createDefaultMetadata(now: string): MemoryData['metadata'] {
 /**
  * Normalize metadata
  */
-function normalizeMetadata(data: Record<string, unknown>, now: string): MemoryData['metadata'] {
+function normalizeMetadata(data: Record<string, unknown>, now: string): MemoryMetadata {
   const defaultMeta = createDefaultMetadata(now);
+
+  let stats = defaultMeta.stats;
+  if (data.stats && typeof data.stats === 'object' && !Array.isArray(data.stats)) {
+    const s = data.stats as Record<string, unknown>;
+    stats = {
+      totalLocations: typeof s.totalLocations === 'number' ? s.totalLocations : 0,
+      totalPlayers: typeof s.totalPlayers === 'number' ? s.totalPlayers : 0,
+      totalFacts: typeof s.totalFacts === 'number' ? s.totalFacts : 0,
+      totalRules: typeof s.totalRules === 'number' ? s.totalRules : 0,
+      totalTasks: typeof s.totalTasks === 'number' ? s.totalTasks : 0,
+      lastCleanupAt: typeof s.lastCleanupAt === 'string' ? s.lastCleanupAt : undefined,
+      lastBackupAt: typeof s.lastBackupAt === 'string' ? s.lastBackupAt : undefined,
+    };
+  }
 
   return {
     schemaVersion:
@@ -219,23 +238,9 @@ function normalizeMetadata(data: Record<string, unknown>, now: string): MemoryDa
     createdAt: typeof data.createdAt === 'string' ? data.createdAt : now,
     updatedAt: now,
     migrationHistory: Array.isArray(data.migrationHistory)
-      ? (data.migrationHistory as MemoryData['metadata']['migrationHistory'])
+      ? (data.migrationHistory as MemoryMetadata['migrationHistory'])
       : [],
-    stats:
-      data.stats && typeof data.stats === 'object'
-        ? {
-            totalLocations:
-              typeof data.stats.totalLocations === 'number' ? data.stats.totalLocations : 0,
-            totalPlayers: typeof data.stats.totalPlayers === 'number' ? data.stats.totalPlayers : 0,
-            totalFacts: typeof data.stats.totalFacts === 'number' ? data.stats.totalFacts : 0,
-            totalRules: typeof data.stats.totalRules === 'number' ? data.stats.totalRules : 0,
-            totalTasks: typeof data.stats.totalTasks === 'number' ? data.stats.totalTasks : 0,
-            lastCleanupAt:
-              typeof data.stats.lastCleanupAt === 'string' ? data.stats.lastCleanupAt : undefined,
-            lastBackupAt:
-              typeof data.stats.lastBackupAt === 'string' ? data.stats.lastBackupAt : undefined,
-          }
-        : defaultMeta.stats,
+    stats,
   };
 }
 
@@ -312,7 +317,7 @@ function normalizeTask(task: Record<string, unknown>): ExtendedTaskInfo | null {
 
   const validStatuses = ['active', 'completed', 'stopped', 'failed'] as const;
   const status = validStatuses.includes(task.status as (typeof validStatuses)[0])
-    ? task.status
+    ? (task.status as ExtendedTaskInfo['status'])
     : 'active';
 
   const now = new Date().toISOString();
@@ -327,7 +332,9 @@ function normalizeTask(task: Record<string, unknown>): ExtendedTaskInfo | null {
     startedAt: typeof task.startedAt === 'string' ? task.startedAt : now,
     completedAt: typeof task.completedAt === 'string' ? task.completedAt : undefined,
     updatedAt: typeof task.updatedAt === 'string' ? task.updatedAt : now,
-    metadata: task.metadata && typeof task.metadata === 'object' ? task.metadata : undefined,
+    metadata: task.metadata && typeof task.metadata === 'object' && !Array.isArray(task.metadata)
+      ? (task.metadata as Record<string, unknown>)
+      : undefined,
   };
 }
 
@@ -366,18 +373,6 @@ function normalizeRule(rule: string): RuleEntry {
 }
 
 /**
- * Check if value is a RuleEntry
- */
-function isRuleEntry(value: unknown): value is RuleEntry {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as RuleEntry).id === 'string' &&
-    typeof (value as RuleEntry).rule === 'string'
-  );
-}
-
-/**
  * ============================================
  * Built-in Migrations
  * ============================================
@@ -406,9 +401,10 @@ registerMigration(2, async (data: Record<string, unknown>) => {
   }
 
   // Convert learnedFacts from simple strings to FactEntry objects
-  if (data.learnedFacts && typeof data.learnedFacts === 'object') {
+  if (data.learnedFacts && typeof data.learnedFacts === 'object' && !Array.isArray(data.learnedFacts)) {
     const newFacts: Record<string, FactEntry> = {};
-    for (const [key, fact] of Object.entries(data.learnedFacts as Record<string, unknown>)) {
+    const oldFacts = data.learnedFacts as Record<string, unknown>;
+    for (const [key, fact] of Object.entries(oldFacts)) {
       if (typeof fact === 'string') {
         newFacts[key] = {
           key,
@@ -431,7 +427,7 @@ registerMigration(2, async (data: Record<string, unknown>) => {
   // Add metadata if missing
   if (!data.metadata) {
     data.metadata = createDefaultMetadata(now);
-  } else if (typeof data.metadata === 'object') {
+  } else if (typeof data.metadata === 'object' && data.metadata !== null && !Array.isArray(data.metadata)) {
     const meta = data.metadata as Record<string, unknown>;
     meta.updatedAt = now;
     if (!meta.migrationHistory) meta.migrationHistory = [];
@@ -445,9 +441,9 @@ registerMigration(2, async (data: Record<string, unknown>) => {
   }
 
   // Add extended fields to locations
-  if (data.locations && typeof data.locations === 'object') {
+  if (data.locations && typeof data.locations === 'object' && !Array.isArray(data.locations)) {
     for (const loc of Object.values(data.locations as Record<string, unknown>)) {
-      if (loc && typeof loc === 'object') {
+      if (loc && typeof loc === 'object' && !Array.isArray(loc)) {
         const l = loc as Record<string, unknown>;
         if (!l.dimension) l.dimension = 'overworld';
         if (!l.tags) l.tags = [];
@@ -458,9 +454,9 @@ registerMigration(2, async (data: Record<string, unknown>) => {
   }
 
   // Add extended fields to players
-  if (data.players && typeof data.players === 'object') {
+  if (data.players && typeof data.players === 'object' && !Array.isArray(data.players)) {
     for (const player of Object.values(data.players as Record<string, unknown>)) {
-      if (player && typeof player === 'object') {
+      if (player && typeof player === 'object' && !Array.isArray(player)) {
         const p = player as Record<string, unknown>;
         if (!p.preferences) p.preferences = {};
         if (!p.totalInteractions) p.totalInteractions = 0;
@@ -470,7 +466,7 @@ registerMigration(2, async (data: Record<string, unknown>) => {
   }
 
   // Add extended fields to currentTask
-  if (data.currentTask && typeof data.currentTask === 'object') {
+  if (data.currentTask && typeof data.currentTask === 'object' && !Array.isArray(data.currentTask)) {
     const task = data.currentTask as Record<string, unknown>;
     if (!task.priority) task.priority = 'medium';
     if (!task.tags) task.tags = [];

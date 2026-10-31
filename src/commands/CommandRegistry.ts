@@ -298,9 +298,10 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
         help += `\n  ${prefix}${example}`;
       }
     }
-    if (command.permission.level !== 'guest') help += `\n⚠️ Requires: ${command.permission.level}`;
-    if (command.permission.pmOnly) help += `\n📩 PM only`;
-    if (command.permission.publicOnly) help += `\n💬 Public only`;
+    const perm = command.permission;
+    if (perm && perm.level !== 'guest') help += `\n⚠️ Requires: ${perm.level}`;
+    if (perm?.pmOnly) help += `\n📩 PM only`;
+    if (perm?.publicOnly) help += `\n💬 Public only`;
     if (command.cooldown) help += `\n⏱️ Cooldown: ${command.cooldown / 1000}s`;
     return help;
   }
@@ -314,7 +315,7 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
 
     // Filter commands by permission
     const accessibleCommands = allCommands.filter((cmd) => {
-      const cmdLevelValue = PERMISSION_HIERARCHY[cmd.permission.level];
+      const cmdLevelValue = PERMISSION_HIERARCHY[cmd.permission?.level ?? 'guest'];
       return cmdLevelValue <= userLevelValue && !cmd.hidden;
     });
 
@@ -413,7 +414,7 @@ export class CommandRegistryImpl implements CommandRegistryInterface {
     command: CommandDefinition,
     context: CommandContext
   ): { allowed: boolean; message?: string } {
-    const { permission } = command;
+    const permission = command.permission ?? { level: 'guest' as PermissionLevel };
     const { username, isPM, permissionLevel } = context;
 
     // Check denied users

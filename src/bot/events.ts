@@ -54,15 +54,16 @@ export interface EventDataMap {
 
 /**
  * Extended event emitter with full type safety
+ * Wraps EventEmitter to provide typed event methods
  */
-export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<BotEvents> {
+export class BotEventEmitter implements TypedEventEmitter<BotEvents> {
+  private emitter = new EventEmitter();
   private eventLog: { event: string; timestamp: number; args: unknown[] }[] = [];
   private maxLogSize = 1000;
   private loggingEnabled = true;
 
   constructor() {
-    super();
-    this.setMaxListeners(100); // Allow many listeners
+    this.emitter.setMaxListeners(100); // Allow many listeners
   }
 
   /**
@@ -99,7 +100,7 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
   /**
    * Typed emit with logging
    */
-  emit<K extends keyof BotEvents>(event: K, ...args: BotEvents[K]): boolean {
+  emit<K extends string & keyof BotEvents>(event: K, ...args: BotEvents[K]): boolean {
     const timestamp = Date.now();
 
     if (this.loggingEnabled) {
@@ -109,34 +110,90 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
       }
     }
 
-    return super.emit(event, ...args);
+    return this.emitter.emit(event, ...args);
   }
 
   /**
    * Typed on
    */
-  on<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
-    return super.on(event, listener);
+  on<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+    this.emitter.on(event, listener);
+    return this;
   }
 
   /**
    * Typed once
    */
-  once<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
-    return super.once(event, listener);
+  once<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+    this.emitter.once(event, listener);
+    return this;
   }
 
   /**
    * Typed off
    */
-  off<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
-    return super.off(event, listener);
+  off<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+    this.emitter.off(event, listener);
+    return this;
+  }
+
+  /**
+   * Remove all listeners for an event
+   */
+  removeAllListeners<K extends string & keyof BotEvents>(event?: K): this {
+    this.emitter.removeAllListeners(event);
+    return this;
+  }
+
+  /**
+   * Set max listeners
+   */
+  setMaxListeners(n: number): this {
+    this.emitter.setMaxListeners(n);
+    return this;
+  }
+
+  /**
+   * Get max listeners
+   */
+  getMaxListeners(): number {
+    return this.emitter.getMaxListeners();
+  }
+
+  /**
+   * Get listener count for an event
+   */
+  listenerCount(eventName: string | symbol): number {
+    return this.emitter.listenerCount(eventName);
+  }
+
+  /**
+   * Get all event names that have listeners
+   */
+  eventNames(): (string | symbol)[] {
+    return this.emitter.eventNames();
+  }
+
+  /**
+   * Prepend listener
+   */
+  prependListener<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+    this.emitter.prependListener(event, listener);
+    return this;
+  }
+
+  /**
+   * Prepend once listener
+   */
+  prependOnceListener<K extends string & keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+    this.emitter.prependOnceListener(event, listener);
+    return this;
   }
 
   /**
    * Wait for an event to fire (promise-based)
    */
-  waitFor<K extends keyof BotEvents>(
+  waitFor<K extends string & keyof BotEvents>(
     event: K,
     timeout = 30000,
     filter?: (...args: BotEvents[K]) => boolean
@@ -162,7 +219,7 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
   /**
    * Wait for one of multiple events
    */
-  waitForAny<K extends keyof BotEvents>(
+  waitForAny<K extends string & keyof BotEvents>(
     events: K[],
     timeout = 30000
   ): Promise<{ event: K; args: BotEvents[K] }> {
@@ -172,15 +229,15 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
         reject(new Error(`Timeout waiting for any of: ${events.join(', ')}`));
       }, timeout);
 
-      const handlers: Record<string, (...args: BotEvents[K]) => void> = {};
+      const handlers: Record<string, (...args: readonly unknown[]) => void> = {};
 
       events.forEach((event) => {
-        handlers[event] = (...args: BotEvents[K]) => {
+        handlers[event] = (...args: readonly unknown[]) => {
           clearTimeout(timer);
           events.forEach((e) => this.off(e, handlers[e]));
-          resolve({ event, args });
+          resolve({ event, args: args as BotEvents[K] });
         };
-        this.once(event, handlers[event]);
+        this.once(event, handlers[event] as (...args: BotEvents[K]) => void);
       });
     });
   }
@@ -188,7 +245,7 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
   /**
    * Create a filtered event stream
    */
-  filter<K extends keyof BotEvents>(
+  filter<K extends string & keyof BotEvents>(
     event: K,
     predicate: (...args: BotEvents[K]) => boolean
   ): AsyncIterableIterator<BotEvents[K]> {
@@ -204,10 +261,12 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
         } else {
           queue.push(args);
         }
-      }
+      };
     };
 
     this.on(event, handler);
+    // Capture reference to 'this' (the BotEventEmitter instance) for cleanup
+    const emitter = this;
 
     return {
       [Symbol.asyncIterator]() {
@@ -226,7 +285,7 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
       },
       async return(): Promise<IteratorResult<BotEvents[K]>> {
         closed = true;
-        this.off(event, handler);
+        emitter.off(event, handler);
         if (resolve) {
           resolve({ value: undefined, done: true });
         }
@@ -238,15 +297,15 @@ export class BotEventEmitter extends EventEmitter implements TypedEventEmitter<B
   /**
    * Get listener count for an event
    */
-  listenerCountTyped<K extends keyof BotEvents>(event: K): number {
+  listenerCountTyped<K extends string & keyof BotEvents>(event: K): number {
     return this.listenerCount(event);
   }
 
   /**
    * Get all event names that have listeners
    */
-  eventNamesTyped(): (keyof BotEvents)[] {
-    return this.eventNames() as (keyof BotEvents)[];
+  eventNamesTyped(): (string & keyof BotEvents)[] {
+    return this.eventNames() as (string & keyof BotEvents)[];
   }
 }
 

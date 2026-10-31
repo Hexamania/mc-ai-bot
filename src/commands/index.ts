@@ -8,6 +8,9 @@ import type {
   CommandDefinition,
   CommandContext,
   CommandRegistry as CommandRegistryType,
+  CommandResult,
+  PermissionLevel,
+  ParsedArguments,
 } from '../types';
 
 /**
@@ -86,52 +89,172 @@ class CommandRegistryImpl implements CommandRegistryType {
     return Array.from(this.commands.values());
   }
 
-  async execute(name: string, context: CommandContext): Promise<boolean> {
+  has(name: string): boolean {
+    return this.get(name) !== undefined;
+  }
+
+  getAliases(): Map<string, string> {
+    return new Map(this.aliases);
+  }
+
+  getCategories(): string[] {
+    const categories = new Set<string>();
+    for (const command of this.commands.values()) {
+      if (command.category) {
+        categories.add(command.category);
+      } else {
+        categories.add('General');
+      }
+    }
+    return Array.from(categories).sort();
+  }
+
+  getByCategory(category: string): CommandDefinition[] {
+    const normalizedCategory = category.toLowerCase();
+    return this.getAll().filter((cmd) => {
+      const cmdCategory = (cmd.category || 'General').toLowerCase();
+      return cmdCategory === normalizedCategory;
+    });
+  }
+
+  async execute(name: string, context: CommandContext): Promise<CommandResult> {
+    const startTime = Date.now();
     const command = this.get(name);
 
     if (!command) {
-      return false;
+      return {
+        success: false,
+        found: false,
+        error: `Command "${name}" not found`,
+        executionTime: Date.now() - startTime,
+      };
     }
 
     // Check admin-only restriction
     if (command.adminOnly && !context.isAdmin) {
-      context.privateReply(`❌ Access denied. This command requires admin privileges.`);
-      return true; // Command was found but not executed due to permissions
+      return {
+        success: false,
+        found: true,
+        error: 'Access denied. This command requires admin privileges.',
+        executionTime: Date.now() - startTime,
+      };
     }
 
     // Check PM-only restriction
     if (command.pmOnly && !context.isPM) {
-      context.privateReply(`❌ This command can only be used in private messages.`);
-      return true;
+      return {
+        success: false,
+        found: true,
+        error: 'This command can only be used in private messages.',
+        executionTime: Date.now() - startTime,
+      };
     }
 
     try {
       await command.execute(context);
-      return true;
+      return {
+        success: true,
+        found: true,
+        executionTime: Date.now() - startTime,
+      };
     } catch (error) {
       console.error(`[COMMANDS] Error executing "${name}":`, error);
-      context.privateReply(
-        `❌ Command error: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return true;
+      return {
+        success: false,
+        found: true,
+        error: error instanceof Error ? error.message : String(error),
+        executionTime: Date.now() - startTime,
+      };
     }
   }
 
   /**
    * Get command help text
    */
-  getHelp(name: string): string | null {
+  getHelp(name: string, prefix: string): string | null {
     const command = this.get(name);
     if (!command) return null;
 
-    let help = `\n📋 **${command.name}**`;
+    let help = `\n📋 **${prefix}${command.name}**`;
     if (command.description) help += `\n${command.description}`;
-    if (command.usage) help += `\nUsage: ${command.usage}`;
+    if (command.usage) help += `\nUsage: ${prefix}${command.name} ${command.usage}`;
     if (command.aliases && command.aliases.length > 0)
-      help += `\nAliases: ${command.aliases.join(', ')}`;
+      help += `\nAliases: ${command.aliases.map((a) => `${prefix}${a}`).join(', ')}`;
     if (command.adminOnly) help += `\n⚠️ Admin only`;
     if (command.pmOnly) help += `\n📩 PM only`;
     return help;
+  }
+
+  /**
+   * Get full help text for all commands visible to user level
+   */
+  getFullHelp(prefix: string, userLevel: PermissionLevel): string {
+    const allCommands = this.getAll();
+    const hierarchy: Record<PermissionLevel, number> = { guest: 0, trusted: 1, admin: 2 };
+    const userLevelNum = hierarchy[userLevel];
+
+    // Filter commands by permission level
+    const visibleCommands = allCommands.filter((cmd) => {
+      if (!cmd.permission) return true;
+      const cmdLevelNum = hierarchy[cmd.permission.level] ?? 0;
+      return cmdLevelNum <= userLevelNum;
+    });
+
+    // Categorize commands
+    const byCategory = new Map<string, CommandDefinition[]>();
+    for (const cmd of visibleCommands) {
+      const category = cmd.category || 'General';
+      if (!byCategory.has(category)) {
+        byCategory.set(category, []);
+      }
+      byCategory.get(category)!.push(cmd);
+    }
+
+    let helpText = `📋 **Available Commands** (Prefix: \`${prefix}\`)\n\n`;
+
+    for (const [category, commands] of byCategory.entries()) {
+      helpText += `**${category}:**\n`;
+      for (const cmd of commands) {
+        const usage = cmd.usage ? ` ${cmd.usage}` : '';
+        helpText += `  \`${prefix}${cmd.name}${usage}\` - ${cmd.description}\n`;
+      }
+      helpText += '\n';
+    }
+
+    helpText += `Use \`${prefix}help <command>\` for details on a specific command.`;
+    return helpText;
+  }
+
+  /**
+   * Register a help command
+   */
+  registerHelpCommand(prefix: string): void {
+    this.register({
+      name: 'help',
+      aliases: ['h', 'commands'],
+      description: 'Show available commands',
+      usage: '[command]',
+      category: 'General',
+      permission: { level: 'guest' },
+      execute: async (context) => {
+        const { rawArgs, reply, privateReply, isAdmin } = context;
+        const userLevel: PermissionLevel = isAdmin ? 'admin' : 'guest';
+
+        if (rawArgs.length > 0) {
+          // Show help for specific command
+          const help = this.getHelp(rawArgs[0], prefix);
+          if (help) {
+            privateReply(help);
+          } else {
+            privateReply(`❌ Command "${rawArgs[0]}" not found.`);
+          }
+          return;
+        }
+
+        // Show full help
+        privateReply(this.getFullHelp(prefix, userLevel));
+      },
+    });
   }
 
   /**
@@ -174,10 +297,19 @@ export function createCommandContext(
     bot,
     username,
     args,
+    rawArgs: args,
     isAdmin,
+    isTrusted: false, // Default, can be overridden
     isPM,
+    hasPermission: true, // Default, checked elsewhere
     reply: replyFn,
     privateReply: privateReplyFn,
+    error: (msg: string) => replyFn(`❌ ${msg}`),
+    permissionLevel: isAdmin ? 'admin' : 'guest',
+    commandName: '',
+    fullCommand: '',
+    timestamp: Date.now(),
+    metadata: {},
   };
 }
 
@@ -226,17 +358,19 @@ export function registerHelpCommand(registry: CommandRegistryType, prefix: strin
     aliases: ['h', 'commands'],
     description: 'Show available commands',
     usage: '[command]',
+    category: 'General',
+    permission: { level: 'guest' },
     execute: async (context) => {
-      const { args, reply, privateReply } = context;
+      const { rawArgs, reply, privateReply, isAdmin } = context;
       const allCommands = registry.getAll();
 
-      if (args.length > 0) {
+      if (rawArgs.length > 0) {
         // Show help for specific command
-        const help = registry.getHelp(args[0]);
+        const help = registry.getHelp(rawArgs[0], prefix);
         if (help) {
           privateReply(help);
         } else {
-          privateReply(`❌ Command "${args[0]}" not found.`);
+          privateReply(`❌ Command "${rawArgs[0]}" not found.`);
         }
         return;
       }
@@ -256,7 +390,7 @@ export function registerHelpCommand(registry: CommandRegistryType, prefix: strin
         helpText += `**PM Only:**\n${pmCommands.map((c) => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
       }
 
-      if (adminCommands.length > 0 && context.isAdmin) {
+      if (adminCommands.length > 0 && isAdmin) {
         helpText += `**Admin:**\n${adminCommands.map((c) => `\`${prefix}${c.name}\``).join(', ')}\n\n`;
       }
 

@@ -4,7 +4,7 @@
  */
 
 import * as fs from 'node:fs';
-import type { MemoryData, LocationInfo, PlayerInfo, TaskInfo } from '../types';
+import type { BaseMemoryData as MemoryData, LocationInfo, PlayerInfo, TaskInfo } from './types';
 import { getConfig } from '../config';
 
 const DEFAULT_MEMORY: MemoryData = {
@@ -353,7 +353,7 @@ export function getMemoryContext(): string {
   const memory = getMemory();
   const context = {
     locations: Object.fromEntries(Object.entries(memory.locations).slice(-30)),
-    rules: memory.rules.slice(-30).map((rule) => rule.slice(0, 300)),
+    rules: memory.rules.slice(-30).map((rule: string) => rule.slice(0, 300)),
     currentTask: memory.currentTask,
     learnedFacts: Object.fromEntries(Object.entries(memory.learnedFacts).slice(-50)),
   };

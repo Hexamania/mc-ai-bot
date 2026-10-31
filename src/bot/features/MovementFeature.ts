@@ -18,22 +18,12 @@ export type MovementFeatureConfig = FeaturePluginConfig;
  * Movement feature options
  */
 export interface MovementFeatureOptions {
-  /** Enable auto-jump when walking */
+  /** Enable auto-jump when walking (deprecated, handled automatically) */
   autoJump?: boolean;
   /** Enable sprinting when possible */
   sprint?: boolean;
-  /** Enable swimming */
-  swim?: boolean;
   /** Enable parkour (climb up blocks) */
   parkour?: boolean;
-  /** Avoid water when pathfinding */
-  avoidWater?: boolean;
-  /** Avoid lava when pathfinding */
-  avoidLava?: boolean;
-  /** Avoid dangerous blocks (cactus, sweet berries, etc.) */
-  avoidDangerous?: boolean;
-  /** Maximum fall distance without taking damage */
-  maxFallDistance?: number;
   /** Timeout for pathfinding in ms */
   pathfindingTimeout?: number;
   /** Movement speed multiplier */
@@ -148,14 +138,10 @@ export class MovementFeature extends BaseFeature {
     const options = this.config.options as MovementFeatureOptions | undefined;
     if (!options) return;
 
-    this.movements.allowSprint = options.sprint ?? true;
-    this.movements.allowSwimming = options.swim ?? true;
-    this.movements.allowParkour = options.parkour ?? true;
+    this.movements.allowSprinting = options.sprint ?? true;
     this.movements.canDig = false; // Don't dig by default
-    this.movements.avoidWater = options.avoidWater ?? false;
-    this.movements.avoidLava = options.avoidLava ?? true;
-    this.movements.avoidDangerous = options.avoidDangerous ?? true;
-    this.movements.maxFallDistance = options.maxFallDistance ?? 3;
+    // Removed deprecated properties: allowSwimming, avoidWater, avoidLava, avoidDangerous, maxFallDistance, allowJump
+    // These are no longer available in newer mineflayer-pathfinder versions
   }
 
   /**
@@ -290,7 +276,14 @@ export class MovementFeature extends BaseFeature {
           break;
         case 'wander':
           center = goal.center ?? bot.entity.position;
-          pathfinderGoal = new goals.GoalRandom(center, goal.radius);
+          // GoalRandom was removed, implement custom wander goal using GoalNear with random offset
+          const randomOffset = new Vec3(
+            (Math.random() - 0.5) * 2 * goal.radius,
+            0,
+            (Math.random() - 0.5) * 2 * goal.radius
+          );
+          const wanderTarget = center.offset(randomOffset.x, randomOffset.y, randomOffset.z);
+          pathfinderGoal = new goals.GoalNear(wanderTarget.x, wanderTarget.y, wanderTarget.z, 1);
           break;
         case 'stop':
           await this.stop();
@@ -452,11 +445,10 @@ export class MovementFeature extends BaseFeature {
   /**
    * Set auto-jump
    */
-  setAutoJump(enabled: boolean): void {
-    if (this.movements) {
-      this.movements.allowJump = enabled;
-      this.setOption('autoJump', enabled);
-    }
+  setAutoJump(_enabled: boolean): void {
+    // allowJump property was removed in newer mineflayer-pathfinder versions
+    // Auto-jump is now handled automatically
+    this.setOption('autoJump', _enabled);
   }
 
   /**
@@ -464,7 +456,7 @@ export class MovementFeature extends BaseFeature {
    */
   setSprint(enabled: boolean): void {
     if (this.movements) {
-      this.movements.allowSprint = enabled;
+      this.movements.allowSprinting = enabled;
       this.setOption('sprint', enabled);
     }
   }

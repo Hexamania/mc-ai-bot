@@ -27,6 +27,17 @@ export interface PermissionConfig {
 }
 
 /**
+ * Player information for permissions
+ */
+export interface PlayerInfo {
+  username: string;
+  role: 'guest' | 'trusted' | 'admin';
+  preferences: Record<string, unknown>;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+/**
  * Command argument definition
  */
 export interface CommandArgument {

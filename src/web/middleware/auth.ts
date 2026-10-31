@@ -245,7 +245,7 @@ export function socketAuthMiddleware(socket: Socket, next: (err?: Error) => void
     return next(new Error('Invalid or expired token'));
   }
 
-  socket.user = payload;
+  socket.data.user = payload;
   next();
 }
 
@@ -256,7 +256,8 @@ export function socketRequireRole(
   socket: Socket,
   ...allowedRoles: ('guest' | 'trusted' | 'admin')[]
 ): boolean {
-  if (!socket.user || !allowedRoles.includes(socket.user.role)) {
+  const user = socket.data.user as TokenPayload | undefined;
+  if (!user || !allowedRoles.includes(user.role)) {
     return false;
   }
   return true;

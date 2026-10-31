@@ -314,8 +314,8 @@ export class ArgumentParser {
       }
 
       const coords = parts.map((part, i) => {
-        const axis = ['x', 'y', 'z'][i];
-        const current = currentPos[axis as keyof typeof currentPos];
+        const axis = ['x', 'y', 'z'][i] as 'x' | 'y' | 'z';
+        const current = currentPos[axis];
 
         if (part === '~') {
           return current;
@@ -420,7 +420,7 @@ export class ArgumentParser {
     const required = argDef.required ? '<' : '[';
     const end = argDef.required ? '>' : ']';
 
-    let typeStr = argDef.type;
+    let typeStr: string = argDef.type;
     if (argDef.type === 'enum' && argDef.enumValues) {
       typeStr = argDef.enumValues.join('|');
     }

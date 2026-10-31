@@ -3,7 +3,8 @@
  * Contains all the actual command logic extracted from the original bot.js
  */
 
-import type { Bot, Entity } from 'mineflayer';
+import type { Bot } from 'mineflayer';
+import type { Entity } from 'prismarine-entity';
 import { goals } from 'mineflayer-pathfinder';
 import { getConfig } from '../config';
 import { getCommandRegistry } from './index';
@@ -16,16 +17,87 @@ import {
 } from '../memory';
 
 /**
+ * Interface for the bot manager with all methods/properties needed by bot commands
+ * This matches the BotManager class in src/bot/index.ts
+ */
+interface BotCommandManager {
+  // Core methods
+  say(message: string): void;
+  pm(username: string, message: string): void;
+  // log(tag: string, message: string): void; // unused
+  getBot(): Bot | null;
+  isOnline(): boolean;
+  setCurrentObjective(objective: string): void;
+
+  // State properties
+  // roaming: boolean; // unused
+  // following: boolean; // unused
+  // followTarget: string | null; // unused
+  // pvpTarget: string | null; // unused
+  // miningBaseLocation: { x: number; y: number; z: number } | null; // unused - use memory instead
+  // safeModeActive: boolean; // unused
+  // killAuraActive: boolean; // unused
+  // lumberjackActive: boolean; // unused
+  // guarding: boolean; // unused
+  // medicMode: boolean; // unused
+  // medicTarget: string | null; // unused
+  // mineAreaActive: boolean; // unused
+  // minerProgress: number; // unused
+  // minerTotal: number; // unused
+  // isDepositing: boolean; // unused
+  // isFarming: boolean; // unused
+  // isHandlingSafety: boolean; // unused
+  // currentObjective: string; // unused
+  baseLocation: { x: number; y: number; z: number } | null;
+  // autoDefense: boolean; // unused
+  // autoArmorEnabled: boolean; // unused
+  // stealthMode: boolean; // unused
+  // isShielding: boolean; // unused
+  // waitingForHelp: boolean; // unused
+  // helpObjective: string | null; // unused
+  // adminSessions: Record<string, boolean>; // unused
+  // mcData: unknown; // unused
+  // movements: unknown; // unused
+
+  // Feature loops
+  followLoop(): void;
+  pvpLoop(): void;
+  guardLoop(): void;
+  roam(): void;
+  medicLoop(): void;
+  activatePanicMode(): void;
+  // depositItems(): void; // unused
+  // handleWaterSafety(): void; // unused
+  mineBlock(blockName: string): void;
+  // mineArea(): void; // unused
+  depositAllItems(): void;
+  autoSortChest(): void;
+  refuel(): void;
+  buildRoof(radius: number): void;
+  minerLoop(dir: string, len: number, progress: number): void;
+  // buildNetherPortal(): void; // unused
+  // askForHelp(): void; // unused
+  // collectMaterials(): void; // unused
+  // buildStructure(): void; // unused
+  // autoFarmWheat(): void; // unused
+  // safeModeLoop(): void; // unused
+  // killAuraLoop(): void; // unused
+  // handleNightAndSleep(): void; // unused
+  // craftIronArmor(): void; // unused
+  // beatTheGame(): void; // unused
+}
+
+/**
  * Register all bot commands
  */
-export function registerBotCommands(botManager: Record<string, unknown>): void {
+export function registerBotCommands(botManager: BotCommandManager): void {
   const registry = getCommandRegistry();
   getConfig(); // Config loaded for potential future use
 
-  // Get bot manager methods
+  // Get bot manager methods and state
   const {
     say,
-    // pm, // unused
+    // pm, // unused - use context.privateReply instead
     // log, // unused
     getBot,
     isOnline,
@@ -34,7 +106,7 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     // following, // unused
     // followTarget, // unused
     // pvpTarget, // unused
-    // miningBaseLocation, // unused
+    // miningBaseLocation, // unused - use memory instead
     // safeModeActive, // unused
     // killAuraActive, // unused
     // lumberjackActive, // unused
@@ -86,6 +158,10 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     // beatTheGame, // unused
   } = botManager;
 
+  // Mutable state variables (replacing commented-out const declarations)
+  let currentBaseLocation = baseLocation;
+  let miningBaseLocation: { x: number; y: number; z: number } | null = null;
+
   // ===== PUBLIC COMMANDS =====
 
   // Miner command
@@ -100,7 +176,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
         return;
       }
 
-      // progressionActive = false;
       const dir = args[0];
       const len = parseInt(args[1], 10) || 10;
 
@@ -109,7 +184,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
         return;
       }
 
-      // minerActive = true;
       setCurrentObjective(`Mining tunnel ${dir}`);
       reply(`⛏️ Starting ${len} block tunnel to the ${dir}...`);
       minerLoop(dir, len, 0);
@@ -122,13 +196,13 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     aliases: ['pos', 'position'],
     description: 'Show current coordinates',
     execute: async (context) => {
-      const { bot } = context;
+      const { bot, reply } = context;
       if (!bot.entity) {
-        context.reply('❌ Bot not spawned yet.');
+        reply('❌ Bot not spawned yet.');
         return;
       }
       const { x, y, z } = bot.entity.position;
-      context.reply(
+      reply(
         `📍 Current Location: X: ${Math.floor(x)}, Y: ${Math.floor(y)}, Z: ${Math.floor(z)}`
       );
     },
@@ -143,18 +217,18 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     execute: async (context) => {
       const { bot, args, reply } = context;
       if (args.length >= 3) {
-        baseLocation = {
+        currentBaseLocation = {
           x: parseFloat(args[0]),
           y: parseFloat(args[1]),
           z: parseFloat(args[2]),
         };
       } else {
         const p = bot.entity.position;
-        baseLocation = { x: p.x, y: p.y, z: p.z };
+        currentBaseLocation = { x: p.x, y: p.y, z: p.z };
       }
-      rememberLocation('home', baseLocation, 'home');
+      rememberLocation('home', currentBaseLocation, 'home');
       reply(
-        `🏠 Base location set to X: ${Math.floor(baseLocation.x)}, Y: ${Math.floor(baseLocation.y)}, Z: ${Math.floor(baseLocation.z)}`
+        `🏠 Base location set to X: ${Math.floor(currentBaseLocation.x)}, Y: ${Math.floor(currentBaseLocation.y)}, Z: ${Math.floor(currentBaseLocation.z)}`
       );
     },
   });
@@ -165,17 +239,13 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'Return to base location',
     execute: async (context) => {
       const { bot, reply } = context;
-      if (!baseLocation) {
+      if (!currentBaseLocation) {
         reply('❌ No base location set. Use :sbase first.');
         return;
       }
-      // progressionActive = false;
-      // roaming = false;
-      // following = false;
-      // pvpTarget = null;
       setCurrentObjective('Returning to home base');
       bot.pathfinder.setGoal(null);
-      bot.pathfinder.setGoal(new goals.GoalBlock(baseLocation.x, baseLocation.y, baseLocation.z));
+      bot.pathfinder.setGoal(new goals.GoalBlock(currentBaseLocation.x, currentBaseLocation.y, currentBaseLocation.z));
       reply('🏃 Heading home to base location.');
     },
   });
@@ -186,16 +256,13 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'View base chest contents',
     execute: async (context) => {
       const { bot, reply } = context;
-      if (!baseLocation) {
+      if (!currentBaseLocation) {
         reply('❌ No base location set. Use :sbase first.');
         return;
       }
-      // progressionActive = false;
-      // roaming = false;
-      // following = false;
       reply('🔍 Navigating to base to inspect chest...');
       await bot.pathfinder.goto(
-        new goals.GoalBlock(baseLocation.x, baseLocation.y, baseLocation.z)
+        new goals.GoalBlock(currentBaseLocation.x, currentBaseLocation.y, currentBaseLocation.z)
       );
       const chestBlock = bot.findBlock({
         matching: bot.registry.blocksByName.chest.id,
@@ -226,15 +293,12 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'Rescue nearest injured player',
     execute: async (context) => {
       const { bot, reply } = context;
-      const rescueTarget = bot.nearestEntity((e: Entity) => e.type === 'player' && e.health < 20);
+      const rescueTarget = bot.nearestEntity((e: Entity) => e.type === 'player' && (e.health ?? 20) < 20);
       if (!rescueTarget) {
         reply('🆘 No injured players found nearby.');
         return;
       }
 
-      // progressionActive = false;
-      // roaming = false;
-      // following = false;
       reply(`🚁 Search and Rescue: Moving to provide aid to ${rescueTarget.username}!`);
 
       await bot.pathfinder.goto(new goals.GoalFollow(rescueTarget, 2));
@@ -276,12 +340,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
         return;
       }
 
-      // progressionActive = false;
-      // roaming = false;
-      // following = false;
-      // medicMode = true;
-      // medicTarget = targetName;
-
       reply(`🚑 Medic protocol active. Protecting ${targetName}.`);
       medicLoop();
     },
@@ -321,7 +379,7 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     execute: async (context) => {
       const { bot, reply } = context;
       const p = bot.entity.position;
-      // miningBaseLocation = { x: p.x, y: p.y, z: p.z };
+      miningBaseLocation = { x: p.x, y: p.y, z: p.z };
       rememberLocation('miningBase', { x: p.x, y: p.y, z: p.z }, 'mining-base');
       reply(
         `⛏️ Mining base set to X: ${Math.floor(p.x)}, Y: ${Math.floor(p.y)}, Z: ${Math.floor(p.z)}`
@@ -334,15 +392,13 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     name: 'minebase',
     description: 'Go to mining base',
     execute: async (context) => {
-      const { reply } = context;
-      // if (!miningBaseLocation) {
-      //   reply('❌ No mining base set. Use :sminebase first.');
-      //   return;
-      // }
-      // progressionActive = false;
-      // roaming = false;
-      // following = false;
-      // bot.pathfinder.setGoal(new goals.GoalBlock(miningBaseLocation.x, miningBaseLocation.y, miningBaseLocation.z));
+      const { bot, reply } = context;
+      if (!miningBaseLocation) {
+        reply('❌ No mining base set. Use :sminebase first.');
+        return;
+      }
+      bot.pathfinder.setGoal(null);
+      bot.pathfinder.setGoal(new goals.GoalBlock(miningBaseLocation.x, miningBaseLocation.y, miningBaseLocation.z));
       reply('🏃 Heading to mining operations base.');
     },
   });
@@ -364,10 +420,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     usage: '[radius]',
     execute: async (context) => {
       const { reply } = context;
-      // lumberjackActive = !lumberjackActive;
-      // if (lumberjackActive) {
-      //   lumberjackLoop(parseInt(context.args[0], 10) || 20);
-      // }
       reply('🌲 Lumberjack Protocol: Toggled');
     },
   });
@@ -379,7 +431,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     adminOnly: true,
     execute: async (context) => {
       const { reply } = context;
-      // roaming = true;
       setCurrentObjective('Roaming');
       roam();
       reply('🚶 Roaming protocol active');
@@ -392,17 +443,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'Stop all operations',
     execute: async (context) => {
       const { reply } = context;
-      // roaming = false;
-      // following = false;
-      // pvpTarget = null;
-      // progressionActive = false;
-      // minerActive = false;
-      // mineAreaActive = false;
-      // lumberjackActive = false;
-      // guarding = false;
-      // medicMode = false;
-      // safeModeActive = false;
-      // killAuraActive = false;
       stopRememberedTask();
       const bot = getBot();
       bot?.pathfinder.setGoal(null);
@@ -419,8 +459,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     execute: async (context) => {
       const { args, reply } = context;
       const target = args[0] || context.username;
-      // following = true;
-      // followTarget = target;
       followLoop();
       reply(`👣 Following ${target}`);
     },
@@ -432,8 +470,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'Stop following',
     execute: async (context) => {
       const { bot, reply } = context;
-      // following = false;
-      // followTarget = null;
       bot.pathfinder.setGoal(null);
       reply('🛑 Stopped following.');
     },
@@ -486,15 +522,15 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'Chat with AI assistant',
     usage: '<message>',
     execute: async (context) => {
-      const { args, pm } = context;
+      const { args, privateReply } = context;
       const msgContent = args.join(' ');
       if (!msgContent) {
-        pm(context.username, '❌ Usage: :chat <msg>');
+        privateReply('❌ Usage: :chat <msg>');
         return;
       }
       const openaiApiKey = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY;
       if (!openaiApiKey) {
-        pm(context.username, '❌ AI chat is unavailable. Configure an OpenAI API key.');
+        privateReply('❌ AI chat is unavailable. Configure an OpenAI API key.');
         return;
       }
       try {
@@ -511,9 +547,9 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
           ],
         });
         const reply = response.choices[0].message.content;
-        say(reply);
+        if (reply) say(reply);
       } catch {
-        pm(context.username, '❌ AI Error');
+        privateReply('❌ AI Error');
       }
     },
   });
@@ -561,8 +597,8 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'Toggle stealth mode',
     adminOnly: true,
     execute: async (context) => {
-      const { reply } = context;
-      // stealthMode = !stealthMode;
+      const { bot, reply } = context;
+      // stealthMode = !stealthMode; // would need mutable reference
       // bot.setControlState('sneak', stealthMode);
       reply('👻 Stealth Mode Toggled');
     },
@@ -574,11 +610,9 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     description: 'Stop auto-defense',
     adminOnly: true,
     execute: async (context) => {
-      const { reply } = context;
-      // pvpTarget = null;
-      const bot = getBot();
-      bot?.pathfinder.setGoal(null);
-      bot?.setControlState('sprint', false);
+      const { bot, reply } = context;
+      bot.pathfinder.setGoal(null);
+      bot.setControlState('sprint', false);
       reply('🛑 Auto-defense halted and target cleared.');
     },
   });
@@ -590,7 +624,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     adminOnly: true,
     execute: async (context) => {
       const { reply } = context;
-      // guarding = true;
       setCurrentObjective('Guarding');
       reply('🛡️ Guarding current location');
       guardLoop();
@@ -604,14 +637,13 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     usage: '<player>',
     adminOnly: true,
     execute: async (context) => {
-      const { bot, args, pm, reply } = context;
+      const { bot, args, privateReply, reply } = context;
       const t = args[0];
       const p = bot.players[t]?.entity;
       if (!p) {
-        pm(context.username, 'player not found');
+        privateReply('player not found');
         return;
       }
-      // pvpTarget = t;
       reply(`⚔️ PVP engaged vs ${t}`);
       pvpLoop();
     },
@@ -624,7 +656,6 @@ export function registerBotCommands(botManager: Record<string, unknown>): void {
     adminOnly: true,
     execute: async (context) => {
       const { bot, reply } = context;
-      // pvpTarget = null;
       bot.pathfinder.setGoal(null);
       reply('🛑 PVP stopped');
     },
@@ -641,7 +672,7 @@ export function getStatusReport(bot: Bot, objective: string): string {
   const registry = bot.registry;
   const count = (name: string) => {
     const item = registry.itemsByName[name];
-    return item ? bot.inventory.count(item.id) : 0;
+    return item ? bot.inventory.count(item.id, 0) : 0;
   };
 
   let report = `📊 Status: ${objective} | `;

@@ -4,6 +4,8 @@
 
 import type { Bot } from 'mineflayer';
 import type { EventEmitter } from 'events';
+import type { Vec3 } from 'vec3';
+import type { Window } from 'prismarine-windows';
 
 // Bot lifecycle states
 export enum BotState {
@@ -62,7 +64,7 @@ export interface PluginManager {
   isLoaded(name: string): boolean;
 }
 
-// Event types
+// Event types - using tuple types for exact argument matching
 export interface BotEvents {
   stateChange: [BotState, BotState]; // [newState, oldState]
   connect: [Bot];
@@ -77,6 +79,11 @@ export interface BotEvents {
   pluginLoad: [Plugin];
   pluginUnload: [string];
   shutdown: [];
+  // Custom events emitted by BotManager
+  healthChange: [number, number]; // [health, food]
+  positionChange: [Vec3];
+  windowOpen: [Window];
+  windowClose: [Window];
 }
 
 // Bot status data
@@ -129,17 +136,26 @@ export interface BotManager {
   on<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this;
   once<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this;
   emit<K extends keyof BotEvents>(event: K, ...args: BotEvents[K]): boolean;
+  off<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this;
 
   // Utility
   getBot(): Bot | null;
   isOnline(): boolean;
 }
 
-// Extended EventEmitter with typed events
-export interface TypedEventEmitter<TEvents extends Record<string, unknown[]>> extends EventEmitter {
-  on<K extends keyof TEvents>(event: K, listener: (...args: TEvents[K]) => void): this;
-  once<K extends keyof TEvents>(event: K, listener: (...args: TEvents[K]) => void): this;
-  emit<K extends keyof TEvents>(event: K, ...args: TEvents[K]): boolean;
-  off<K extends keyof TEvents>(event: K, listener: (...args: TEvents[K]) => void): this;
-  removeAllListeners<K extends keyof TEvents>(event?: K): this;
+// Extended EventEmitter with typed events - uses string keys to avoid symbol issues
+// Uses a more permissive constraint to allow tuple types
+export interface TypedEventEmitter<TEvents> {
+  on<K extends string & keyof TEvents>(event: K, listener: (...args: unknown[]) => void): this;
+  once<K extends string & keyof TEvents>(event: K, listener: (...args: unknown[]) => void): this;
+  emit<K extends string & keyof TEvents>(event: K, ...args: unknown[]): boolean;
+  off<K extends string & keyof TEvents>(event: K, listener: (...args: unknown[]) => void): this;
+  removeAllListeners<K extends string & keyof TEvents>(event?: K): this;
+  // EventEmitter methods we need
+  setMaxListeners(n: number): this;
+  getMaxListeners(): number;
+  listenerCount(eventName: string | symbol): number;
+  eventNames(): (string | symbol)[];
+  prependListener<K extends string & keyof TEvents>(event: K, listener: (...args: unknown[]) => void): this;
+  prependOnceListener<K extends string & keyof TEvents>(event: K, listener: (...args: unknown[]) => void): this;
 }

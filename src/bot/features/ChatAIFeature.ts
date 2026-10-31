@@ -5,7 +5,10 @@
 
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
-import type { OpenAI } from 'openai';
+
+// Type alias for OpenAI client - use any to avoid import resolution mode conflicts
+// between static and dynamic imports
+type OpenAIClient = any;
 
 /**
  * ChatAI feature configuration
@@ -47,7 +50,7 @@ export class ChatAIFeature extends BaseFeature {
   public readonly description = 'OpenAI integration for AI chat responses';
   public readonly dependencies = ['core'];
 
-  private openai: OpenAI | null = null;
+  private openai: OpenAIClient | null = null;
   private apiKey = '';
   private model = 'gpt-4';
   private systemPrompt =

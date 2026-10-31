@@ -4,6 +4,8 @@
  */
 
 import type { Item } from 'prismarine-item';
+import type { Recipe, RecipeItem } from 'prismarine-recipe';
+import type { Block } from 'prismarine-block';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
 
@@ -145,25 +147,27 @@ export class InventoryFeature extends BaseFeature {
   private loadCraftingRecipes(): void {
     const bot = this.getBot();
 
-    // Register basic recipes
-    const recipes = bot.recipesAll();
+    // Register basic recipes - recipesAll requires itemType, metadata, craftingTable
+    const recipes = bot.recipesAll(-1, null, null);
 
     for (const recipe of recipes) {
       const result = recipe.result;
       if (result) {
-        const recipeKey = result.name;
+        // Get item name from registry using the result item id
+        const resultName = bot.registry.items[result.id]?.name ?? 'unknown';
+        const recipeKey = resultName;
         if (
           !this.craftingRecipes.has(recipeKey) ||
           this.craftingRecipes.get(recipeKey)!.ingredients.length > recipe.ingredients.length
         ) {
           this.craftingRecipes.set(recipeKey, {
-            name: result.name,
+            name: resultName,
             ingredients: recipe.ingredients.map((ing) => ({
-              name: ing?.name ?? 'air',
-              count: ing?.count ?? 1,
+              name: bot.registry.items[ing.id]?.name ?? 'air',
+              count: ing.count,
             })),
             result: {
-              name: result.name,
+              name: resultName,
               count: result.count,
             },
             shaped: recipe.requiresTable,
@@ -179,7 +183,7 @@ export class InventoryFeature extends BaseFeature {
   /**
    * Get recipe pattern for shaped recipes
    */
-  private getRecipePattern(_recipe: unknown): string[] {
+  private getRecipePattern(_recipe: Recipe): string[] {
     // This is a simplified pattern extraction
     // In reality, you'd need to parse the recipe matrix
     return ['###', '###', '###'];
@@ -191,10 +195,12 @@ export class InventoryFeature extends BaseFeature {
   private setupEventListeners(): void {
     const bot = this.getBot();
 
-    // Auto-sort on inventory change
+    // Auto-sort on inventory change - use windowClose/windowOpen or just periodic check
+    // windowUpdate is not a standard bot event, use a different approach
     if (this.autoSortEnabled) {
-      bot.on('windowUpdate', () => {
-        if (bot.currentWindow && bot.currentWindow.type === 'minecraft:container') {
+      // Listen for window changes - we can use a periodic check or the window events
+      bot.on('windowOpen', (window) => {
+        if (window.type === 'minecraft:container') {
           void this.sortInventory();
         }
       });
@@ -257,7 +263,9 @@ export class InventoryFeature extends BaseFeature {
    */
   getItemCount(name: string): number {
     const bot = this.getBot();
-    return bot.inventory.count(bot.registry.itemsByName[name]?.id ?? -1);
+    const itemId = bot.registry.itemsByName[name]?.id ?? -1;
+    // count requires itemType and metadata
+    return bot.inventory.count(itemId, null);
   }
 
   /**
@@ -281,12 +289,12 @@ export class InventoryFeature extends BaseFeature {
   getEquipment(): EquipmentInfo {
     const bot = this.getBot();
     return {
-      head: bot.inventory.slots[5] ? this.itemToInfo(bot.inventory.slots[5]) : null,
-      chest: bot.inventory.slots[6] ? this.itemToInfo(bot.inventory.slots[6]) : null,
-      legs: bot.inventory.slots[7] ? this.itemToInfo(bot.inventory.slots[7]) : null,
-      feet: bot.inventory.slots[8] ? this.itemToInfo(bot.inventory.slots[8]) : null,
-      hand: bot.inventory.slots[45] ? this.itemToInfo(bot.inventory.slots[45]) : null,
-      offhand: bot.inventory.slots[44] ? this.itemToInfo(bot.inventory.slots[44]) : null,
+      head: bot.inventory.slots[5] ? this.itemToInfo(bot.inventory.slots[5]!) : null,
+      chest: bot.inventory.slots[6] ? this.itemToInfo(bot.inventory.slots[6]!) : null,
+      legs: bot.inventory.slots[7] ? this.itemToInfo(bot.inventory.slots[7]!) : null,
+      feet: bot.inventory.slots[8] ? this.itemToInfo(bot.inventory.slots[8]!) : null,
+      hand: bot.inventory.slots[45] ? this.itemToInfo(bot.inventory.slots[45]!) : null,
+      offhand: bot.inventory.slots[44] ? this.itemToInfo(bot.inventory.slots[44]!) : null,
     };
   }
 
@@ -294,15 +302,20 @@ export class InventoryFeature extends BaseFeature {
    * Convert mineflayer item to info object
    */
   private itemToInfo(item: Item): InventoryItemInfo {
+    // Use enchants getter which returns { name: string; lvl: number }[]
+    const enchants = item.enchants
+      ? Object.fromEntries(item.enchants.map((e) => [e.name, e.lvl]))
+      : undefined;
+
     return {
       slot: item.slot,
       name: item.name,
       displayName: item.displayName,
       count: item.count,
       maxStackSize: item.stackSize,
-      durability: item.durability,
-      maxDurability: item.maxDurability,
-      enchantments: item.enchantments ? Object.fromEntries(item.enchantments) : undefined,
+      durability: item.durabilityUsed > 0 ? item.maxDurability - item.durabilityUsed : undefined,
+      maxDurability: item.maxDurability > 0 ? item.maxDurability : undefined,
+      enchantments: enchants,
     };
   }
 
@@ -421,7 +434,7 @@ export class InventoryFeature extends BaseFeature {
   }
 
   /**
-   * Move item between slots
+   * Move item between slots using moveSlotItem
    */
   async moveItem(fromSlot: number, toSlot: number, _count?: number): Promise<boolean> {
     const bot = this.getBot();
@@ -430,8 +443,7 @@ export class InventoryFeature extends BaseFeature {
       const item = bot.inventory.slots[fromSlot];
       if (!item) return false;
 
-      await bot.windowClick(fromSlot, 0, 0); // Click to pick up
-      await bot.windowClick(toSlot, 0, 0); // Click to place
+      await bot.moveSlotItem(fromSlot, toSlot);
       return true;
     } catch (error) {
       console.error('[InventoryFeature] Move item error:', error);
@@ -446,9 +458,10 @@ export class InventoryFeature extends BaseFeature {
     const bot = this.getBot();
 
     try {
-      await bot.windowClick(slot1, 0, 0);
-      await bot.windowClick(slot2, 0, 0);
-      await bot.windowClick(slot1, 0, 0);
+      // Use moveSlotItem to swap
+      await bot.moveSlotItem(slot1, slot2);
+      await bot.moveSlotItem(slot2, slot1);
+      await bot.moveSlotItem(slot1, slot2);
       return true;
     } catch (error) {
       console.error('[InventoryFeature] Swap error:', error);
@@ -480,13 +493,25 @@ export class InventoryFeature extends BaseFeature {
     }
 
     try {
-      if (craftingTable && recipe.shaped) {
-        // Need crafting table
-        await this.craftWithTable(recipe, count);
-      } else {
-        // Craft in inventory
-        await bot.craft(recipe.name, count, craftingTable);
+      // Find the actual Recipe object from mineflayer
+      const itemId = bot.registry.itemsByName[name]?.id;
+      if (itemId === undefined) {
+        console.warn(`[InventoryFeature] Unknown item: ${name}`);
+        return false;
       }
+
+      const recipes = bot.recipesAll(itemId, null, craftingTable ? true : null);
+      const actualRecipe = recipes[0];
+
+      if (!actualRecipe) {
+        console.warn(`[InventoryFeature] No recipe available for ${name}`);
+        return false;
+      }
+
+      // craft() expects a Block for craftingTable, not a boolean
+      // For now, pass null (will craft in inventory)
+      // A full implementation would find and place a crafting table block
+      await bot.craft(actualRecipe, count, null);
       return true;
     } catch (error) {
       console.error('[InventoryFeature] Craft error:', error);
@@ -508,7 +533,16 @@ export class InventoryFeature extends BaseFeature {
 
     // Place crafting table, craft, then break it
     // This is a simplified implementation
-    await bot.craft(recipe.name, count, true);
+    const itemId = bot.registry.itemsByName[recipe.name]?.id;
+    if (itemId === undefined) throw new Error(`Unknown item: ${recipe.name}`);
+
+    const recipes = bot.recipesAll(itemId, null, true);
+    const actualRecipe = recipes[0];
+    if (!actualRecipe) throw new Error(`No recipe for ${recipe.name}`);
+
+    // craft() expects a Block for craftingTable, not a boolean
+    // For now, pass null - a full implementation would place and use a crafting table block
+    await bot.craft(actualRecipe, count, null);
   }
 
   /**
@@ -519,7 +553,8 @@ export class InventoryFeature extends BaseFeature {
     const missing: string[] = [];
 
     for (const ingredient of recipe.ingredients) {
-      const have = bot.inventory.count(bot.registry.itemsByName[ingredient.name]?.id ?? -1);
+      const itemId = bot.registry.itemsByName[ingredient.name]?.id ?? -1;
+      const have = bot.inventory.count(itemId, null);
       const need = ingredient.count * count;
 
       if (have < need) {
@@ -546,7 +581,7 @@ export class InventoryFeature extends BaseFeature {
   getCraftableItems(): string[] {
     const craftable: string[] = [];
 
-    for (const [name] of this.craftingRecipes) {
+    for (const [name] of Array.from(this.craftingRecipes.entries())) {
       if (this.canCraft(name)) {
         craftable.push(name);
       }
@@ -615,23 +650,23 @@ export class InventoryFeature extends BaseFeature {
     else if (item.name.includes('gold')) value += 200;
     else if (item.name.includes('leather')) value += 100;
 
-    // Add enchantment value
-    if (item.enchantments) {
-      for (const [ench, level] of item.enchantments) {
+    // Add enchantment value - use enchants getter
+    if (item.enchants) {
+      for (const ench of item.enchants) {
         if (
-          ench.includes('protection') ||
-          ench.includes('blast') ||
-          ench.includes('fire') ||
-          ench.includes('projectile')
+          ench.name.includes('protection') ||
+          ench.name.includes('blast') ||
+          ench.name.includes('fire') ||
+          ench.name.includes('projectile')
         ) {
-          value += level * 50;
+          value += ench.lvl * 50;
         }
       }
     }
 
     // Factor in durability
-    if (item.durability && item.maxDurability) {
-      value *= item.durability / item.maxDurability;
+    if (item.durabilityUsed > 0 && item.maxDurability > 0) {
+      value *= (item.maxDurability - item.durabilityUsed) / item.maxDurability;
     }
 
     return value;
@@ -655,8 +690,8 @@ export class InventoryFeature extends BaseFeature {
     if (targetSlot === undefined) return;
 
     try {
-      await bot.windowClick(fromSlot, 0, 0);
-      await bot.windowClick(targetSlot, 0, 0);
+      // Use moveSlotItem instead of clickWindow
+      await bot.moveSlotItem(fromSlot, targetSlot);
     } catch (error) {
       console.error('[InventoryFeature] Equip error:', error);
     }
@@ -713,24 +748,24 @@ export class InventoryFeature extends BaseFeature {
     else if (item.name.includes('stone')) value += 200;
     else if (item.name.includes('wooden')) value += 100;
 
-    if (item.enchantments) {
-      for (const [ench, level] of item.enchantments) {
+    if (item.enchants) {
+      for (const ench of item.enchants) {
         if (
-          ench.includes('efficiency') ||
-          ench.includes('fortune') ||
-          ench.includes('silk_touch') ||
-          ench.includes('sharpness')
+          ench.name.includes('efficiency') ||
+          ench.name.includes('fortune') ||
+          ench.name.includes('silk_touch') ||
+          ench.name.includes('sharpness')
         ) {
-          value += level * 100;
+          value += ench.lvl * 100;
         }
-        if (ench.includes('unbreaking') || ench.includes('mending')) {
-          value += level * 50;
+        if (ench.name.includes('unbreaking') || ench.name.includes('mending')) {
+          value += ench.lvl * 50;
         }
       }
     }
 
-    if (item.durability && item.maxDurability) {
-      value *= item.durability / item.maxDurability;
+    if (item.durabilityUsed > 0 && item.maxDurability > 0) {
+      value *= (item.maxDurability - item.durabilityUsed) / item.maxDurability;
     }
 
     return value;

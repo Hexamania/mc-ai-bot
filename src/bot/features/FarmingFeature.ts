@@ -146,7 +146,7 @@ export class FarmingFeature extends BaseFeature {
       console.log('[FarmingFeature] Food low: Harvesting grown wheat...');
 
       try {
-        const movementFeature = this.getFeature('movement');
+        const movementFeature = this.getMovementFeature();
         if (movementFeature) {
           await movementFeature.moveToBlock(
             wheatBlock.position.x,
@@ -155,7 +155,7 @@ export class FarmingFeature extends BaseFeature {
             4
           );
         } else {
-          await bot.pathfinder.goto(new goals.GoalLookAtBlock(wheatBlock.position, bot.world));
+          await bot.pathfinder.goto(new goals.GoalBlock(wheatBlock.position.x, wheatBlock.position.y, wheatBlock.position.z));
         }
 
         await bot.dig(wheatBlock);

@@ -14,6 +14,22 @@ import type {
 } from './types';
 import type { PermissionManager } from './permissions';
 
+// Extended Bot type to include properties used in web commands
+interface ExtendedBot extends Bot {
+  _client?: {
+    latency?: number;
+  };
+  game?: {
+    dimension?: string;
+  };
+  time?: {
+    timeOfDay?: number;
+  };
+  entity?: {
+    position?: { x: number; y: number; z: number };
+  } | null;
+}
+
 /**
  * Web command request from dashboard
  */
@@ -56,7 +72,7 @@ export interface WebCommandResponse {
  */
 export class WebCommandHandler {
   private io: Server | null = null;
-  private bot: Bot | null = null;
+  private bot: ExtendedBot | null = null;
   private registry: CommandRegistry | null = null;
   private permissionManager: PermissionManager | null = null;
   private config: WebCommandConfig;
@@ -88,7 +104,7 @@ export class WebCommandHandler {
     permissionManager: PermissionManager
   ): void {
     this.io = io;
-    this.bot = bot;
+    this.bot = bot as ExtendedBot;
     this.registry = registry;
     this.permissionManager = permissionManager;
 
@@ -462,7 +478,7 @@ export class WebCommandHandler {
       description: cmd.description,
       usage: cmd.usage,
       category: cmd.category || 'General',
-      permission: cmd.permission.level,
+      permission: cmd.permission?.level ?? 'guest',
       hidden: cmd.hidden || false,
       deprecated: cmd.deprecated || false,
     }));
@@ -574,21 +590,26 @@ export const WebOnlyCommands = {
     category: 'Web',
     permission: { level: 'guest' as PermissionLevel },
     execute: async (context: CommandContext) => {
-      if (!context.bot) {
+      const bot = context.bot as ExtendedBot;
+      if (!bot) {
         context.error('Bot not connected');
         return;
       }
-      const pos = context.bot.entity?.position;
+      const pos = bot.entity?.position;
+      const latency = bot._client?.latency;
+      const dimension = bot.game?.dimension;
+      const timeOfDay = bot.time?.timeOfDay;
+
       context.privateReply(
         `🤖 **Bot Status**\n` +
-          `Online: ${context.bot.entity ? 'Yes' : 'No'}\n` +
-          `Username: ${context.bot.username}\n` +
-          `Health: ${context.bot.health}/20\n` +
-          `Food: ${context.bot.food}/20\n` +
+          `Online: ${bot.entity ? 'Yes' : 'No'}\n` +
+          `Username: ${bot.username}\n` +
+          `Health: ${bot.health}/20\n` +
+          `Food: ${bot.food}/20\n` +
           `Position: ${pos ? `X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}` : 'Unknown'}\n` +
-          `Dimension: ${context.bot.game?.dimension || 'Unknown'}\n` +
-          `Time: ${context.bot.time?.timeOfDay || 'Unknown'}\n` +
-          `Ping: ${context.bot._client?.getLatency() || 'Unknown'}ms`
+          `Dimension: ${dimension || 'Unknown'}\n` +
+          `Time: ${timeOfDay !== undefined ? timeOfDay : 'Unknown'}\n` +
+          `Ping: ${latency !== undefined ? `${latency}ms` : 'Unknown'}`
       );
     },
   },
@@ -610,12 +631,13 @@ export const WebOnlyCommands = {
       },
     ],
     execute: async (context: CommandContext) => {
-      if (!context.bot) {
+      const bot = context.bot as ExtendedBot;
+      if (!bot) {
         context.error('Bot not connected');
         return;
       }
 
-      const items = context.bot.inventory.items();
+      const items = bot.inventory.items();
       if (items.length === 0) {
         context.privateReply('📦 Inventory is empty');
         return;
@@ -623,7 +645,7 @@ export const WebOnlyCommands = {
 
       const slotArg = context.args.args[0] as number | undefined;
       if (slotArg !== undefined && slotArg >= 0 && slotArg < 36) {
-        const item = context.bot.inventory.slots[slotArg];
+        const item = bot.inventory.slots[slotArg];
         if (item) {
           context.privateReply(
             `📦 Slot ${slotArg}: ${item.count}x ${item.displayName || item.name}`
@@ -659,7 +681,8 @@ export const WebOnlyCommands = {
       },
     ],
     execute: async (context: CommandContext) => {
-      if (!context.bot) {
+      const bot = context.bot as ExtendedBot;
+      if (!bot) {
         context.error('Bot not connected');
         return;
       }
@@ -670,7 +693,7 @@ export const WebOnlyCommands = {
         return;
       }
 
-      context.bot.chat(message);
+      bot.chat(message);
       context.privateReply(`✅ Sent: ${message}`);
     },
   },
@@ -693,7 +716,8 @@ export const WebOnlyCommands = {
       },
     ],
     execute: async (context: CommandContext) => {
-      if (!context.bot) {
+      const bot = context.bot as ExtendedBot;
+      if (!bot) {
         context.error('Bot not connected');
         return;
       }
@@ -704,7 +728,7 @@ export const WebOnlyCommands = {
         return;
       }
 
-      context.bot.chat(`/${command}`);
+      bot.chat(`/${command}`);
       context.privateReply(`✅ Executed: /${command}`);
     },
   },

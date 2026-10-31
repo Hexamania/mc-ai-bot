@@ -104,8 +104,10 @@ export class ChatParser {
     const { commandName, args, isAdminCommand, prefix } = commandCheck;
 
     // Check if command exists in registry
-    if (this.registry) {
-      this.registry.has(commandName);
+    if (this.registry && commandName) {
+      const commandExists = this.registry.has(commandName);
+      // Command existence is checked but not enforced here - registry.execute will handle it
+      void commandExists; // Suppress unused variable warning
     }
 
     return {
@@ -131,9 +133,11 @@ export class ChatParser {
     const trimmed = raw.trim();
 
     // Try custom parsers first
-    for (const parser of this.config.customParsers) {
-      const result = parser(trimmed);
-      if (result) return result;
+    if (this.config.customParsers) {
+      for (const parser of this.config.customParsers) {
+        const result = parser(trimmed);
+        if (result) return result;
+      }
     }
 
     // Format: [User -> me] Private Message
@@ -363,6 +367,15 @@ export class ChatParser {
 
     // Determine if PM
     const isPM = message.type === 'pm' || message.type === 'whisper';
+
+    // Check if command requires admin and user is not admin
+    if (this.registry && parseResult.commandName) {
+      const command = this.registry.get(parseResult.commandName);
+      if (command?.permission?.level === 'admin' && !isAdmin) {
+        // Command requires admin but user is not admin
+        // We still create context but registry.execute will handle permission check
+      }
+    }
 
     return {
       bot: this.bot,

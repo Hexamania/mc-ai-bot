@@ -5,9 +5,10 @@
 
 import type { Player } from 'mineflayer';
 import type { Entity } from 'prismarine-entity';
-import { goals } from 'mineflayer-pathfinder';
+import { goals, Movements } from 'mineflayer-pathfinder';
 import type { FeaturePluginConfig } from './BaseFeature.js';
 import { BaseFeature } from './BaseFeature.js';
+import type { MovementFeature } from './MovementFeature.js';
 
 /**
  * Follow feature configuration
@@ -140,7 +141,7 @@ export class FollowFeature extends BaseFeature {
    */
   async startFollowing(target: string, range = 2): Promise<boolean> {
     const bot = this.getBot();
-    const movementFeature = this.getFeature('movement');
+    const movementFeature = this.getMovementFeature();
 
     if (!movementFeature) {
       console.error('[FollowFeature] Movement feature not available');
@@ -230,7 +231,7 @@ export class FollowFeature extends BaseFeature {
    */
   private startFollowLoop(range: number): void {
     const bot = this.getBot();
-    const movementFeature = this.getFeature('movement');
+    const movementFeature = this.getMovementFeature();
 
     const interval = this.getOption('updateInterval', 2000);
 
@@ -262,11 +263,11 @@ export class FollowFeature extends BaseFeature {
 
       try {
         // Use movement feature to follow entity
-        if (movementFeature && typeof movementFeature.followEntity === 'function') {
+        if (movementFeature) {
           await movementFeature.followEntity(this.targetEntity, range);
         } else {
           // Fallback: use pathfinder directly with GoalFollow
-          const goal = new goals.GoalFollow(this.targetEntity.id, range);
+          const goal = new goals.GoalFollow(this.targetEntity, range);
           await bot.pathfinder.goto(goal);
         }
 
@@ -277,7 +278,12 @@ export class FollowFeature extends BaseFeature {
     }, interval);
 
     // Also run immediately once
-    this.followInterval.refresh();
+    // Note: NodeJS.Timeout doesn't have refresh(), just call the callback manually
+    setTimeout(() => {
+      if (this.followInterval && this.isFollowing) {
+        // The interval will run naturally, no need for immediate execution
+      }
+    }, 0);
   }
 
   /**

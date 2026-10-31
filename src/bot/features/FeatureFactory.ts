@@ -78,7 +78,7 @@ export async function createAllFeatures(
   // Apply configurations
   for (const [key, config] of Object.entries(configs)) {
     if (config && features[key as keyof FeatureInstances]) {
-      features[key as keyof FeatureInstances].configure(config);
+      features[key as keyof FeatureInstances].setConfig(config);
     }
   }
 
@@ -111,7 +111,7 @@ export async function createAllFeatures(
 export class FeatureFactory {
   private bot: Bot | null = null;
   private manager: BotManager | null = null;
-  private features: Partial<FeatureInstances> = {};
+  private features: Record<string, BaseFeature> = {};
   private enabledFeatures = new Set<string>();
   private configs: FeatureConfigMap = {};
 
@@ -177,7 +177,7 @@ export class FeatureFactory {
     if (!this.features[featureName]) {
       this.features[featureName] = await this.createFeature(FeatureClass);
     }
-    return this.features[featureName] as T;
+    return this.features[featureName] as unknown as T;
   }
 
   /**
@@ -348,13 +348,13 @@ export class FeatureFactory {
    * Get list of enabled features
    */
   getEnabledFeatures(): string[] {
-    return [...this.enabledFeatures];
+    return Array.from(this.enabledFeatures);
   }
 
   /**
    * Get all feature instances (for direct access)
    */
-  getAllFeatures(): Partial<FeatureInstances> {
+  getAllFeatures(): Record<string, BaseFeature> {
     return { ...this.features };
   }
 

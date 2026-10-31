@@ -7,7 +7,8 @@ import { EventEmitter } from 'events';
 import mineflayer from 'mineflayer';
 import type { Bot, BotOptions } from 'mineflayer';
 import { pathfinder, goals } from 'mineflayer-pathfinder';
-import type { Vec3, Window } from 'prismarine-windows';
+import type { Vec3 } from 'vec3';
+import type { Window } from 'prismarine-windows';
 
 import type {
   BotConfig,
@@ -25,7 +26,17 @@ import { ConfigLoader } from './Config.js';
 import { PluginManager as PluginManagerImpl } from './PluginManager.js';
 import { BotEventEmitter, EventNames } from './events.js';
 
-export class BotManager extends EventEmitter implements BotManagerInterface {
+// Type for bot event handlers - using a more flexible type
+type BotEventHandler = (...args: unknown[]) => void;
+
+/**
+ * BotManager - Uses composition over inheritance for EventEmitter to avoid type conflicts
+ * but implements the BotManagerInterface which requires EventEmitter-like methods
+ */
+export class BotManager implements BotManagerInterface {
+  // Use a private EventEmitter instance for event handling
+  private readonly emitter = new EventEmitter();
+
   // Core components
   private stateMachine: StateMachine;
   private pluginManager: PluginManagerImpl;
@@ -44,11 +55,10 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
   private lastError: Error | null = null;
 
   // Mineflayer event handlers storage for cleanup
-  private botEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>();
+  private botEventHandlers = new Map<string, BotEventHandler[]>();
+  private readonly botEventNames: string[] = [];
 
   constructor(configOptions?: Partial<BotConfig>) {
-    super();
-
     // Initialize components
     this.stateMachine = new StateMachine(BotState.DISCONNECTED);
     this.pluginManager = new PluginManagerImpl();
@@ -65,7 +75,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
     this.setupEventForwarding();
 
     // Set max listeners
-    this.setMaxListeners(100);
+    this.emitter.setMaxListeners(100);
   }
 
   /**
@@ -75,11 +85,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
     // Global state change logging
     this.stateMachine.onEnter(async (from, to) => {
       console.log(`[BotManager] State transition: ${from} -> ${to}`);
-      this.eventEmitter.emit(EventNames.STATE_CHANGE, {
-        newState: to,
-        oldState: from,
-        timestamp: Date.now(),
-      });
+      this.eventEmitter.emit(EventNames.STATE_CHANGE, to, from);
     });
 
     // Specific transition handlers
@@ -89,10 +95,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       onEnter: async () => {
         this.reconnectAttempt = 0;
         this.startTime = Date.now();
-        this.eventEmitter.emit(EventNames.CONNECT, {
-          bot: this.bot,
-          timestamp: Date.now(),
-        });
+        this.eventEmitter.emit(EventNames.CONNECT, this.bot!);
       },
     });
 
@@ -113,20 +116,16 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
     });
 
     this.stateMachine.addTransition({
-      from: '*',
+      from: [BotState.CONNECTING, BotState.CONNECTED, BotState.RECONNECTING, BotState.DISCONNECTED],
       to: BotState.ERROR,
       onEnter: async (from, to) => {
         this.lastError = new Error(`State error: ${from} -> ${to}`);
-        this.eventEmitter.emit(EventNames.ERROR, {
-          error: this.lastError,
-          timestamp: Date.now(),
-          fatal: false,
-        });
+        this.eventEmitter.emit(EventNames.ERROR, this.lastError);
       },
     });
 
     this.stateMachine.addTransition({
-      from: '*',
+      from: [BotState.CONNECTING, BotState.CONNECTED, BotState.RECONNECTING, BotState.ERROR, BotState.DISCONNECTED],
       to: BotState.SHUTTING_DOWN,
       onEnter: async () => {
         this.isShuttingDown = true;
@@ -138,11 +137,8 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       from: BotState.SHUTTING_DOWN,
       to: BotState.SHUTDOWN,
       onEnter: async () => {
-        this.eventEmitter.emit(EventNames.SHUTDOWN, {
-          reason: 'Graceful shutdown',
-          timestamp: Date.now(),
-        });
-        this.emit('shutdown');
+        this.eventEmitter.emit(EventNames.SHUTDOWN);
+        this.emitter.emit('shutdown');
       },
     });
   }
@@ -151,11 +147,12 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
    * Setup event forwarding from eventEmitter to this manager
    */
   private setupEventForwarding(): void {
-    // Forward all events from eventEmitter to this manager
+    // Forward all events from eventEmitter to this manager's emitter
     const events = Object.values(EventNames);
     events.forEach((eventName) => {
       this.eventEmitter.on(eventName, (...args: unknown[]) => {
-        this.emit(eventName, ...args);
+        // Cast to string to satisfy EventEmitter.emit
+        this.emitter.emit(eventName, ...args);
       });
     });
   }
@@ -240,15 +237,12 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
   private setupBotEvents(): void {
     if (!this.bot) return;
 
-    const handlers: { event: string; handler: (...args: unknown[]) => void }[] = [
+    const handlers: { event: string; handler: BotEventHandler }[] = [
       // Spawn event
       {
         event: 'spawn',
         handler: () => {
-          this.eventEmitter.emit(EventNames.SPAWN, {
-            position: this.bot!.entity.position,
-            timestamp: Date.now(),
-          });
+          this.eventEmitter.emit(EventNames.SPAWN);
         },
       },
 
@@ -256,100 +250,77 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       {
         event: 'death',
         handler: () => {
-          this.eventEmitter.emit(EventNames.DEATH, {
-            location: this.bot!.entity.position,
-            timestamp: Date.now(),
-          });
+          this.eventEmitter.emit(EventNames.DEATH);
         },
       },
 
       // Chat event
       {
         event: 'chat',
-        handler: (username: string, message: string, _type: string) => {
+        handler: ((username: string, message: string, _type: string) => {
           if (username === this.bot!.username) return;
-          this.eventEmitter.emit(EventNames.CHAT, {
-            username,
-            message,
-            type: _type,
-            timestamp: Date.now(),
-          });
-        },
+          this.eventEmitter.emit(EventNames.CHAT, username, message, _type);
+        }) as BotEventHandler,
       },
 
       // Whisper event
       {
         event: 'whisper',
-        handler: (username: string, message: string, _type: string) => {
-          this.eventEmitter.emit(EventNames.CHAT, {
-            username,
-            message,
-            type: 'whisper',
-            timestamp: Date.now(),
-          });
-        },
+        handler: ((username: string, message: string, _type: string) => {
+          this.eventEmitter.emit(EventNames.CHAT, username, message, 'whisper');
+        }) as BotEventHandler,
       },
 
       // Error event
       {
         event: 'error',
-        handler: (error: Error) => {
+        handler: ((error: Error) => {
           console.error('[BotManager] Bot error:', error.message);
           this.lastError = error;
-          this.eventEmitter.emit(EventNames.ERROR, {
-            error,
-            timestamp: Date.now(),
-            fatal: false,
-          });
+          this.eventEmitter.emit(EventNames.ERROR, error);
 
           // Check if we should reconnect
           if (this.stateMachine.getState() === BotState.CONNECTED) {
             void this.stateMachine.transition(BotState.RECONNECTING);
           }
-        },
+        }) as BotEventHandler,
       },
 
       // End event (disconnect)
       {
         event: 'end',
-        handler: (reason: string) => {
+        handler: ((reason: string) => {
           console.log('[BotManager] Disconnected:', reason);
-          this.eventEmitter.emit(EventNames.DISCONNECT, {
-            reason,
-            timestamp: Date.now(),
-          });
+          this.eventEmitter.emit(EventNames.DISCONNECT, reason);
 
           if (!this.isShuttingDown && this._config.reconnect.enabled) {
             void this.stateMachine.transition(BotState.RECONNECTING);
           } else {
             void this.stateMachine.transition(BotState.DISCONNECTED);
           }
-        },
+        }) as BotEventHandler,
       },
 
       // Kicked event
       {
         event: 'kicked',
-        handler: (reason: string, _loggedIn: boolean) => {
+        handler: ((reason: string, _loggedIn: boolean) => {
           console.log('[BotManager] Kicked:', reason);
-          this.eventEmitter.emit(EventNames.DISCONNECT, {
-            reason: `Kicked: ${reason}`,
-            timestamp: Date.now(),
-          });
+          this.eventEmitter.emit(EventNames.DISCONNECT, `Kicked: ${reason}`);
 
           if (!this.isShuttingDown && this._config.reconnect.enabled) {
             void this.stateMachine.transition(BotState.RECONNECTING);
           } else {
             void this.stateMachine.transition(BotState.DISCONNECTED);
           }
-        },
+        }) as BotEventHandler,
       },
 
       // Health changes
       {
         event: 'health',
         handler: () => {
-          this.emit('healthChange', this.bot!.health, this.bot!.food);
+          this.emitter.emit('healthChange', this.bot!.health, this.bot!.food);
         },
       },
 
@@ -357,31 +328,32 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       {
         event: 'move',
         handler: () => {
-          this.emit('positionChange', this.bot!.entity.position);
+          this.emitter.emit('positionChange', this.bot!.entity.position);
         },
       },
 
       // Inventory changes
       {
         event: 'windowOpen',
-        handler: (window: Window) => {
-          this.emit('windowOpen', window);
-        },
+        handler: ((window: Window) => {
+          this.emitter.emit('windowOpen', window);
+        }) as BotEventHandler,
       },
 
       {
         event: 'windowClose',
-        handler: (window: Window) => {
-          this.emit('windowClose', window);
-        },
+        handler: ((window: Window) => {
+          this.emitter.emit('windowClose', window);
+        }) as BotEventHandler,
       },
     ];
 
     // Register all handlers
     handlers.forEach(({ event, handler }) => {
-      this.bot!.on(event, handler);
+      (this.bot as any).on(event, handler);
       if (!this.botEventHandlers.has(event)) {
         this.botEventHandlers.set(event, []);
+        this.botEventNames.push(event);
       }
       this.botEventHandlers.get(event)!.push(handler);
     });
@@ -406,11 +378,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
     if (this.reconnectAttempt >= maxAttempts) {
       console.error(`[BotManager] Max reconnect attempts (${maxAttempts}) reached`);
       const error = new Error(`Max reconnect attempts (${maxAttempts}) reached`);
-      this.eventEmitter.emit(EventNames.RECONNECT_FAILED, {
-        error,
-        attempts: this.reconnectAttempt,
-        timestamp: Date.now(),
-      });
+      this.eventEmitter.emit(EventNames.RECONNECT_FAILED, error);
       void this.stateMachine.transition(BotState.ERROR);
       return;
     }
@@ -424,11 +392,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       `[BotManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt}/${maxAttempts})`
     );
 
-    this.eventEmitter.emit(EventNames.RECONNECT, {
-      attempt: this.reconnectAttempt,
-      delay,
-      timestamp: Date.now(),
-    });
+    this.eventEmitter.emit(EventNames.RECONNECT, this.reconnectAttempt);
 
     // Wait for delay
     await new Promise((resolve) => {
@@ -474,12 +438,16 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
 
     // Remove all bot event handlers
     if (this.bot) {
-      this.botEventHandlers.forEach((handlers, event) => {
-        handlers.forEach((handler) => {
-          this.bot!.off(event, handler);
-        });
+      this.botEventNames.forEach((event) => {
+        const handlers = this.botEventHandlers.get(event);
+        if (handlers) {
+          handlers.forEach((handler) => {
+            (this.bot as any).off(event, handler);
+          });
+        }
       });
       this.botEventHandlers.clear();
+      this.botEventNames.length = 0;
     }
 
     // Unload all plugins
@@ -551,7 +519,7 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
       username: this.bot?.username,
       uptime: this.startTime ? Date.now() - this.startTime : 0,
       reconnectAttempts: this.reconnectAttempt,
-      lastError: this.lastError,
+      lastError: this.lastError ?? undefined,
       plugins: this.pluginManager.getLoadOrder(),
       memoryUsage: process.memoryUsage(),
     };
@@ -672,21 +640,57 @@ export class BotManager extends EventEmitter implements BotManagerInterface {
     return this.bot?.inventory.items() ?? [];
   }
 
-  // EventEmitter delegation
+  // EventEmitter delegation - delegate to internal emitter
   on<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
-    return super.on(event, listener);
+    this.emitter.on(event as string, listener as (...args: unknown[]) => void);
+    return this;
   }
 
   once<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
-    return super.once(event, listener);
+    this.emitter.once(event as string, listener as (...args: unknown[]) => void);
+    return this;
   }
 
   emit<K extends keyof BotEvents>(event: K, ...args: BotEvents[K]): boolean {
-    return super.emit(event, ...args);
+    return this.emitter.emit(event as string, ...args);
   }
 
   off<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
-    return super.off(event, listener);
+    this.emitter.off(event as string, listener as (...args: unknown[]) => void);
+    return this;
+  }
+
+  // Additional EventEmitter methods for compatibility
+  setMaxListeners(n: number): this {
+    this.emitter.setMaxListeners(n);
+    return this;
+  }
+
+  getMaxListeners(): number {
+    return this.emitter.getMaxListeners();
+  }
+
+  listenerCount(eventName: string | symbol): number {
+    return this.emitter.listenerCount(eventName);
+  }
+
+  eventNames(): (string | symbol)[] {
+    return this.emitter.eventNames();
+  }
+
+  prependListener<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+    this.emitter.prependListener(event as string, listener as (...args: unknown[]) => void);
+    return this;
+  }
+
+  prependOnceListener<K extends keyof BotEvents>(event: K, listener: (...args: BotEvents[K]) => void): this {
+    this.emitter.prependOnceListener(event as string, listener as (...args: unknown[]) => void);
+    return this;
+  }
+
+  removeAllListeners<K extends keyof BotEvents>(event?: K): this {
+    this.emitter.removeAllListeners(event as string | undefined);
+    return this;
   }
 }
 

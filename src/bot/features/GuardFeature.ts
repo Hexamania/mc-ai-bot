@@ -1,6 +1,6 @@
 /**
  * Guard Feature
- * Handles guarding a location - stays at a position using GoalBlock
+ * Handles guarding a location - stays at a position using GoalNear
  */
 
 import { Vec3 } from 'vec3';
@@ -54,9 +54,6 @@ export class GuardFeature extends BaseFeature {
       this.defaultRange = options.defaultRange ?? 1;
     }
 
-    // Register guard commands
-    this.registerCommands();
-
     console.log('[GuardFeature] Guard feature enabled');
   }
 
@@ -77,77 +74,6 @@ export class GuardFeature extends BaseFeature {
   }
 
   /**
-   * Register guard-related commands
-   */
-  private registerCommands(): void {
-    const manager = this.getManager();
-
-    // Guard command - start guarding at current or specified position
-    manager.registerCommand?.({
-      name: 'guard',
-      description: 'Start guarding at current position or specified coordinates',
-      usage: 'guard [x] [y] [z]',
-      adminOnly: true,
-      execute: async (context: { args: string[]; reply: (msg: string) => void }) => {
-        const { args, reply } = context;
-
-        if (args.length === 0) {
-          // Guard at current position
-          await this.startGuarding();
-          reply('🛡️ Guarding current location');
-        } else if (args.length === 3) {
-          // Guard at specified position
-          const x = parseFloat(args[0]);
-          const y = parseFloat(args[1]);
-          const z = parseFloat(args[2]);
-
-          if (isNaN(x) || isNaN(y) || isNaN(z)) {
-            reply('❌ Invalid coordinates. Usage: guard [x] [y] [z]');
-            return;
-          }
-
-          await this.startGuarding(new Vec3(x, y, z));
-          reply(`🛡️ Guarding position ${Math.floor(x)}, ${Math.floor(y)}, ${Math.floor(z)}`);
-        } else {
-          reply('❌ Usage: guard [x] [y] [z]');
-        }
-      },
-    });
-
-    // Stop guard command
-    manager.registerCommand?.({
-      name: 'stopguard',
-      description: 'Stop guarding',
-      usage: 'stopguard',
-      adminOnly: true,
-      execute: async (context: { reply: (msg: string) => void }) => {
-        const { reply } = context;
-        await this.stopGuarding();
-        reply('🛑 Stopped guarding');
-      },
-    });
-
-    // Guard status command
-    manager.registerCommand?.({
-      name: 'guardstatus',
-      description: 'Get current guard status',
-      usage: 'guardstatus',
-      adminOnly: true,
-      execute: async (context: { reply: (msg: string) => void }) => {
-        const { reply } = context;
-        const pos = this.getGuardPosition();
-        const status = this.isGuardingNow() ? 'Guarding' : 'Not guarding';
-
-        if (pos) {
-          reply(`🛡️ ${status} at ${Math.floor(pos.x)}, ${Math.floor(pos.y)}, ${Math.floor(pos.z)}`);
-        } else {
-          reply(`🛡️ ${status}`);
-        }
-      },
-    });
-  }
-
-  /**
    * Start guarding at a position
    * @param position - Optional position to guard. If not provided, uses current position.
    */
@@ -162,9 +88,6 @@ export class GuardFeature extends BaseFeature {
     const bot = this.getBot();
     this.guardPosition = position ?? bot.entity.position.clone();
     this.isGuarding = true;
-
-    // Set the objective for tracking
-    this.emit('taskUpdate', { goal: 'guarding', status: 'active', position: this.guardPosition });
 
     // Start the guard loop
     this.guardLoop();
@@ -192,8 +115,6 @@ export class GuardFeature extends BaseFeature {
     // Stop the pathfinder
     bot.pathfinder.stop();
 
-    this.emit('taskUpdate', { goal: 'guarding', status: 'stopped' });
-
     console.log('[GuardFeature] Stopped guarding');
   }
 
@@ -214,7 +135,7 @@ export class GuardFeature extends BaseFeature {
   }
 
   /**
-   * Private guard loop - stays at position using GoalBlock
+   * Private guard loop - stays at position using GoalNear
    * Updates every 2 seconds (configurable)
    */
   private guardLoop(): void {
@@ -225,8 +146,8 @@ export class GuardFeature extends BaseFeature {
     const bot = this.getBot();
 
     try {
-      // Set goal to stay at the guard position
-      const goal = new goals.GoalBlock(
+      // Set goal to stay at the guard position with range
+      const goal = new goals.GoalNear(
         this.guardPosition.x,
         this.guardPosition.y,
         this.guardPosition.z,

@@ -471,7 +471,7 @@ export class BuildingFeature extends BaseFeature {
           await bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 4));
         }
 
-        const item = bot.inventory.findInventoryItem(obsidianId);
+        const item = bot.inventory.findInventoryItem(obsidianId, null, false);
         if (!item) return;
         await bot.equip(item, 'hand');
 
@@ -499,7 +499,7 @@ export class BuildingFeature extends BaseFeature {
       }
     }
 
-    const flint = bot.inventory.findInventoryItem(flintId);
+    const flint = bot.inventory.findInventoryItem(flintId, null, false);
     const portalInside = startPos.offset(1, 1, 0);
     const blockAtPortalInside = bot.blockAt(portalInside);
     if (flint && blockAtPortalInside && blockAtPortalInside.name === 'air') {

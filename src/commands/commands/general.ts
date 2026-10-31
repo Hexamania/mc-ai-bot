@@ -61,7 +61,7 @@ export const statusCommand: CommandDefinition = {
     report += `📍 Position: ${pos ? `X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}` : 'Unknown'}\n`;
     report += `🌍 Dimension: ${bot.game?.dimension || 'Unknown'}\n`;
     report += `🕐 Time: ${bot.time?.timeOfDay || 'Unknown'}\n`;
-    report += `📡 Ping: ${bot._client?.getLatency() || 'Unknown'}ms\n`;
+    report += `📡 Ping: ${bot._client?.latency || 'Unknown'}ms\n`;
 
     // Inventory summary
     const items = bot.inventory.items();
@@ -125,7 +125,7 @@ export const versionCommand: CommandDefinition = {
     context.privateReply(
       `🤖 **Airi Bot Version Info**\n` +
         `Version: 1.0.0\n` +
-        `Minecraft: ${bot.game?.version || 'Unknown'}\n` +
+        `Minecraft: ${bot._client?.version || 'Unknown'}\n` +
         `Protocol: ${bot._client?.protocolVersion || 'Unknown'}\n` +
         `Node: ${process.version}\n` +
         `Platform: ${process.platform}\n` +

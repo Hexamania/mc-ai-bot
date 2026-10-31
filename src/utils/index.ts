@@ -4,7 +4,8 @@
 
 import type { Bot } from 'mineflayer';
 import type { Vec3 } from 'vec3';
-import type { BotPosition } from '../types';
+import type { BotPosition, EquipmentDestination } from '../types';
+import type { goals } from 'mineflayer-pathfinder';
 
 /**
  * Sleep/delay utility
@@ -227,9 +228,10 @@ export function autoArmor(bot: Bot): void {
     items.sort((a, b) => ids.indexOf(a.type) - ids.indexOf(b.type));
     const best = items[0];
 
-    const current = bot.inventory.slots[bot.getEquipmentDestSlot(slot)];
+    const equipSlot = slot as EquipmentDestination;
+    const current = bot.inventory.slots[bot.getEquipmentDestSlot(equipSlot)];
     if (!current || current.type !== best.type) {
-      void bot.equip(best, slot).catch(() => undefined);
+      void bot.equip(best, equipSlot).catch(() => undefined);
     }
   }
 }
@@ -324,7 +326,7 @@ export function getNearestEntity(
 /**
  * Safe pathfinder goto with timeout
  */
-export async function safeGoto(bot: Bot, goal: unknown, timeout = 30000): Promise<boolean> {
+export async function safeGoto(bot: Bot, goal: goals.Goal | null, timeout = 30000): Promise<boolean> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       bot.pathfinder.setGoal(null);
@@ -443,7 +445,7 @@ export function safeJsonParse<T>(str: string, fallback: T): T {
  */
 export function getItemCount(bot: Bot, itemName: string): number {
   const item = bot.registry.itemsByName[itemName];
-  return item ? bot.inventory.count(item.id) : 0;
+  return item ? bot.inventory.count(item.id, null) : 0;
 }
 
 /**

@@ -4,15 +4,24 @@
  */
 
 import type { Bot } from 'mineflayer';
-import mineflayer from 'mineflayer';
+import * as mineflayer from 'mineflayer';
 import { pathfinder, Movements, goals } from 'mineflayer-pathfinder';
-import mcDataLoader from 'minecraft-data';
+import mcDataLoader = require('minecraft-data');
 import { EventEmitter } from 'events';
 import { getConfig } from '../config';
-import type { BotConfig, BotState, BotStatus, BotPosition, MapBlock, MapEntity } from '../types';
+import type { BotConfig, BotState, BotStatus, BotPosition, MapBlock, MapEntity, Equipment, AppConfig } from '../types';
 import { loadMemory, rememberLocation, rememberPlayer, persistMemory } from '../memory';
 import { getCommandRegistry, createCommandContext, parseCommand } from '../commands';
 import { getFeatureRegistry } from '../plugins';
+import type { Server as SocketIOServer } from 'socket.io';
+
+// Extend FeatureRegistry with initializeAll and shutdownAll methods
+import type { FeatureRegistry } from '../types';
+
+interface ExtendedFeatureRegistry extends FeatureRegistry {
+  initializeAll(bot: Bot): Promise<void>;
+  shutdownAll(): Promise<void>;
+}
 
 /**
  * Bot manager class - handles bot lifecycle and state
@@ -47,7 +56,15 @@ export class BotManager extends EventEmitter {
     inventory: [],
     currentPath: [],
     favorites: {},
-    equipment: {},
+    equipment: {
+      head: 'Empty',
+      chest: 'Empty',
+      legs: 'Empty',
+      feet: 'Empty',
+      hand: 'Empty',
+      offhand: 'Empty',
+    },
+    mapData: { blocks: [], entities: [] },
   };
 
   // Feature flags
@@ -83,7 +100,7 @@ export class BotManager extends EventEmitter {
   adminSessions: Record<string, boolean> = {};
 
   // Socket.io reference
-  private io: unknown = null;
+  private io: SocketIOServer | null = null;
 
   constructor(private config: BotConfig) {
     super();
@@ -93,7 +110,7 @@ export class BotManager extends EventEmitter {
   /**
    * Set Socket.io instance for real-time updates
    */
-  setSocketIO(io: unknown): void {
+  setSocketIO(io: SocketIOServer): void {
     this.io = io;
   }
 
@@ -115,6 +132,7 @@ export class BotManager extends EventEmitter {
    * Get current bot status
    */
   getStatus(): BotStatus {
+    const fullConfig = getConfig();
     return {
       online: this.isOnline,
       username: this.client?.username || this.config.username,
@@ -348,13 +366,13 @@ export class BotManager extends EventEmitter {
 
     instance.on('message', (msg) => this.onMessage(instance, msg));
 
-    // Forward other events
-    instance.on('health', () => this.emit('health'));
-    instance.on('physicsTick', () => this.emit('physicsTick'));
-    instance.on('path_update', (r) => this.emit('path_update', r));
-    instance.on('goal_reached', () => this.emit('goal_reached'));
-    instance.on('playerCollect', (e) => this.emit('playerCollect', e));
-    instance.on('resourcePack', () => this.emit('resourcePack'));
+    // Forward other events - using void to handle boolean return
+    instance.on('health', () => void this.emit('health'));
+    instance.on('physicsTick', () => void this.emit('physicsTick'));
+    instance.on('path_update', (r) => void this.emit('path_update', r));
+    instance.on('goal_reached', () => void this.emit('goal_reached'));
+    instance.on('playerCollect', (e) => void this.emit('playerCollect', e));
+    instance.on('resourcePack', () => void this.emit('resourcePack'));
   }
 
   /**
@@ -375,14 +393,12 @@ export class BotManager extends EventEmitter {
 
     // Initialize minecraft-data and movements
     this.mcData = mcDataLoader(instance.version) || mcDataLoader(this.config.version);
-    this.movements = new Movements(instance, this.mcData);
+    this.movements = new Movements(instance);
 
-    // Configure movements
+    // Configure movements - using available properties only
     this.movements.canDig = true;
-    this.movements.allowBridging = true;
     this.movements.allowParkour = true;
     this.movements.allowSprinting = true;
-    this.movements.climbMax = 1;
     instance.pathfinder.setMovements(this.movements);
 
     // Set up periodic look updates to prevent AFK kick
@@ -425,7 +441,7 @@ export class BotManager extends EventEmitter {
    * Initialize features after spawn
    */
   private async initializeFeatures(instance: mineflayer.Bot): Promise<void> {
-    const featureRegistry = getFeatureRegistry();
+    const featureRegistry = getFeatureRegistry() as ExtendedFeatureRegistry;
     await featureRegistry.initializeAll(instance);
   }
 
@@ -498,18 +514,29 @@ export class BotManager extends EventEmitter {
       }
     }
 
-    const entities: MapEntity[] = Object.values(instance.entities)
+    // Type the entities properly - use unknown to avoid type overlap issues
+    const entities = Object.values(instance.entities) as unknown as Array<{
+      position: { x: number; y: number; z: number; distanceTo: (pos: { x: number; y: number; z: number }) => number };
+      username?: string;
+      displayName?: string;
+      name?: string;
+      type?: string;
+      id: number;
+    }>;
+
+    const botEntityId = instance.entity.id;
+    const mapEntities: MapEntity[] = entities
       .filter(
-        (e) => e !== instance.entity && e.position.distanceTo(instance.entity.position) < mapRadius
+        (e) => e.id !== botEntityId && e.position.distanceTo(instance.entity.position) < mapRadius
       )
       .map((e) => ({
         x: e.position.x - instance.entity.position.x,
         z: e.position.z - instance.entity.position.z,
-        name: e.username || e.displayName || e.name,
+        name: e.username || e.displayName || e.name || 'Unknown',
         isPlayer: e.type === 'player',
       }));
 
-    this.state.mapData = { blocks: mapBlocks, entities };
+    this.state.mapData = { blocks: mapBlocks, entities: mapEntities };
 
     // Emit consolidated update
     this.io?.emit('bulk_update', { ...this.state, botData: this.state.botData });
@@ -527,6 +554,7 @@ export class BotManager extends EventEmitter {
 
     const { user, msg: content, type } = parsed;
     rememberPlayer(user);
+    const fullConfig = getConfig();
     const isAdmin = this.adminSessions[user] === true;
 
     // Handle waiting for help
@@ -536,7 +564,7 @@ export class BotManager extends EventEmitter {
     }
 
     // Handle admin login via PM
-    if (type === 'pm' && content.startsWith(this.config.admin.prefix)) {
+    if (type === 'pm' && content.startsWith(fullConfig.admin.prefix)) {
       this.handleAdminLogin(user, content);
       return;
     }
@@ -595,8 +623,9 @@ export class BotManager extends EventEmitter {
    * Handle admin login
    */
   private handleAdminLogin(user: string, content: string): void {
+    const fullConfig = getConfig();
     const args = content.slice(1).split(' ');
-    if (args[0] === 'loginadmin' && args.slice(1).join(' ') === this.config.admin.password) {
+    if (args[0] === 'loginadmin' && args.slice(1).join(' ') === fullConfig.admin.password) {
       this.adminSessions[user] = true;
       this.pm(user, '✅ Admin login successful');
       this.log('ADMIN', `${user} logged in`);
@@ -612,12 +641,13 @@ export class BotManager extends EventEmitter {
     type: 'chat' | 'pm',
     isAdmin: boolean
   ): void {
-    const isPublic = content.startsWith(this.config.prefix.public);
-    const isAdminCmd = content.startsWith(this.config.prefix.admin);
+    const fullConfig = getConfig();
+    const isPublic = content.startsWith(fullConfig.prefix.public);
+    const isAdminCmd = content.startsWith(fullConfig.prefix.admin);
 
     if (!isPublic && !isAdminCmd) return;
 
-    const prefix = isAdminCmd ? this.config.prefix.admin : this.config.prefix.public;
+    const prefix = isAdminCmd ? fullConfig.prefix.admin : fullConfig.prefix.public;
     const parsed = parseCommand(content, prefix);
     if (!parsed) return;
 
@@ -663,7 +693,7 @@ export class BotManager extends EventEmitter {
     }
 
     // Shutdown features
-    const featureRegistry = getFeatureRegistry();
+    const featureRegistry = getFeatureRegistry() as ExtendedFeatureRegistry;
     await featureRegistry.shutdownAll();
 
     // Disconnect bot

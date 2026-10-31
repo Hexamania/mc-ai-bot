@@ -246,8 +246,8 @@ export class HelpFormatter {
     }
 
     // Permission indicator
-    if (command.permission.level !== 'guest') {
-      line += ` ${theme.warning}[${command.permission.level.toUpperCase()}]`;
+    if (command.permission?.level !== 'guest') {
+      line += ` ${theme.warning}[${command.permission?.level.toUpperCase()}]`;
     }
 
     if (command.deprecated) {
@@ -314,15 +314,16 @@ export class HelpFormatter {
 
     // Permissions
     output += `${theme.subHeader}Permissions${theme.separator}\n`;
-    output += `${theme.bullet}Level: ${theme.warning}${command.permission.level}${theme.description}\n`;
-    if (command.permission.pmOnly)
+    const permLevel = command.permission?.level ?? 'guest';
+    output += `${theme.bullet}Level: ${theme.warning}${permLevel}${theme.description}\n`;
+    if (command.permission?.pmOnly)
       output += `${theme.bullet}PM only: ${theme.warning}Yes${theme.description}\n`;
-    if (command.permission.publicOnly)
+    if (command.permission?.publicOnly)
       output += `${theme.bullet}Public only: ${theme.warning}Yes${theme.description}\n`;
-    if (command.permission.allowedUsers?.length) {
+    if (command.permission?.allowedUsers?.length) {
       output += `${theme.bullet}Allowed users: ${command.permission.allowedUsers.join(', ')}\n`;
     }
-    if (command.permission.deniedUsers?.length) {
+    if (command.permission?.deniedUsers?.length) {
       output += `${theme.bullet}Denied users: ${command.permission.deniedUsers.join(', ')}\n`;
     }
 
@@ -351,7 +352,7 @@ export class HelpFormatter {
     const theme = this.options.theme;
     const required = arg.required ? 'required' : 'optional';
 
-    let typeStr = arg.type;
+    let typeStr: string = arg.type;
     if (arg.type === 'enum' && arg.enumValues) {
       typeStr = arg.enumValues.join(' | ');
     }
@@ -428,7 +429,7 @@ export class HelpFormatter {
       // Skip deprecated unless showDeprecated
       if (cmd.deprecated && !this.options.showDeprecated) return false;
       // Check permission level
-      const cmdLevelValue = hierarchy[cmd.permission.level];
+      const cmdLevelValue = hierarchy[cmd.permission?.level ?? 'guest'];
       return cmdLevelValue <= userLevelValue;
     });
   }
@@ -454,6 +455,13 @@ export class HelpFormatter {
    */
   setTheme(theme: HelpTheme): void {
     this.options.theme = theme;
+  }
+
+  /**
+   * Get current formatter options
+   */
+  getOptions(): HelpFormatterOptions {
+    return { ...this.options };
   }
 }
 
@@ -510,7 +518,7 @@ export function createHelpCommand(
           privateReply(`❌ No commands found in category: ${category}`);
           return;
         }
-        const oldUseCategories = formatter['options'].useCategories;
+        const oldUseCategories = formatter.getOptions().useCategories;
         formatter.setOptions({ useCategories: false });
         privateReply(formatter.getFullHelp(permissionLevel));
         formatter.setOptions({ useCategories: oldUseCategories });
@@ -519,11 +527,10 @@ export function createHelpCommand(
 
       // Check for all option
       if (args.options.all) {
-        const oldShowHidden = formatter['options'].showHidden;
-        const oldShowDeprecated = formatter['options'].showDeprecated;
+        const oldOptions = formatter.getOptions();
         formatter.setOptions({ showHidden: true, showDeprecated: true });
         privateReply(formatter.getFullHelp(permissionLevel));
-        formatter.setOptions({ showHidden: oldShowHidden, showDeprecated: oldShowDeprecated });
+        formatter.setOptions({ showHidden: oldOptions.showHidden, showDeprecated: oldOptions.showDeprecated });
         return;
       }
 

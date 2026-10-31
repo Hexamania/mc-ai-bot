@@ -5,6 +5,7 @@
 
 import type { Bot } from 'mineflayer';
 import type { Feature, FeatureRegistry } from '../types';
+import type { BotManager } from '../bot/BotManager';
 
 /**
  * Internal feature registry implementation
@@ -70,8 +71,9 @@ class FeatureRegistryImpl implements FeatureRegistry {
 
   /**
    * Initialize all features in dependency order
+   * Note: This is an extension method not in the base FeatureRegistry interface
    */
-  async initializeAll(bot: Bot): Promise<void> {
+  async initializeAll(bot: Bot, manager: BotManager): Promise<void> {
     // Topological sort based on dependencies
     const sorted = this.topologicalSort();
 
@@ -97,7 +99,7 @@ class FeatureRegistryImpl implements FeatureRegistry {
 
       try {
         console.log(`[PLUGINS] Initializing: ${name}`);
-        await feature.initialize(bot, this);
+        await feature.initialize(bot, manager);
         this.initialized.add(name);
         this.initializationOrder.push(name);
         console.log(`[PLUGINS] Initialized: ${name}`);
@@ -109,6 +111,7 @@ class FeatureRegistryImpl implements FeatureRegistry {
 
   /**
    * Shutdown all features in reverse initialization order
+   * Note: This is an extension method not in the base FeatureRegistry interface
    */
   async shutdownAll(): Promise<void> {
     for (const name of this.initializationOrder.slice().reverse()) {
@@ -208,6 +211,7 @@ export abstract class BaseFeature implements Feature {
   public readonly version: string;
   public readonly description: string;
   public readonly dependencies: string[];
+  public enabled: boolean = true;
 
   constructor(name: string, version: string, description: string, dependencies: string[] = []) {
     this.name = name;
@@ -216,8 +220,18 @@ export abstract class BaseFeature implements Feature {
     this.dependencies = dependencies;
   }
 
-  abstract initialize(bot: Bot, registry: FeatureRegistry): Promise<void> | void;
+  abstract initialize(bot: Bot, manager: BotManager): Promise<void> | void;
   abstract shutdown(): Promise<void> | void;
+
+  enable(): Promise<void> | void {
+    this.enabled = true;
+    console.log(`[FEATURE] ${this.name} enabled`);
+  }
+
+  disable(): Promise<void> | void {
+    this.enabled = false;
+    console.log(`[FEATURE] ${this.name} disabled`);
+  }
 }
 
 /**
@@ -257,11 +271,20 @@ export const coreFeature: Feature = {
   version: '1.0.0',
   description: 'Core bot functionality and lifecycle management',
   dependencies: [],
-  initialize: async (_bot: Bot) => {
+  enabled: true,
+  initialize: async (_bot: Bot, _manager: BotManager) => {
     console.log('[CORE] Core feature initialized');
   },
   shutdown: async () => {
     console.log('[CORE] Core feature shut down');
+  },
+  enable(): void {
+    this.enabled = true;
+    console.log('[CORE] Core feature enabled');
+  },
+  disable(): void {
+    this.enabled = false;
+    console.log('[CORE] Core feature disabled');
   },
 };
 
@@ -271,11 +294,20 @@ export const movementFeature: Feature = {
   version: '1.0.0',
   description: 'Pathfinding, movement, and navigation utilities',
   dependencies: ['core'],
-  initialize: async (_bot: Bot) => {
+  enabled: true,
+  initialize: async (_bot: Bot, _manager: BotManager) => {
     console.log('[MOVEMENT] Movement feature initialized');
   },
   shutdown: async () => {
     console.log('[MOVEMENT] Movement feature shut down');
+  },
+  enable(): void {
+    this.enabled = true;
+    console.log('[MOVEMENT] Movement feature enabled');
+  },
+  disable(): void {
+    this.enabled = false;
+    console.log('[MOVEMENT] Movement feature disabled');
   },
 };
 
@@ -285,11 +317,20 @@ export const combatFeature: Feature = {
   version: '1.0.0',
   description: 'Combat mechanics, PvP, and auto-defense',
   dependencies: ['core', 'movement'],
-  initialize: async (_bot: Bot) => {
+  enabled: true,
+  initialize: async (_bot: Bot, _manager: BotManager) => {
     console.log('[COMBAT] Combat feature initialized');
   },
   shutdown: async () => {
     console.log('[COMBAT] Combat feature shut down');
+  },
+  enable(): void {
+    this.enabled = true;
+    console.log('[COMBAT] Combat feature enabled');
+  },
+  disable(): void {
+    this.enabled = false;
+    console.log('[COMBAT] Combat feature disabled');
   },
 };
 
@@ -299,11 +340,20 @@ export const automationFeature: Feature = {
   version: '1.0.0',
   description: 'Automation tasks: mining, farming, building, progression',
   dependencies: ['core', 'movement'],
-  initialize: async (_bot: Bot) => {
+  enabled: true,
+  initialize: async (_bot: Bot, _manager: BotManager) => {
     console.log('[AUTOMATION] Automation feature initialized');
   },
   shutdown: async () => {
     console.log('[AUTOMATION] Automation feature shut down');
+  },
+  enable(): void {
+    this.enabled = true;
+    console.log('[AUTOMATION] Automation feature enabled');
+  },
+  disable(): void {
+    this.enabled = false;
+    console.log('[AUTOMATION] Automation feature disabled');
   },
 };
 
@@ -313,11 +363,20 @@ export const memoryFeature: Feature = {
   version: '1.0.0',
   description: 'Persistent memory system for locations, players, tasks',
   dependencies: ['core'],
-  initialize: async (_bot: Bot, _registry: FeatureRegistry) => {
+  enabled: true,
+  initialize: async (_bot: Bot, _manager: BotManager) => {
     console.log('[MEMORY] Memory feature initialized');
   },
   shutdown: async () => {
     console.log('[MEMORY] Memory feature shut down');
+  },
+  enable(): void {
+    this.enabled = true;
+    console.log('[MEMORY] Memory feature enabled');
+  },
+  disable(): void {
+    this.enabled = false;
+    console.log('[MEMORY] Memory feature disabled');
   },
 };
 
@@ -327,11 +386,20 @@ export const webFeature: Feature = {
   version: '1.0.0',
   description: 'Web dashboard and Socket.io server',
   dependencies: ['core', 'memory'],
-  initialize: async (_bot: Bot, _registry: FeatureRegistry) => {
+  enabled: true,
+  initialize: async (_bot: Bot, _manager: BotManager) => {
     console.log('[WEB] Web feature initialized');
   },
   shutdown: async () => {
     console.log('[WEB] Web feature shut down');
+  },
+  enable(): void {
+    this.enabled = true;
+    console.log('[WEB] Web feature enabled');
+  },
+  disable(): void {
+    this.enabled = false;
+    console.log('[WEB] Web feature disabled');
   },
 };
 

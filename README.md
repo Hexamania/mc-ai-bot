@@ -1,3 +1,4 @@
+⚠️ not meant for prod use!
 # Airi OS
 
 **A configurable Minecraft bot with a live dashboard and a Windows desktop app.**

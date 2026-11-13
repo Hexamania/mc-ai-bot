@@ -153,7 +153,9 @@ impl MinecraftRuntime {
                     connection.disconnect()?;
                 }
             }
-            BotState::Error => self.state_machine.transition(BotState::ShuttingDown)?,
+            BotState::Error => {
+                self.state_machine.transition(BotState::ShuttingDown)?;
+            }
             BotState::Disconnected | BotState::Connecting | BotState::Reconnecting => {
                 self.state_machine.transition(BotState::Disconnected)?;
             }

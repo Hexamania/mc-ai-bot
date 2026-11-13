@@ -25,7 +25,7 @@ pub enum MinecraftEvent {
     },
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum MinecraftTransportError {
     #[error("Minecraft host is required")]
     MissingHost,
@@ -204,7 +204,7 @@ fn server_address(host: &str, port: u16) -> String {
 mod tests {
     use super::*;
 
-    fn config() -> BotConfig {
+    fn default_config() -> BotConfig {
         BotConfig {
             host: "localhost".to_owned(),
             port: 25565,
@@ -218,36 +218,36 @@ mod tests {
 
     #[test]
     fn accepts_the_supported_protocol_and_authentication_modes() {
-        assert_eq!(validate_config(&config()), Ok(()));
-        let mut config = config();
+        assert_eq!(validate_config(&default_config()), Ok(()));
+        let mut config = default_config();
         config.auth = "microsoft".to_owned();
         assert_eq!(validate_config(&config), Ok(()));
     }
 
     #[test]
     fn rejects_missing_connection_values_and_unsupported_protocols() {
-        let mut config = config();
+        let mut config = default_config();
         config.host.clear();
         assert_eq!(
             validate_config(&config),
             Err(MinecraftTransportError::MissingHost)
         );
 
-        let mut config = config();
+        let mut config = default_config();
         config.port = 0;
         assert_eq!(
             validate_config(&config),
             Err(MinecraftTransportError::InvalidPort)
         );
 
-        let mut config = config();
+        let mut config = default_config();
         config.username = "  ".to_owned();
         assert_eq!(
             validate_config(&config),
             Err(MinecraftTransportError::MissingUsername)
         );
 
-        let mut config = config();
+        let mut config = default_config();
         config.version = "1.20.4".to_owned();
         assert_eq!(
             validate_config(&config),
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn rejects_unsupported_authentication_without_connecting() {
-        let mut config = config();
+        let mut config = default_config();
         config.auth = "mojang".to_owned();
         assert_eq!(
             validate_config(&config),

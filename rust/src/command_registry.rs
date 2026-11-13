@@ -862,8 +862,14 @@ mod tests {
     use std::{
         future::Future,
         sync::{Mutex, MutexGuard},
-        task::{Context as TaskContext, Poll, Waker},
+        task::{Context as TaskContext, Poll, Wake, Waker},
     };
+
+    struct NoopWake;
+
+    impl Wake for NoopWake {
+        fn wake(self: Arc<Self>) {}
+    }
 
     fn handler(
         callback: impl Fn(&CommandContext) -> Result<(), String> + Send + Sync + 'static,
@@ -898,8 +904,8 @@ mod tests {
     }
 
     fn run<F: Future>(future: F) -> F::Output {
-        let waker = Waker::noop();
-        let mut task_context = TaskContext::from_waker(waker);
+        let waker = Waker::from(Arc::new(NoopWake));
+        let mut task_context = TaskContext::from_waker(&waker);
         let mut future = Box::pin(future);
         loop {
             match future.as_mut().poll(&mut task_context) {

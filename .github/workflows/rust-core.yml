@@ -1,0 +1,25 @@
+name: Rust core
+
+on:
+  push:
+    branches: [rust-rewrite]
+  pull_request:
+    branches: [rust-rewrite]
+
+jobs:
+  check-and-test:
+    name: Check and test Rust core
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path rust/Cargo.toml -- --check
+      - name: Check all targets
+        run: cargo check --all-targets --manifest-path rust/Cargo.toml
+      - name: Run tests
+        run: cargo test --manifest-path rust/Cargo.toml

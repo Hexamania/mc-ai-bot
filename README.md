@@ -159,9 +159,11 @@ The web dashboard (served on the configured port) provides:
 ## Rust Migration (In Progress)
 
 The initial Rust core is in [`rust/`](./rust/). It ports environment-backed configuration,
-validation, the bot lifecycle state machine, legacy-to-v2 memory normalization, atomic memory-file
-writes, and remembered-fact operations. Focused Rust tests cover defaults, invalid ports and memory
-shapes, lifecycle transitions, legacy migration, fact updates, and persistence.
+validation, the bot lifecycle state machine, chat command parsing, role-based permissions,
+legacy-to-v2 memory normalization, atomic memory-file writes, and remembered-fact operations.
+Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions, chat
+formats, permission checks, legacy migration, fact updates, and persistence.
+The `Rust core` GitHub Actions workflow checks formatting, all targets, and tests on Windows.
 
 This is the first migration slice, not yet a replacement application. The Minecraft connection and
 automation, command registry, HTTP and Socket.IO dashboard, and Electron/Vue desktop app still run

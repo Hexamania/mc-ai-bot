@@ -591,7 +591,7 @@ impl CommandRegistry {
         }
         self.update_cooldown(&command, context, Instant::now())?;
 
-        let mut execution_error = command.execute(context, self).await.err();
+        let mut execution_error = (command.execute)(context, self).await.err();
         let mut completion_error = None;
         if let Some(on_complete) = &command.on_complete {
             if let Err(error) = on_complete(context, execution_error.as_deref()).await {

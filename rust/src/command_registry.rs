@@ -1081,7 +1081,7 @@ mod tests {
         assert!(full_help.contains("!ping"));
         assert!(full_help.contains("!help"));
         assert!(registry
-            .get_help("p", "!")
+            .get_help("ping", "!")
             .unwrap()
             .unwrap()
             .contains("Check bot responsiveness"));

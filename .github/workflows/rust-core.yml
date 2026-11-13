@@ -14,8 +14,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Set up Azalea-compatible nightly Rust
-        uses: dtolnay/rust-toolchain@nightly-2024-10-23
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2024-10-23
           components: rustfmt
       - name: Check formatting
         run: cargo fmt --manifest-path rust/Cargo.toml -- --check

@@ -24,7 +24,7 @@ pub struct TransitionRecord {
     pub timestamp_ms: i64,
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[error("invalid bot state transition: {from:?} -> {to:?}")]
 pub struct InvalidTransition {
     pub from: BotState,

@@ -25,7 +25,7 @@ pub enum MinecraftEvent {
     },
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum MinecraftTransportError {
     #[error("Minecraft host is required")]
     MissingHost,

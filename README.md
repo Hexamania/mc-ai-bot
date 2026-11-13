@@ -159,22 +159,25 @@ The web dashboard (served on the configured port) provides:
 ## Rust Migration (In Progress)
 
 The initial Rust core is in [`rust/`](./rust/). It ports environment-backed configuration,
-validation, the bot lifecycle state machine, Minecraft transport and event mapping, chat command
-parsing, typed argument and option parsing, role-based permissions, and a command registry with
-async handlers, aliases, help, cooldowns, and execution statistics. It also ports legacy-to-v2
-memory normalization, atomic memory-file writes, and remembered-fact operations.
+validation, the bot lifecycle state machine, Minecraft transport and event mapping, automatic
+reconnection, chat command parsing, typed argument and option parsing, role-based permissions, and
+a command registry with async handlers, aliases, help, cooldowns, and execution statistics. It also
+ports legacy-to-v2 memory normalization, atomic memory-file writes, and remembered-fact operations.
 The Minecraft transport currently supports protocol `1.21.1` with offline or Microsoft
 authentication. Set `MC_AUTH=microsoft` and use the account email as `MC_USERNAME` to authenticate
-through Azalea's Microsoft sign-in flow. Other protocol versions and authentication modes are
-rejected explicitly; the Rust transport uses the Azalea-compatible `nightly-2024-10-23` toolchain.
+through Azalea's Microsoft sign-in flow. Transient connection failures retry after 1 second with
+exponential backoff capped at 60 seconds; polling the Rust runtime surfaces retry reasons and
+attempts. Invalid configuration and authentication errors are returned without retrying. Other
+protocol versions and authentication modes are rejected explicitly; the Rust transport uses the
+Azalea-compatible `nightly-2024-10-23` toolchain.
 Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions, chat
 formats, typed argument validation, registry execution, permission checks, cooldowns, legacy
 migration, fact updates, persistence, and transport configuration.
 The `Rust core` GitHub Actions workflow checks formatting, all targets, and tests on Windows.
 
-This is not yet a replacement application. Bot-specific automation, automatic reconnection, the
-HTTP and Socket.IO dashboard, and the Electron/Vue desktop app remain unported. The Rust registry
-still needs to be connected to the Minecraft runtime before it can replace the Node.js command path.
+This is not yet a replacement application. Bot-specific automation, the HTTP and Socket.IO
+dashboard, and the Electron/Vue desktop app remain unported. The Rust registry still needs to be
+connected to the Minecraft runtime before it can replace the Node.js command path.
 
 Check and test the Rust core with:
 

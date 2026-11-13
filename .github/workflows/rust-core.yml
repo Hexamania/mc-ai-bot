@@ -13,8 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set up stable Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up nightly Rust
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
       - name: Check formatting

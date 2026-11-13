@@ -70,6 +70,7 @@ impl AppConfig {
             "MC_USERNAME",
             "MC_PASSWORD",
             "MC_VERSION",
+            "MC_AUTH",
             "WEB_PORT",
             "WEB_HOST",
             "OPENAI_API_KEY",
@@ -116,7 +117,7 @@ impl AppConfig {
                 username: get("MC_USERNAME", "Airi"),
                 password: values.get("MC_PASSWORD").cloned(),
                 version,
-                auth: "offline".to_owned(),
+                auth: get("MC_AUTH", "offline"),
                 check_timeout_interval: 60_000,
             },
             web: WebConfig {
@@ -199,6 +200,7 @@ mod tests {
         assert_eq!(config.bot.port, 25565);
         assert_eq!(config.bot.username, "Airi");
         assert_eq!(config.bot.version, "1.21.1");
+        assert_eq!(config.bot.auth, "offline");
         assert_eq!(config.web.port, 3000);
         assert_eq!(config.openai.model, "gpt-4");
         assert!(!config.memory.enabled);
@@ -210,6 +212,7 @@ mod tests {
     fn environment_values_are_trimmed_and_openai_key_has_a_fallback() {
         let values = HashMap::from([
             ("MC_VERSION".to_owned(), " 1.20.4 ".to_owned()),
+            ("MC_AUTH".to_owned(), "microsoft".to_owned()),
             ("MC_PORT".to_owned(), "12345".to_owned()),
             ("OPENAI_API_KEY".to_owned(), String::new()),
             ("OPENAI_KEY".to_owned(), "fallback".to_owned()),
@@ -218,6 +221,7 @@ mod tests {
         let config = AppConfig::from_values(&values).unwrap();
 
         assert_eq!(config.bot.version, "1.20.4");
+        assert_eq!(config.bot.auth, "microsoft");
         assert_eq!(config.bot.port, 12345);
         assert_eq!(config.openai.api_key, "fallback");
         assert_eq!(config.prefix.admin, "!");

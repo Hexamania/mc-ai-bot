@@ -159,16 +159,20 @@ The web dashboard (served on the configured port) provides:
 ## Rust Migration (In Progress)
 
 The initial Rust core is in [`rust/`](./rust/). It ports environment-backed configuration,
-validation, the bot lifecycle state machine, chat command parsing, typed argument and option
-parsing, role-based permissions, and a command registry with async handlers, aliases, help,
-cooldowns, and execution statistics. It also ports legacy-to-v2 memory normalization, atomic
-memory-file writes, and remembered-fact operations.
+validation, the bot lifecycle state machine, Minecraft transport and event mapping, chat command
+parsing, typed argument and option parsing, role-based permissions, and a command registry with
+async handlers, aliases, help, cooldowns, and execution statistics. It also ports legacy-to-v2
+memory normalization, atomic memory-file writes, and remembered-fact operations.
+The Minecraft transport currently supports protocol `1.21.1` with offline or Microsoft
+authentication. Set `MC_AUTH=microsoft` and use the account email as `MC_USERNAME` to authenticate
+through Azalea's Microsoft sign-in flow. Other protocol versions and authentication modes are
+rejected explicitly; the Rust transport requires nightly Rust.
 Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions, chat
 formats, typed argument validation, registry execution, permission checks, cooldowns, legacy
-migration, fact updates, and persistence.
+migration, fact updates, persistence, and transport configuration.
 The `Rust core` GitHub Actions workflow checks formatting, all targets, and tests on Windows.
 
-This is not yet a replacement application. Minecraft transport and bot-specific automation, the
+This is not yet a replacement application. Bot-specific automation, automatic reconnection, the
 HTTP and Socket.IO dashboard, and the Electron/Vue desktop app remain unported. The Rust registry
 still needs to be connected to the Minecraft runtime before it can replace the Node.js command path.
 
@@ -183,7 +187,7 @@ cargo test --manifest-path rust/Cargo.toml
 
 ```
 mc-ai-bot/
-├── rust/                       # Rust core migration (bot state, configuration, memory)
+├── rust/                       # Rust migration (bot state, transport, configuration, memory)
 ├── .github/                    # GitHub Actions CI/CD workflows
 │   ├── workflows/
 │   │   └── ci.yml             # Main CI/CD pipeline

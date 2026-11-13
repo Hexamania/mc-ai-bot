@@ -156,10 +156,29 @@ The web dashboard (served on the configured port) provides:
 - **Inventory grid** — 36-slot view with counts
 - **Equipment panel** — worn armor and held items
 
+## Rust Migration (In Progress)
+
+The initial Rust core is in [`rust/`](./rust/). It ports environment-backed configuration,
+validation, the bot lifecycle state machine, legacy-to-v2 memory normalization, atomic memory-file
+writes, and remembered-fact operations. Focused Rust tests cover defaults, invalid ports and memory
+shapes, lifecycle transitions, legacy migration, fact updates, and persistence.
+
+This is the first migration slice, not yet a replacement application. The Minecraft connection and
+automation, command registry, HTTP and Socket.IO dashboard, and Electron/Vue desktop app still run
+from the existing Node.js code and must be ported before that runtime can be retired.
+
+Check and test the Rust core with:
+
+```bash
+cargo check --all-targets --manifest-path rust/Cargo.toml
+cargo test --manifest-path rust/Cargo.toml
+```
+
 ## Project Structure
 
 ```
 mc-ai-bot/
+├── rust/                       # Rust core migration (bot state, configuration, memory)
 ├── .github/                    # GitHub Actions CI/CD workflows
 │   ├── workflows/
 │   │   └── ci.yml             # Main CI/CD pipeline

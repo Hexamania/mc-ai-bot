@@ -21,6 +21,7 @@ backup_full_*
 
 # Build artifacts
 *.cjs
+/rust/target/
 
 # others
 chat.json

@@ -160,16 +160,17 @@ The web dashboard (served on the configured port) provides:
 
 The initial Rust core is in [`rust/`](./rust/). It ports environment-backed configuration,
 validation, the bot lifecycle state machine, chat command parsing, typed argument and option
-parsing, role-based permissions, legacy-to-v2 memory normalization, atomic memory-file writes, and
-remembered-fact operations.
+parsing, role-based permissions, and a command registry with async handlers, aliases, help,
+cooldowns, and execution statistics. It also ports legacy-to-v2 memory normalization, atomic
+memory-file writes, and remembered-fact operations.
 Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions, chat
-formats, typed argument validation, option parsing, permission checks, legacy migration, fact
-updates, and persistence.
+formats, typed argument validation, registry execution, permission checks, cooldowns, legacy
+migration, fact updates, and persistence.
 The `Rust core` GitHub Actions workflow checks formatting, all targets, and tests on Windows.
 
-This is the first migration slice, not yet a replacement application. The Minecraft connection and
-automation, command registry, HTTP and Socket.IO dashboard, and Electron/Vue desktop app still run
-from the existing Node.js code and must be ported before that runtime can be retired.
+This is not yet a replacement application. Minecraft transport and bot-specific automation, the
+HTTP and Socket.IO dashboard, and the Electron/Vue desktop app remain unported. The Rust registry
+still needs to be connected to the Minecraft runtime before it can replace the Node.js command path.
 
 Check and test the Rust core with:
 

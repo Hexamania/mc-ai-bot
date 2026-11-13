@@ -13,8 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set up nightly Rust
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Set up Azalea-compatible nightly Rust
+        uses: dtolnay/rust-toolchain@nightly-2024-10-23
         with:
           components: rustfmt
       - name: Check formatting

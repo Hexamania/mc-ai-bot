@@ -166,7 +166,7 @@ memory normalization, atomic memory-file writes, and remembered-fact operations.
 The Minecraft transport currently supports protocol `1.21.1` with offline or Microsoft
 authentication. Set `MC_AUTH=microsoft` and use the account email as `MC_USERNAME` to authenticate
 through Azalea's Microsoft sign-in flow. Other protocol versions and authentication modes are
-rejected explicitly; the Rust transport requires nightly Rust.
+rejected explicitly; the Rust transport uses the Azalea-compatible `nightly-2024-10-23` toolchain.
 Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions, chat
 formats, typed argument validation, registry execution, permission checks, cooldowns, legacy
 migration, fact updates, persistence, and transport configuration.

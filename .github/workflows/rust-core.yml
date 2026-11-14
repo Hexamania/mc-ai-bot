@@ -7,7 +7,7 @@ on:
     branches: [rust-rewrite]
 
 env:
-  RUSTUP_TOOLCHAIN: nightly-2025-11-01
+  RUSTUP_TOOLCHAIN: nightly-2025-10-15
 
 jobs:
   check-and-test:
@@ -22,9 +22,8 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-01
+          toolchain: nightly-2025-10-15
           components: rustfmt
-          override: true
       - name: Verify toolchain
         run: rustc --version && cargo --version
       - name: Check formatting

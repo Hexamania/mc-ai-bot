@@ -127,6 +127,12 @@ impl MinecraftConnection {
         &self.client.profile.name
     }
 
+    pub fn position(&mut self) -> Option<Vec3> {
+        let entity = self.client.entity;
+        let position: Position = self.client.get_entity_component(entity)?;
+        Some(position.into())
+    }
+
     pub fn inventory_snapshot(&self) -> Result<InventorySnapshot, MinecraftTransportError> {
         if self.state() != BotState::Connected {
             return Err(MinecraftTransportError::NotConnected);

@@ -87,6 +87,7 @@ impl MinecraftRuntime {
         let fatal_error = command_registry
             .register_help_command(chat_config.public_prefix.clone())
             .and_then(|_| command_registry.register_ping_command())
+            .and_then(|_| register_coordinate_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_follow_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_roam_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_navigation_commands(&command_registry, action_sender.clone()))
@@ -419,6 +420,20 @@ impl MinecraftRuntime {
                         result.error = Some(error.to_owned());
                     }
                 }
+                RuntimeCommandAction::Coordinates => match connection.position() {
+                    Some(position) => context.reply(&format!(
+                        "📍 Current Location: X: {}, Y: {}, Z: {}",
+                        position.x.floor(),
+                        position.y.floor(),
+                        position.z.floor()
+                    )),
+                    None => {
+                        let error = "Bot not spawned yet.";
+                        context.error(error);
+                        result.success = false;
+                        result.error = Some(error.to_owned());
+                    }
+                },
                 RuntimeCommandAction::Inventory { slot } => {
                     let snapshot = connection.inventory_snapshot()?;
                     context.private_reply(&snapshot.inventory_report(slot));
@@ -505,6 +520,7 @@ enum RuntimeCommandAction {
         z: f64,
         range: f64,
     },
+    Coordinates,
     Inventory {
         slot: Option<usize>,
     },
@@ -515,6 +531,36 @@ enum RuntimeCommandAction {
     MineBlock {
         name: String,
     },
+}
+
+fn register_coordinate_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    let mut coords = CommandDefinition::new(
+        "coords",
+        "Show current coordinates",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: coords".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Coordinates)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    coords.aliases = vec![
+        "pos".to_owned(),
+        "position".to_owned(),
+        "whereami".to_owned(),
+    ];
+    coords.category = Some("General".to_owned());
+    coords.permission = Some(PermissionConfig::default());
+    registry.register(coords)?;
+    Ok(())
 }
 
 fn register_follow_commands(
@@ -1375,6 +1421,39 @@ mod tests {
             receiver.try_recv().unwrap(),
             RuntimeCommandAction::Equipment
         );
+    }
+
+    #[test]
+    fn coords_command_supports_guest_aliases_and_rejects_arguments() {
+        let registry = CommandRegistry::default();
+        let (sender, receiver) = mpsc::channel();
+        register_coordinate_commands(&registry, sender).unwrap();
+        let mut context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let result = run(registry.execute("whereami", &mut context)).unwrap();
+        assert!(result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Coordinates
+        );
+
+        let mut invalid_context = CommandContext::new(
+            "Alex",
+            vec!["extra".to_owned()],
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let invalid_result = run(registry.execute("coords", &mut invalid_context)).unwrap();
+        assert!(!invalid_result.success);
+        assert!(receiver.try_recv().is_err());
     }
 
     #[test]

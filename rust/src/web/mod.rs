@@ -11,8 +11,18 @@ pub mod socket;
 use crate::{
     bot::minecraft::MinecraftConnection, bot::runtime::MinecraftRuntime, config::AppConfig,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+/// Socket-specific data stored by socket ID
+#[derive(Debug, Clone, Default)]
+pub struct SocketData {
+    pub user: Option<crate::web::auth::UserRole>,
+    pub username: Option<String>,
+    pub handshake_auth: Option<serde_json::Value>,
+    pub handshake_query: Option<serde_json::Value>,
+}
 
 /// Web server state shared between HTTP and Socket.io handlers
 #[derive(Clone)]
@@ -21,6 +31,7 @@ pub struct WebState {
     pub connection: Arc<RwLock<Option<MinecraftConnection>>>,
     pub runtime: Arc<RwLock<Option<Arc<RwLock<MinecraftRuntime>>>>>,
     pub socket_io: Arc<RwLock<Option<socketioxide::SocketIo>>>,
+    pub socket_data: Arc<RwLock<HashMap<String, SocketData>>>,
 }
 
 impl WebState {
@@ -30,6 +41,7 @@ impl WebState {
             connection: Arc::new(RwLock::new(None)),
             runtime: Arc::new(RwLock::new(None)),
             socket_io: Arc::new(RwLock::new(None)),
+            socket_data: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -51,6 +63,21 @@ impl WebState {
             .await
             .clone()
             .ok_or_else(|| "Socket.io not initialized".to_string())
+    }
+
+    /// Get socket data by socket ID
+    pub async fn get_socket_data(&self, socket_id: &str) -> Option<SocketData> {
+        self.socket_data.read().await.get(socket_id).cloned()
+    }
+
+    /// Set socket data by socket ID
+    pub async fn set_socket_data(&self, socket_id: String, data: SocketData) {
+        self.socket_data.write().await.insert(socket_id, data);
+    }
+
+    /// Remove socket data by socket ID (on disconnect)
+    pub async fn remove_socket_data(&self, socket_id: &str) {
+        self.socket_data.write().await.remove(socket_id);
     }
 
     pub async fn clear(&self) {

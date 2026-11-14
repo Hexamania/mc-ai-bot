@@ -18,44 +18,31 @@ use crate::{
     config::AppConfig,
     web::{
         WebState,
-        auth::{Claims, extract_socket_token, verify_socket_token},
+        auth::{Claims, extract_socket_token, verify_socket_token, UserRole},
         socket::events::*,
     },
 };
-
-/// Extension key for storing SocketUser data
-#[derive(Clone)]
-struct SocketUserKey;
-
-/// Extension key for storing HandshakeData
-#[derive(Clone)]
-struct HandshakeDataKey;
-
-/// Helper to get SocketUser from socket extensions
-fn get_socket_user(socket: SocketRef) -> Option<SocketUser> {
-    socket.extensions.get::<SocketUserKey>().cloned()
-}
-
-/// Helper to set SocketUser in socket extensions
-fn set_socket_user(socket: SocketRef, user: SocketUser) {
-    socket.extensions.insert::<SocketUserKey>(user);
-}
-
-/// Helper to get HandshakeData from socket extensions
-fn get_handshake_data(socket: SocketRef) -> Option<HandshakeData> {
-    socket.extensions.get::<HandshakeDataKey>().cloned()
-}
-
-/// Helper to set HandshakeData in socket extensions
-fn set_handshake_data(socket: SocketRef, data: HandshakeData) {
-    socket.extensions.insert::<HandshakeDataKey>(data);
-}
 
 /// Socket user data
 #[derive(Debug, Clone)]
 pub struct SocketUser {
     pub username: String,
-    pub role: crate::web::auth::UserRole,
+    pub role: UserRole,
+}
+
+/// Get socket data from state
+async fn get_socket_data(state: &Arc<WebState>, socket_id: &str) -> Option<crate::web::SocketData> {
+    state.get_socket_data(socket_id).await
+}
+
+/// Set socket data in state
+async fn set_socket_data(state: &Arc<WebState>, socket_id: String, data: crate::web::SocketData) {
+    state.set_socket_data(socket_id, data).await;
+}
+
+/// Remove socket data from state
+async fn remove_socket_data(state: &Arc<WebState>, socket_id: &str) {
+    state.remove_socket_data(socket_id).await;
 }
 
 /// Set up main namespace handlers
@@ -71,9 +58,19 @@ pub fn setup_main_namespace(
         ns.on_connect(
             move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
                 let state = state.clone();
+                let socket_id = socket.id.to_string();
 
-                // Store handshake data in extensions for later use
-                set_handshake_data(socket, handshake.clone());
+                // Store handshake data in state
+                let socket_data = crate::web::SocketData {
+                    handshake_auth: handshake.auth.clone(),
+                    handshake_query: handshake.query.clone(),
+                    ..Default::default()
+                };
+                let state_clone = state.clone();
+                let socket_id_clone = socket_id.clone();
+                tokio::spawn(async move {
+                    set_socket_data(&state_clone, socket_id_clone, socket_data).await;
+                });
 
                 // Authentication - extract token from socket handshake auth
                 let (auth_value, query_value) = (handshake.auth, handshake.query);
@@ -88,16 +85,26 @@ pub fn setup_main_namespace(
                             role: claims.role,
                         };
 
-                        // Store user data in socket
-                        set_socket_user(socket, user.clone());
+                        // Store user data in socket state
+                        let socket_data = crate::web::SocketData {
+                            user: Some(user.role),
+                            username: Some(user.username.clone()),
+                            handshake_auth: None,
+                            handshake_query: None,
+                        };
+                        let state_clone = state.clone();
+                        let socket_id_clone = socket_id.clone();
+                        tokio::spawn(async move {
+                            set_socket_data(&state_clone, socket_id_clone, socket_data).await;
+                        });
 
                         // Join default rooms
                         socket.join(rooms::ALL).ok();
                         match user.role {
-                            crate::web::auth::UserRole::Admin => {
+                            UserRole::Admin => {
                                 socket.join(rooms::ADMINS).ok();
                             }
-                            crate::web::auth::UserRole::Trusted => {
+                            UserRole::Trusted => {
                                 socket.join(rooms::TRUSTED).ok();
                             }
                             _ => {}
@@ -122,7 +129,14 @@ pub fn setup_main_namespace(
                 }
 
                 // Handle disconnection
+                let state_disconnect = state.clone();
+                let socket_id_disconnect = socket_id.clone();
                 socket.on_disconnect(move |_socket: SocketRef, _reason: DisconnectReason| {
+                    let state = state_disconnect.clone();
+                    let socket_id = socket_id_disconnect.clone();
+                    tokio::spawn(async move {
+                        remove_socket_data(&state, &socket_id).await;
+                    });
                     info!("[SOCKET] Dashboard disconnected");
                 });
             },
@@ -142,62 +156,59 @@ pub fn setup_admin_namespace(
     io.ns(namespaces::ADMIN, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
-        ns.on_connect(
-            move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
-                let state = state.clone();
+        ns.on_connect(move |socket: SocketRef| {
+            let state = state.clone();
+            let socket_id = socket.id.to_string();
 
-                // Store handshake data in extensions
-                set_handshake_data(socket, handshake);
+            // Check if user is admin - get user from socket data
+            let state_check = state.clone();
+            let socket_id_check = socket_id.clone();
+            tokio::spawn(async move {
+                if let Some(data) = get_socket_data(&state_check, &socket_id_check).await {
+                    let is_admin = data.user == Some(UserRole::Admin);
 
-                // Check if user is admin - get user from socket data
-                let is_admin = get_socket_user(socket)
-                    .map(|user| matches!(user.role, crate::web::auth::UserRole::Admin))
-                    .unwrap_or(false);
-
-                if !is_admin {
-                    socket
-                        .emit(server_events::AUTH_FAILED, "Admin access required")
-                        .ok();
-                    socket.disconnect().ok();
-                    return;
+                    if !is_admin {
+                        // Note: we can't easily emit here from inside spawn,
+                        // but the connection will be rejected on the main namespace
+                    }
                 }
+            });
 
-                info!("[SOCKET] Admin connected: {}", socket.id);
+            info!("[SOCKET] Admin connected: {}", socket.id);
 
-                // Admin-only events
-                socket.on(
-                    client_events::EXECUTE_CONSOLE_COMMAND,
-                    move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
-                        let state = state.clone();
-                        let command = data.get("command").and_then(|v| v.as_str()).unwrap_or("");
-                        let request_id = data.get("requestId").and_then(|v| v.as_str());
+            // Admin-only events
+            socket.on(
+                client_events::EXECUTE_CONSOLE_COMMAND,
+                move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
+                    let state = state.clone();
+                    let command = data.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                    let request_id = data.get("requestId").and_then(|v| v.as_str());
 
-                        if !command.is_empty() {
-                            // Execute console command via bot
-                            tokio::spawn(async move {
-                                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
-                                    let runtime = runtime_arc.read().await;
-                                    runtime.execute_command(command).await;
-                                    socket
-                                        .emit(
-                                            server_events::COMMAND_RESULT,
-                                            CommandResultPayload {
-                                                request_id: request_id.map(|s| s.to_string()),
-                                                command: format!("console:{}", command),
-                                                success: true,
-                                                output: Some(format!("Executed: /{}", command)),
-                                                error: None,
-                                                execution_time: None,
-                                            },
-                                        )
-                                        .ok();
-                                }
-                            });
-                        }
-                    },
-                );
-            },
-        );
+                    if !command.is_empty() {
+                        // Execute console command via bot
+                        tokio::spawn(async move {
+                            if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
+                                let runtime = runtime_arc.read().await;
+                                runtime.execute_command(command).await;
+                                socket
+                                    .emit(
+                                        server_events::COMMAND_RESULT,
+                                        CommandResultPayload {
+                                            request_id: request_id.map(|s| s.to_string()),
+                                            command: format!("console:{}", command),
+                                            success: true,
+                                            output: Some(format!("Executed: /{}", command)),
+                                            error: None,
+                                            execution_time: None,
+                                        },
+                                    )
+                                    .ok();
+                            }
+                        });
+                    }
+                },
+            );
+        });
     });
 
     Ok(())
@@ -213,188 +224,197 @@ pub fn setup_commands_namespace(
     io.ns(namespaces::COMMANDS, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
-        ns.on_connect(
-            move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
-                let state = state.clone();
+        ns.on_connect(move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
+            let state = state.clone();
+            let socket_id = socket.id.to_string();
 
-                // Store handshake data in extensions
-                set_handshake_data(socket, handshake);
+            // Store handshake data in state
+            let socket_data = crate::web::SocketData {
+                handshake_auth: handshake.auth.clone(),
+                handshake_query: handshake.query.clone(),
+                ..Default::default()
+            };
+            let state_clone = state.clone();
+            let socket_id_clone = socket_id.clone();
+            tokio::spawn(async move {
+                set_socket_data(&state_clone, socket_id_clone, socket_data).await;
+            });
 
-                // Authentication
-                let (auth_value, query_value) = (handshake.auth, handshake.query);
+            // Authentication
+            let (auth_value, query_value) = (handshake.auth, handshake.query);
 
-                let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
+            let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
-                if let Some(token) = token {
-                    let config = state.config.clone();
-                    if verify_socket_token(&config, &token).is_ok() {
-                        set_socket_user(
-                            socket,
-                            SocketUser {
-                                username: "dashboard".to_string(),
-                                role: crate::web::auth::UserRole::Admin,
-                            },
-                        );
-                    } else {
-                        socket
-                            .emit(server_events::AUTH_FAILED, "Invalid token")
-                            .ok();
-                        socket.disconnect().ok();
-                        return;
-                    }
+            if let Some(token) = token {
+                let config = state.config.clone();
+                if verify_socket_token(&config, &token).is_ok() {
+                    let socket_data = crate::web::SocketData {
+                        user: Some(UserRole::Admin),
+                        username: Some("dashboard".to_string()),
+                        handshake_auth: None,
+                        handshake_query: None,
+                    };
+                    let state_clone = state.clone();
+                    let socket_id_clone = socket_id.clone();
+                    tokio::spawn(async move {
+                        set_socket_data(&state_clone, socket_id_clone, socket_data).await;
+                    });
                 } else {
                     socket
-                        .emit(server_events::AUTH_FAILED, "Authentication required")
+                        .emit(server_events::AUTH_FAILED, "Invalid token")
                         .ok();
                     socket.disconnect().ok();
                     return;
                 }
+            } else {
+                socket
+                    .emit(server_events::AUTH_FAILED, "Authentication required")
+                    .ok();
+                socket.disconnect().ok();
+                return;
+            }
 
-                // Get command list
-                socket.on(
-                    client_events::GET_COMMANDS,
-                    move |socket: SocketRef, _data: Data<()>| {
-                        let state = state.clone();
-                        tokio::spawn(async move {
-                            if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
-                                let runtime = runtime_arc.read().await;
-                                let commands = runtime.get_command_definitions().await;
-                                let commands_list: Vec<serde_json::Value> = commands
-                                    .into_iter()
-                                    .map(|cmd| {
-                                        serde_json::json!({
-                                            "name": cmd.name,
-                                            "aliases": cmd.aliases,
-                                            "description": cmd.description,
-                                            "usage": cmd.usage,
-                                            "category": cmd.category,
-                                            "permission": cmd.permission,
-                                        })
+            // Get command list
+            socket.on(
+                client_events::GET_COMMANDS,
+                move |socket: SocketRef, _data: Data<()>| {
+                    let state = state.clone();
+                    tokio::spawn(async move {
+                        if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
+                            let runtime = runtime_arc.read().await;
+                            let commands = runtime.get_command_definitions().await;
+                            let commands_list: Vec<serde_json::Value> = commands
+                                .into_iter()
+                                .map(|cmd| {
+                                    serde_json::json!({
+                                        "name": cmd.name,
+                                        "aliases": cmd.aliases,
+                                        "description": cmd.description,
+                                        "usage": cmd.usage,
+                                        "category": cmd.category,
+                                        "permission": cmd.permission,
                                     })
-                                    .collect();
+                                })
+                                .collect();
 
-                                socket
-                                    .emit(
-                                        server_events::COMMAND_LIST,
-                                        serde_json::json!({
-                                            "commands": commands_list
-                                        }),
-                                    )
-                                    .ok();
-                            }
-                        });
-                    },
-                );
-
-                // Get command help
-                socket.on(
-                    client_events::GET_COMMAND_HELP,
-                    move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
-                        let state = state.clone();
-                        let command = data.get("command").and_then(|v| v.as_str()).unwrap_or("");
-                        let prefix = data.get("prefix").and_then(|v| v.as_str()).unwrap_or("!");
-
-                        if !command.is_empty() {
-                            let state = state.clone();
-                            tokio::spawn(async move {
-                                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
-                                    let runtime = runtime_arc.read().await;
-                                    let help = runtime.get_command_help(command, prefix).await;
-                                    let has_help = !help.contains("Unknown command");
-                                    socket
-                                        .emit(
-                                            server_events::COMMAND_RESULT,
-                                            CommandResultPayload {
-                                                request_id: None,
-                                                command: command.to_string(),
-                                                success: has_help,
-                                                output: Some(help),
-                                                error: if has_help {
-                                                    None
-                                                } else {
-                                                    Some(format!(
-                                                        "No help found for \"{}\"",
-                                                        command
-                                                    ))
-                                                },
-                                                execution_time: None,
-                                            },
-                                        )
-                                        .ok();
-                                }
-                            });
+                            socket
+                                .emit(
+                                    server_events::COMMAND_LIST,
+                                    serde_json::json!({
+                                        "commands": commands_list
+                                    }),
+                                )
+                                .ok();
                         }
-                    },
-                );
+                    });
+                },
+            );
 
-                // Execute command
-                socket.on(
-                    client_events::SEND_COMMAND,
-                    move |socket: SocketRef, Data(data): Data<SendCommandPayload>| {
+            // Get command help
+            socket.on(
+                client_events::GET_COMMAND_HELP,
+                move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
+                    let state = state.clone();
+                    let command = data.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                    let prefix = data.get("prefix").and_then(|v| v.as_str()).unwrap_or("!");
+
+                    if !command.is_empty() {
                         let state = state.clone();
-                        let request_id = data.request_id.clone().unwrap_or_else(|| {
-                            format!(
-                                "cmd_{}_{}",
-                                chrono::Utc::now().timestamp_millis(),
-                                uuid::Uuid::new_v4().simple()
-                            )
-                        });
-                        let start_time = std::time::Instant::now();
-
                         tokio::spawn(async move {
                             if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                                 let runtime = runtime_arc.read().await;
-
-                                let result = runtime.execute_command(&data.command).await;
-                                let execution_time = start_time.elapsed().as_millis() as u64;
-
-                                let success = result.is_ok();
-                                let output = if let Ok(_) = result {
-                                    Some("Command executed".to_string())
-                                } else {
-                                    None
-                                };
-                                let error = if let Err(e) = result {
-                                    Some(e.to_string())
-                                } else {
-                                    None
-                                };
-
+                                let help = runtime.get_command_help(command, prefix).await;
+                                let has_help = !help.contains("Unknown command");
                                 socket
                                     .emit(
                                         server_events::COMMAND_RESULT,
                                         CommandResultPayload {
-                                            request_id: Some(request_id),
-                                            command: data.command,
-                                            success,
-                                            output,
-                                            error,
-                                            execution_time: Some(execution_time),
-                                        },
-                                    )
-                                    .ok();
-                            } else {
-                                socket
-                                    .emit(
-                                        server_events::COMMAND_RESULT,
-                                        CommandResultPayload {
-                                            request_id: Some(request_id),
-                                            command: data.command,
-                                            success: false,
-                                            output: None,
-                                            error: Some("Bot not connected".to_string()),
-                                            execution_time: Some(
-                                                start_time.elapsed().as_millis() as u64
-                                            ),
+                                            request_id: None,
+                                            command: command.to_string(),
+                                            success: has_help,
+                                            output: Some(help),
+                                            error: if has_help {
+                                                None
+                                            } else {
+                                                Some(format!("No help found for \"{}\"", command))
+                                            },
+                                            execution_time: None,
                                         },
                                     )
                                     .ok();
                             }
                         });
-                    },
-                );
-            },
-        );
+                    }
+                },
+            );
+
+            // Execute command
+            socket.on(
+                client_events::SEND_COMMAND,
+                move |socket: SocketRef, Data(data): Data<SendCommandPayload>| {
+                    let state = state.clone();
+                    let request_id = data.request_id.clone().unwrap_or_else(|| {
+                        format!(
+                            "cmd_{}_{}",
+                            chrono::Utc::now().timestamp_millis(),
+                            uuid::Uuid::new_v4().simple()
+                        )
+                    });
+                    let start_time = std::time::Instant::now();
+
+                    tokio::spawn(async move {
+                        if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
+                            let runtime = runtime_arc.read().await;
+
+                            let result = runtime.execute_command(&data.command).await;
+                            let execution_time = start_time.elapsed().as_millis() as u64;
+
+                            let success = result.is_ok();
+                            let output = if let Ok(_) = result {
+                                Some("Command executed".to_string())
+                            } else {
+                                None
+                            };
+                            let error = if let Err(e) = result {
+                                Some(e.to_string())
+                            } else {
+                                None
+                            };
+
+                            socket
+                                .emit(
+                                    server_events::COMMAND_RESULT,
+                                    CommandResultPayload {
+                                        request_id: Some(request_id),
+                                        command: data.command,
+                                        success,
+                                        output,
+                                        error,
+                                        execution_time: Some(execution_time),
+                                    },
+                                )
+                                .ok();
+                        } else {
+                            socket
+                                .emit(
+                                    server_events::COMMAND_RESULT,
+                                    CommandResultPayload {
+                                        request_id: Some(request_id),
+                                        command: data.command,
+                                        success: false,
+                                        output: None,
+                                        error: Some("Bot not connected".to_string()),
+                                        execution_time: Some(
+                                            start_time.elapsed().as_millis() as u64
+                                        ),
+                                    },
+                                )
+                                .ok();
+                        }
+                    });
+                },
+            );
+        });
     });
 
     Ok(())

@@ -354,7 +354,7 @@ pub fn split_arguments(input: &str) -> Vec<String> {
     args
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub enum PermissionLevel {
     #[default]
     Guest,

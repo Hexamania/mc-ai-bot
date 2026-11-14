@@ -80,7 +80,7 @@ pub struct RateLimiter {
 impl RateLimiter {
     /// Create a new rate limiter with default config
     pub fn new(config: RateLimitConfig) -> Self {
-        let store = Arc::new(RwLock::new(HashMap::new()));
+        let store = Arc::new(RwLock::new(HashMap::<String, RateLimitEntry>::new()));
         let cleanup_interval = config.window;
 
         // Start cleanup task

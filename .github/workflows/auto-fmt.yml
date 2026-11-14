@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  RUSTUP_TOOLCHAIN: nightly-2025-01-15
+  RUSTUP_TOOLCHAIN: 1.90.0
 
 jobs:
   fmt:
@@ -32,7 +32,7 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-01-15
+          toolchain: 1.90.0
           components: rustfmt
 
       - name: Verify toolchain

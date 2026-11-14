@@ -32,22 +32,22 @@ struct SocketUserKey;
 struct HandshakeDataKey;
 
 /// Helper to get SocketUser from socket extensions
-fn get_socket_user(socket: &SocketRef) -> Option<SocketUser> {
+fn get_socket_user(socket: SocketRef) -> Option<SocketUser> {
     socket.extensions.get::<SocketUserKey>().cloned()
 }
 
 /// Helper to set SocketUser in socket extensions
-fn set_socket_user(socket: &SocketRef, user: SocketUser) {
+fn set_socket_user(socket: SocketRef, user: SocketUser) {
     socket.extensions.insert::<SocketUserKey>(user);
 }
 
 /// Helper to get HandshakeData from socket extensions
-fn get_handshake_data(socket: &SocketRef) -> Option<HandshakeData> {
+fn get_handshake_data(socket: SocketRef) -> Option<HandshakeData> {
     socket.extensions.get::<HandshakeDataKey>().cloned()
 }
 
 /// Helper to set HandshakeData in socket extensions
-fn set_handshake_data(socket: &SocketRef, data: HandshakeData) {
+fn set_handshake_data(socket: SocketRef, data: HandshakeData) {
     socket.extensions.insert::<HandshakeDataKey>(data);
 }
 

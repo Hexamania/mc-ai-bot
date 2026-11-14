@@ -26,6 +26,9 @@ jobs:
           fetch-depth: 0
       - name: Configure git to use LF line endings
         run: git config --global core.autocrlf false
+      - name: Configure git credentials for private dependencies
+        run: |
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master

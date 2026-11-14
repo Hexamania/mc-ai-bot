@@ -16,7 +16,7 @@ jobs:
       - name: Set up Azalea-compatible nightly Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2024-10-23
+          toolchain: nightly-2025-01-15
           components: rustfmt
       - name: Check formatting
         run: cargo fmt --manifest-path rust/Cargo.toml -- --check

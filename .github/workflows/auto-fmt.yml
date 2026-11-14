@@ -45,7 +45,5 @@ jobs:
         if: steps.fmt-check.outputs.changed == 'true'
         run: |
           git add rust/
-          git commit -m "style: auto-format with rustfmt
-
-Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+          git commit -m $'style: auto-format with rustfmt\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'
           git push

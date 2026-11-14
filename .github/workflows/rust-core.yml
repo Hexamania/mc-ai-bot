@@ -5,6 +5,7 @@ on:
     branches: [rust-rewrite]
   pull_request:
     branches: [rust-rewrite]
+  workflow_dispatch:
 
 env:
   RUSTUP_TOOLCHAIN: nightly-2025-06-15

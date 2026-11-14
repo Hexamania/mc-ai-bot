@@ -641,7 +641,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let mut runtime = runtime_arc.write().await;
                     runtime.set_home().await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
-                        let pos = runtime.get_position().unwrap_or_else(|| crate::web::socket::events::BotPosition { x: 0.0, y: 0.0, z: 0.0 });
+                        let pos = runtime.get_position().unwrap_or_else(|| {
+                            crate::web::socket::events::BotPosition {
+                                x: 0.0,
+                                y: 0.0,
+                                z: 0.0,
+                            }
+                        });
                         conn.say(&format!(
                             "🏠 Home set to {}, {}, {}",
                             pos.x as i32, pos.y as i32, pos.z as i32
@@ -1059,7 +1065,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                 if let Some(runtime_arc) = state.runtime.as_ref() {
                     let runtime = runtime_arc.read().await;
                     // Convert HashMap to Value
-                    let settings_value = serde_json::to_value(data.settings).unwrap_or(serde_json::Value::Null);
+                    let settings_value =
+                        serde_json::to_value(data.settings).unwrap_or(serde_json::Value::Null);
                     runtime.update_settings(settings_value).await;
 
                     let bot_state = runtime.get_full_state().await;
@@ -1081,16 +1088,14 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                 if let Some(runtime_arc) = state.runtime.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     let pos = data.position.unwrap_or_else(|| {
-                        runtime
-                            .get_position()
-                            .unwrap_or_else(|| {
-                                // Default position if bot not connected
-                                crate::web::socket::events::BotPosition {
-                                    x: 0.0,
-                                    y: 0.0,
-                                    z: 0.0,
-                                }
-                            })
+                        runtime.get_position().unwrap_or_else(|| {
+                            // Default position if bot not connected
+                            crate::web::socket::events::BotPosition {
+                                x: 0.0,
+                                y: 0.0,
+                                z: 0.0,
+                            }
+                        })
                     });
                     runtime
                         .save_location(&data.name, pos, data.location_type)

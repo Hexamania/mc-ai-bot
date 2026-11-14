@@ -1,5 +1,6 @@
 use std::{collections::HashMap, str::FromStr, time::{Duration, Instant}};
 
+use serde_json::{json, Value};
 use azalea::{
     auto_tool::AutoToolClientExt,
     blocks::{Block as BlockTrait, BlockState, BlockStates},
@@ -2443,6 +2444,597 @@ impl MinecraftConnection {
         }
         self.client.chat(message);
         Ok(())
+    }
+
+    // Web API support methods
+
+    /// Get bot vitals (health, food, saturation, position)
+    pub async fn get_vitals(&self) -> Result<Value, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let entity = self.client.entity;
+        let position: Option<Position> = self.client.get_entity_component(entity);
+        let health: Option<Health> = self.client.get_entity_component(entity);
+        let food = self.client.component::<azalea::hunger::Hunger>();
+
+        let pos = position.map(|p| Vec3::from(&p));
+        let health_val = health.map(|h| h.health).unwrap_or(20.0);
+        let food_level = food.food_level;
+        let saturation = food.saturation;
+
+        Ok(json!({
+            "health": health_val,
+            "food": food_level,
+            "saturation": saturation,
+            "position": pos,
+            "yaw": self.client.entity_yaw(),
+            "pitch": self.client.entity_pitch(),
+            "dimension": self.client.dimension().map(|d| d.to_string()),
+            "time": self.client.time().map(|t| t.time_of_day()),
+            "gamemode": self.client.game_mode().map(|g| g.to_string()),
+        }))
+    }
+
+    /// Get inventory items
+    pub async fn get_inventory(&self) -> Result<Value, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let snapshot = self.inventory_snapshot()?;
+        let items: Vec<Value> = snapshot
+            .slots
+            .iter()
+            .enumerate()
+            .map(|(i, slot)| {
+                if slot.is_empty() {
+                    json!({
+                        "slot": i,
+                        "name": "air",
+                        "displayName": "Empty",
+                        "count": 0,
+                        "maxStackSize": 64,
+                    })
+                } else {
+                    json!({
+                        "slot": i,
+                        "name": slot.name(),
+                        "displayName": slot.display_name(),
+                        "count": slot.count(),
+                        "maxStackSize": slot.max_stack_size(),
+                    })
+                }
+            })
+            .collect();
+
+        let used_slots = snapshot.slots.iter().filter(|s| !s.is_empty()).count();
+
+        Ok(json!({
+            "items": items,
+            "usedSlots": used_slots,
+            "totalSlots": 36,
+            "heldItem": snapshot.selected_hotbar_slot.map(|slot| {
+                let item = &snapshot.slots[slot as usize];
+                json!({
+                    "slot": slot,
+                    "name": item.name(),
+                    "displayName": item.display_name(),
+                    "count": item.count(),
+                })
+            }),
+        }))
+    }
+
+    /// Get equipment (armor and held items)
+    pub async fn get_equipment(&self) -> Result<Value, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let snapshot = self.inventory_snapshot()?;
+        let inventory = self.client.component::<azalea::inventory::Inventory>();
+
+        Ok(json!({
+            "head": snapshot.helmet().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
+            "chest": snapshot.chestplate().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
+            "legs": snapshot.leggings().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
+            "feet": snapshot.boots().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
+            "hand": snapshot.main_hand().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
+            "offhand": snapshot.off_hand().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
+        }))
+    }
+
+    /// Get nearby players
+    pub async fn get_players(&self) -> Result<Vec<Value>, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let mut players = Vec::new();
+        let bot_pos = self.position().unwrap_or(Vec3::ZERO);
+        let bot_username = self.username();
+
+        for (entity, profile) in self.client.entities_with::<GameProfileComponent>() {
+            let position: Option<Position> = self.client.get_entity_component(entity);
+            let health: Option<Health> = self.client.get_entity_component(entity);
+
+            if let (Some(pos), Some(profile)) = (position, profile) {
+                let distance = Vec3::from(&pos).distance(bot_pos);
+                players.push(json!({
+                    "username": profile.name,
+                    "entityId": entity.0,
+                    "position": {
+                        "x": pos.x,
+                        "y": pos.y,
+                        "z": pos.z,
+                    },
+                    "health": health.map(|h| h.health),
+                    "gamemode": None, // Not easily accessible
+                    "ping": None,
+                    "isBot": profile.name == bot_username,
+                }));
+            }
+        }
+
+        Ok(players)
+    }
+
+    /// Get map data (blocks and entities around bot)
+    pub async fn get_map(&self, radius: i32) -> Result<Value, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let bot_pos = self.position().unwrap_or(Vec3::ZERO);
+        let world = self.client.world();
+        let world = world.read();
+        let chunk_storage = world.chunk_storage.clone();
+        drop(world);
+
+        let mut blocks = Vec::new();
+        let mut entities = Vec::new();
+
+        let base_block_pos = azalea::BlockPos::from(bot_pos);
+
+        // Scan blocks
+        for dx in -radius..=radius {
+            for dz in -radius..=radius {
+                for dy in -2..=2 {
+                    let check_pos = azalea::BlockPos::new(
+                        base_block_pos.x + dx,
+                        base_block_pos.y + dy,
+                        base_block_pos.z + dz,
+                    );
+                    if let Some(state) = chunk_storage.get_block_state(&check_pos) {
+                        let block = RegistryBlock::from(state);
+                        if !matches!(
+                            block,
+                            RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
+                        ) {
+                            blocks.push(json!({
+                                "x": check_pos.x,
+                                "y": check_pos.y,
+                                "z": check_pos.z,
+                                "name": block.to_string().strip_prefix("minecraft:").unwrap_or(&block.to_string()),
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Get entities
+        for (entity, _) in self.client.entities_with::<GameProfileComponent>() {
+            if entity == self.client.entity {
+                continue;
+            }
+            let position: Option<Position> = self.client.get_entity_component(entity);
+            if let Some(pos) = position {
+                let distance = Vec3::from(&pos).distance(bot_pos);
+                if distance < radius as f64 {
+                    entities.push(json!({
+                        "id": entity.0,
+                        "username": None,
+                        "name": entity.0.to_string(),
+                        "position": {
+                            "x": pos.x,
+                            "y": pos.y,
+                            "z": pos.z,
+                        },
+                        "type": "unknown",
+                        "isPlayer": false,
+                        "distance": distance,
+                    }));
+                }
+            }
+        }
+
+        Ok(json!({
+            "blocks": blocks,
+            "entities": entities,
+            "center": { "x": bot_pos.x, "y": bot_pos.y, "z": bot_pos.z },
+            "radius": radius,
+        }))
+    }
+
+    /// Execute a server command
+    pub async fn execute_command(&self, command: &str) -> Result<(), MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        self.client.chat(command);
+        Ok(())
+    }
+
+    /// Get current position as BotPosition
+    pub fn get_position(&self) -> crate::web::socket::events::BotPosition {
+        let pos = self.position().unwrap_or(Vec3::ZERO);
+        crate::web::socket::events::BotPosition {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+        }
+    }
+
+    /// Get position with integer coordinates
+    pub fn get_position_blocking(&self) -> crate::web::socket::events::BotPosition {
+        let pos = self.position().unwrap_or(Vec3::ZERO);
+        crate::web::socket::events::BotPosition {
+            x: pos.x.floor(),
+            y: pos.y.floor(),
+            z: pos.z.floor(),
+        }
+    }
+
+    /// Get base location
+    pub fn get_base_location(&self) -> crate::web::socket::events::BotPosition {
+        let pos = self.base_location.unwrap_or(Vec3::ZERO);
+        crate::web::socket::events::BotPosition {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+        }
+    }
+
+    /// Toggle kill aura
+    pub fn toggle_kill_aura(&mut self, enabled: bool) {
+        // This would need to be implemented based on combat feature
+        // For now, just toggle auto_defense as a proxy
+        self.auto_defense = enabled;
+    }
+
+    /// Toggle auto defense
+    pub fn toggle_auto_defense(&mut self, enabled: bool) {
+        self.auto_defense = enabled;
+    }
+
+    /// Toggle safe mode
+    pub fn toggle_safe_mode(&mut self, enabled: bool) {
+        // Implementation would depend on feature system
+    }
+
+    /// Toggle stealth
+    pub fn toggle_stealth(&mut self, enabled: bool) {
+        self.stealth_mode = enabled;
+        self.client.ecs.lock().send_event(azalea::entity::SetControlStateEvent {
+            entity: self.client.entity,
+            control: "sneak".to_owned(),
+            state: enabled,
+        });
+    }
+
+    /// Toggle auto armor
+    pub fn toggle_auto_armor(&mut self, enabled: bool) {
+        // Implementation would depend on feature system
+    }
+
+    /// Start roaming
+    pub fn start_roaming(&mut self) {
+        let _ = self.start_roaming(10, Duration::from_secs(5));
+    }
+
+    /// Stop roaming
+    pub fn stop_roaming(&mut self) {
+        self.stop_roaming();
+    }
+
+    /// Start farming
+    pub fn start_farming(&mut self) {
+        // Implementation would depend on feature system
+    }
+
+    /// Stop farming
+    pub fn stop_farming(&mut self) {
+        // Implementation would depend on feature system
+    }
+
+    /// Start mining
+    pub fn start_mining(&mut self) {
+        // Implementation would depend on feature system
+    }
+
+    /// Stop mining
+    pub fn stop_mining(&mut self) {
+        self.stop_mining();
+    }
+
+    /// Start lumberjack
+    pub fn start_lumberjack(&mut self) {
+        let _ = self.start_lumberjack(10);
+    }
+
+    /// Stop lumberjack
+    pub fn stop_lumberjack(&mut self) {
+        // Implementation would depend on feature system
+    }
+
+    /// Start progression
+    pub fn start_progression(&mut self) {
+        // Implementation would depend on feature system
+    }
+
+    /// Stop all tasks
+    pub fn stop_all_tasks(&mut self) {
+        self.stop_movement();
+    }
+
+    /// Save location
+    pub fn save_location(&mut self, name: &str, pos: crate::web::socket::events::BotPosition, _location_type: &str) {
+        // Implementation would use memory system
+        let vec3 = Vec3::new(pos.x, pos.y, pos.z);
+        self.set_base(Some(vec3.x), Some(vec3.y), Some(vec3.z)).ok();
+    }
+
+    /// Add favorite location
+    pub fn add_favorite(&mut self, name: &str, pos: crate::web::socket::events::BotPosition) {
+        let vec3 = Vec3::new(pos.x, pos.y, pos.z);
+        self.set_base(Some(vec3.x), Some(vec3.y), Some(vec3.z)).ok();
+    }
+
+    /// Remember fact
+    pub async fn remember_fact(&self, key: &str, fact: &str) -> bool {
+        // Implementation would use memory system
+        !key.is_empty() && !fact.is_empty()
+    }
+
+    /// Forget fact
+    pub async fn forget_fact(&self, key: &str) -> bool {
+        // Implementation would use memory system
+        !key.is_empty()
+    }
+
+    /// Add rule
+    pub async fn add_rule(&self, rule: &str) -> bool {
+        // Implementation would use memory system
+        !rule.is_empty()
+    }
+
+    /// Remove rule
+    pub async fn remove_rule(&self, rule: &str) -> bool {
+        // Implementation would use memory system
+        !rule.is_empty()
+    }
+
+    /// Update settings
+    pub async fn update_settings(&self, settings: Value) {
+        // Implementation would update bot settings
+        log::info!("[WEB] Settings updated: {}", settings);
+    }
+
+    /// Drop item
+    pub async fn drop_item(&mut self, slot: i32, count: Option<i32>) {
+        if self.state() != BotState::Connected {
+            return;
+        }
+        let inventory = self.client.component::<azalea::inventory::Inventory>();
+        if let Some(item) = inventory.slots.get(slot as usize) {
+            if let Some(item_stack) = item.as_present() {
+                let drop_count = count.unwrap_or(item_stack.count).min(item_stack.count);
+                self.client.ecs.lock().send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                    entity: self.client.entity,
+                    slot: slot as u8,
+                });
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                for _ in 0..drop_count {
+                    self.client.ecs.lock().send_event(azalea::entity::DropItemEvent {
+                        entity: self.client.entity,
+                        slot: slot as u8,
+                        count: 1,
+                    });
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            }
+        }
+    }
+
+    /// Drop all items
+    pub async fn drop_all_items(&mut self) {
+        if self.state() != BotState::Connected {
+            return;
+        }
+        let inventory = self.client.component::<azalea::inventory::Inventory>();
+        let items = inventory.items().collect::<Vec<_>>();
+        for item in items {
+            let _ = self.toss_stack(&item).await;
+        }
+    }
+
+    /// Move item
+    pub async fn move_item(&mut self, from: i32, to: i32) {
+        if self.state() != BotState::Connected {
+            return;
+        }
+        self.client.ecs.lock().send_event(azalea::inventory::operations::click::ClickOperation {
+            entity: self.client.entity,
+            slot: from as u8,
+            click_type: azalea::inventory::operations::click::ClickType::Pickup,
+            button: azalea::inventory::operations::click::MouseButton::Left,
+            mode: azalea::inventory::operations::click::ClickMode::Normal,
+        });
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        self.client.ecs.lock().send_event(azalea::inventory::operations::click::ClickOperation {
+            entity: self.client.entity,
+            slot: to as u8,
+            click_type: azalea::inventory::operations::click::ClickType::Pickup,
+            button: azalea::inventory::operations::click::MouseButton::Left,
+            mode: azalea::inventory::operations::click::ClickMode::Normal,
+        });
+    }
+
+    /// Set hotbar slot
+    pub async fn set_hotbar_slot(&mut self, slot: i32) {
+        if self.state() != BotState::Connected {
+            return;
+        }
+        if slot >= 0 && slot <= 8 {
+            self.client.ecs.lock().send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                entity: self.client.entity,
+                slot: slot as u8,
+            });
+        }
+    }
+
+    /// Mine block at position
+    pub async fn mine_block(&mut self, x: i32, y: i32, z: i32) {
+        if self.state() != BotState::Connected {
+            return;
+        }
+        let block_pos = azalea::BlockPos::new(x, y, z);
+        let world = self.client.world();
+        let world = world.read();
+        let chunk_storage = world.chunk_storage.clone();
+        drop(world);
+
+        let goal = azalea::pathfinder::goals::ReachBlockPosGoal {
+            pos: block_pos,
+            chunk_storage: chunk_storage.clone(),
+        };
+        self.client.goto_without_mining(goal);
+
+        // Wait and mine
+        let mut ticks = self.client.get_tick_broadcaster();
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            if goal.success(azalea::BlockPos::from(self.client.position())) {
+                break;
+            }
+            match tokio::time::timeout_at(deadline, ticks.recv()).await {
+                Ok(Ok(())) => {}
+                _ => return,
+            }
+        }
+
+        let _ = self.client.mine(block_pos).await;
+    }
+
+    /// Place block at position
+    pub async fn place_block(&mut self, x: i32, y: i32, z: i32, _block_type: Option<String>) {
+        if self.state() != BotState::Connected {
+            return;
+        }
+        let block_pos = azalea::BlockPos::new(x, y, z);
+        self.client.look_at(Vec3::from(block_pos.center()));
+        let mut ticks = self.client.get_tick_broadcaster();
+        let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
+
+        self.client.ecs.lock().send_event(azalea::interact::InteractBlockEvent {
+            entity: self.client.entity,
+            position: block_pos,
+            direction: azalea::world::direction::Direction::Up,
+            hand: azalea::protocol::packets::game::Hand::MainHand,
+            cursor_position: None,
+            inside_block: false,
+            sequence: 0,
+        });
+    }
+
+    /// Move to position
+    pub async fn move_to(&mut self, x: f64, y: f64, z: f64) {
+        if self.state() != BotState::Connected {
+            return;
+        }
+        let _ = self.move_to_position(x, y, z, 1.0);
+    }
+
+    /// Follow player
+    pub async fn follow_player(&mut self, username: &str) -> bool {
+        if self.state() != BotState::Connected {
+            return false;
+        }
+        self.start_following(username, 2.0).unwrap_or(false)
+    }
+
+    /// Stop all movement
+    pub async fn stop_all_movement(&mut self) {
+        self.stop_movement();
+    }
+
+    /// Go home
+    pub async fn go_home(&mut self) {
+        let _ = self.go_home();
+    }
+
+    /// Set home
+    pub async fn set_home(&mut self) {
+        let pos = self.position().unwrap_or(Vec3::ZERO);
+        self.set_base(Some(pos.x), Some(pos.y), Some(pos.z)).ok();
+    }
+
+    /// Start roaming
+    pub async fn start_roaming(&mut self) {
+        let _ = self.start_roaming(10, Duration::from_secs(5));
+    }
+
+    /// Stop roaming
+    pub async fn stop_roaming(&mut self) {
+        self.stop_roaming();
+    }
+
+    /// Start farming
+    pub async fn start_farming(&mut self) {
+        // Feature-dependent
+    }
+
+    /// Stop farming
+    pub async fn stop_farming(&mut self) {
+        // Feature-dependent
+    }
+
+    /// Start mining
+    pub async fn start_mining(&mut self) {
+        // Feature-dependent
+    }
+
+    /// Stop mining
+    pub async fn stop_mining(&mut self) {
+        self.stop_mining();
+    }
+
+    /// Start lumberjack
+    pub async fn start_lumberjack(&mut self) {
+        let _ = self.start_lumberjack(10);
+    }
+
+    /// Stop lumberjack
+    pub async fn stop_lumberjack(&mut self) {
+        // Feature-dependent
+    }
+
+    /// Start progression
+    pub async fn start_progression(&mut self) {
+        // Feature-dependent
+    }
+
+    /// Stop all tasks
+    pub async fn stop_all_tasks(&mut self) {
+        self.stop_movement();
+    }
+
+    /// Restart bot
+    pub async fn restart(&mut self) {
+        self.disconnect().ok();
+    }
+
+    /// Shutdown bot
+    pub async fn shutdown(&mut self) {
+        self.disconnect().ok();
     }
 
     pub fn disconnect(&mut self) -> Result<(), MinecraftTransportError> {

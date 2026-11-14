@@ -1,16 +1,36 @@
 use std::error::Error;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
-use mc_ai_bot_core::{bot::runtime::MinecraftRuntime, config::AppConfig};
+use mc_ai_bot_core::{
+    bot::runtime::MinecraftRuntime,
+    config::AppConfig,
+    web::server::{WebServer, WebServerBuilder},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let app_config = AppConfig::from_env()?;
+    let app_config = Arc::new(AppConfig::from_env()?);
     let validation_errors = app_config.validate();
     if !validation_errors.is_empty() {
         return Err(format!("Invalid configuration: {}", validation_errors.join("; ")).into());
     }
 
-    let mut runtime = MinecraftRuntime::from_app_config(app_config);
+    // Initialize and start web server
+    let mut web_server = WebServerBuilder::new()
+        .config(app_config.clone())
+        .build()
+        .await?;
+
+    // Wrap runtime in Arc<RwLock> for sharing with web server
+    let runtime = Arc::new(RwLock::new(MinecraftRuntime::from_app_config(app_config.as_ref().clone())));
+
+    // Set runtime on web server
+    web_server.set_runtime(runtime.clone()).await;
+
+    // Start web server
+    web_server.start().await?;
+
     let shutdown_signal = tokio::signal::ctrl_c();
     tokio::pin!(shutdown_signal);
 
@@ -18,12 +38,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::select! {
             signal_result = &mut shutdown_signal => {
                 signal_result?;
-                runtime.shutdown()?;
+                log::info!("Shutdown signal received, stopping services...");
+                runtime.write().await.shutdown()?;
+                web_server.stop().await;
                 break;
             }
-            event_result = runtime.next_event() => {
+            event_result = async {
+                runtime.write().await.next_event().await
+            } => {
                 match event_result? {
-                    Some(event) => println!("{event:?}"),
+                    Some(event) => {
+                        println!("{event:?}");
+                        // Update web state with connection if we just connected
+                        if let mc_ai_bot_core::bot::MinecraftRuntimeEvent::Minecraft(
+                            mc_ai_bot_core::bot::MinecraftEvent::Login
+                        ) = &event {
+                            // The connection is now available in runtime, web server can access it via runtime
+                        }
+                    }
                     None => break,
                 }
             }

@@ -21,6 +21,7 @@ use crate::{
         PermissionManager,
     },
     config::{AppConfig, BotConfig},
+    features::{FeatureRegistry, register_builtin_features},
     memory::{default_memory, load_memory, remember_fact, forget_fact, save_memory, MemoryError},
 };
 
@@ -59,6 +60,7 @@ pub struct MinecraftRuntime {
     chat_parser: ChatParser,
     permissions: PermissionManager,
     fatal_error: Option<MinecraftRuntimeError>,
+    feature_registry: FeatureRegistry,
 }
 
 impl MinecraftRuntime {
@@ -111,6 +113,12 @@ impl MinecraftRuntime {
             permissions.set_admin_password(password);
         }
 
+        // Initialize feature registry with built-in features
+        let mut feature_registry = FeatureRegistry::new();
+        if let Err(e) = register_builtin_features(&mut feature_registry) {
+            log::error!("[FEATURES] Failed to register built-in features: {}", e);
+        }
+
         Self {
             config,
             connection: None,
@@ -121,6 +129,7 @@ impl MinecraftRuntime {
             chat_parser: ChatParser::new(chat_config),
             permissions,
             fatal_error,
+            feature_registry,
         }
     }
 
@@ -165,6 +174,318 @@ impl MinecraftRuntime {
         Ok(())
     }
 
+    // Web API support methods - delegate to connection
+
+    /// Get bot vitals (health, food, saturation, position)
+    pub async fn get_vitals(&self) -> Result<serde_json::Value, MinecraftRuntimeError> {
+        self.connection
+            .as_ref()
+            .ok_or(MinecraftTransportError::NotConnected)?
+            .get_vitals()
+            .await
+            .map_err(MinecraftRuntimeError::Transport)
+    }
+
+    /// Get inventory items
+    pub async fn get_inventory(&self) -> Result<serde_json::Value, MinecraftRuntimeError> {
+        self.connection
+            .as_ref()
+            .ok_or(MinecraftTransportError::NotConnected)?
+            .get_inventory()
+            .await
+            .map_err(MinecraftRuntimeError::Transport)
+    }
+
+    /// Get equipment (armor and held items)
+    pub async fn get_equipment(&self) -> Result<serde_json::Value, MinecraftRuntimeError> {
+        self.connection
+            .as_ref()
+            .ok_or(MinecraftTransportError::NotConnected)?
+            .get_equipment()
+            .await
+            .map_err(MinecraftRuntimeError::Transport)
+    }
+
+    /// Get nearby players
+    pub async fn get_players(&self) -> Result<Vec<serde_json::Value>, MinecraftRuntimeError> {
+        self.connection
+            .as_ref()
+            .ok_or(MinecraftTransportError::NotConnected)?
+            .get_players()
+            .await
+            .map_err(MinecraftRuntimeError::Transport)
+    }
+
+    /// Get map data
+    pub async fn get_map(&self, radius: i32) -> Result<serde_json::Value, MinecraftRuntimeError> {
+        self.connection
+            .as_ref()
+            .ok_or(MinecraftTransportError::NotConnected)?
+            .get_map(radius)
+            .await
+            .map_err(MinecraftRuntimeError::Transport)
+    }
+
+    /// Execute a server command
+    pub async fn execute_command(&self, command: &str) -> Result<(), MinecraftRuntimeError> {
+        self.connection
+            .as_ref()
+            .ok_or(MinecraftTransportError::NotConnected)?
+            .execute_command(command)
+            .await
+            .map_err(MinecraftRuntimeError::Transport)
+    }
+
+    /// Toggle kill aura
+    pub fn toggle_kill_aura(&mut self, enabled: bool) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.toggle_kill_aura(enabled);
+        }
+    }
+
+    /// Toggle auto defense
+    pub fn toggle_auto_defense(&mut self, enabled: bool) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.toggle_auto_defense(enabled);
+        }
+    }
+
+    /// Toggle safe mode
+    pub fn toggle_safe_mode(&mut self, enabled: bool) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.toggle_safe_mode(enabled);
+        }
+    }
+
+    /// Toggle stealth
+    pub fn toggle_stealth(&mut self, enabled: bool) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.toggle_stealth(enabled);
+        }
+    }
+
+    /// Toggle auto armor
+    pub fn toggle_auto_armor(&mut self, enabled: bool) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.toggle_auto_armor(enabled);
+        }
+    }
+
+    /// Start roaming
+    pub fn start_roaming(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.start_roaming();
+        }
+    }
+
+    /// Stop roaming
+    pub fn stop_roaming(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.stop_roaming();
+        }
+    }
+
+    /// Start farming
+    pub fn start_farming(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.start_farming();
+        }
+    }
+
+    /// Stop farming
+    pub fn stop_farming(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.stop_farming();
+        }
+    }
+
+    /// Start mining
+    pub fn start_mining(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.start_mining();
+        }
+    }
+
+    /// Stop mining
+    pub fn stop_mining(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.stop_mining();
+        }
+    }
+
+    /// Start lumberjack
+    pub fn start_lumberjack(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.start_lumberjack();
+        }
+    }
+
+    /// Stop lumberjack
+    pub fn stop_lumberjack(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.stop_lumberjack();
+        }
+    }
+
+    /// Start progression
+    pub fn start_progression(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.start_progression();
+        }
+    }
+
+    /// Stop all tasks
+    pub fn stop_all_tasks(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.stop_all_tasks();
+        }
+    }
+
+    /// Save location
+    pub fn save_location(&mut self, name: &str, pos: crate::web::socket::events::BotPosition, location_type: &str) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.save_location(name, pos, location_type);
+        }
+    }
+
+    /// Add favorite location
+    pub fn add_favorite(&mut self, name: &str, pos: crate::web::socket::events::BotPosition) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.add_favorite(name, pos);
+        }
+    }
+
+    /// Remember fact
+    pub async fn remember_fact(&self, key: &str, fact: &str) -> bool {
+        self.connection
+            .as_ref()
+            .map(|c| c.remember_fact(key, fact).await)
+            .unwrap_or(false)
+    }
+
+    /// Forget fact
+    pub async fn forget_fact(&self, key: &str) -> bool {
+        self.connection
+            .as_ref()
+            .map(|c| c.forget_fact(key).await)
+            .unwrap_or(false)
+    }
+
+    /// Add rule
+    pub async fn add_rule(&self, rule: &str) -> bool {
+        self.connection
+            .as_ref()
+            .map(|c| c.add_rule(rule).await)
+            .unwrap_or(false)
+    }
+
+    /// Remove rule
+    pub async fn remove_rule(&self, rule: &str) -> bool {
+        self.connection
+            .as_ref()
+            .map(|c| c.remove_rule(rule).await)
+            .unwrap_or(false)
+    }
+
+    /// Update settings
+    pub async fn update_settings(&self, settings: serde_json::Value) {
+        if let Some(connection) = self.connection.as_ref() {
+            connection.update_settings(settings).await;
+        }
+    }
+
+    /// Drop item
+    pub async fn drop_item(&mut self, slot: i32, count: Option<i32>) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.drop_item(slot, count).await;
+        }
+    }
+
+    /// Drop all items
+    pub async fn drop_all_items(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.drop_all_items().await;
+        }
+    }
+
+    /// Move item
+    pub async fn move_item(&mut self, from: i32, to: i32) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.move_item(from, to).await;
+        }
+    }
+
+    /// Set hotbar slot
+    pub async fn set_hotbar_slot(&mut self, slot: i32) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.set_hotbar_slot(slot).await;
+        }
+    }
+
+    /// Mine block
+    pub async fn mine_block(&mut self, x: i32, y: i32, z: i32) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.mine_block(x, y, z).await;
+        }
+    }
+
+    /// Place block
+    pub async fn place_block(&mut self, x: i32, y: i32, z: i32, block_type: Option<String>) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.place_block(x, y, z, block_type).await;
+        }
+    }
+
+    /// Move to position
+    pub async fn move_to(&mut self, x: f64, y: f64, z: f64) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.move_to(x, y, z).await;
+        }
+    }
+
+    /// Follow player
+    pub async fn follow_player(&mut self, username: &str) -> bool {
+        self.connection
+            .as_mut()
+            .map(|c| c.follow_player(username).await)
+            .unwrap_or(false)
+    }
+
+    /// Stop all movement
+    pub async fn stop_all_movement(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.stop_all_movement().await;
+        }
+    }
+
+    /// Go home
+    pub async fn go_home(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.go_home().await;
+        }
+    }
+
+    /// Set home
+    pub async fn set_home(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.set_home().await;
+        }
+    }
+
+    /// Restart bot
+    pub async fn restart(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.restart().await;
+        }
+    }
+
+    /// Shutdown bot
+    pub async fn shutdown(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.shutdown().await;
+        }
+    }
+
     pub async fn next_event(
         &mut self,
     ) -> Result<Option<MinecraftRuntimeEvent>, MinecraftRuntimeError> {
@@ -183,10 +504,20 @@ impl MinecraftRuntime {
             self.state_machine.transition(BotState::Connecting)?;
 
             match MinecraftConnection::connect(&self.config).await {
-                Ok(connection) => {
+                Ok(mut connection) => {
                     self.chat_parser
                         .set_bot_username(Some(connection.username().to_owned()));
                     self.state_machine.transition(BotState::Connected)?;
+
+                    // Initialize features
+                    if let Err(e) = self
+                        .feature_registry
+                        .initialize_all(&mut connection, self)
+                        .await
+                    {
+                        log::error!("[FEATURES] Failed to initialize features: {}", e);
+                    }
+
                     self.connection = Some(connection);
                 }
                 Err(error @ MinecraftTransportError::Connection(_)) => {
@@ -807,6 +1138,12 @@ impl MinecraftRuntime {
             }
             BotState::ShuttingDown => {}
         }
+
+        // Shutdown features
+        if let Err(e) = tokio::runtime::Handle::current().block_on(self.feature_registry.shutdown_all()) {
+            log::error!("[FEATURES] Error during feature shutdown: {}", e);
+        }
+
         self.state_machine.transition(BotState::Shutdown)?;
         Ok(())
     }

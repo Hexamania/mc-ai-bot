@@ -4,13 +4,16 @@ use thiserror::Error;
 use tokio::time::sleep;
 
 use crate::{
+    arguments::{ArgumentConstraint, ArgumentDefinition, ArgumentType, ArgumentValue},
     bot::minecraft::MinecraftEvent::Chat,
     bot::{
         minecraft::{MinecraftConnection, MinecraftEvent, MinecraftTransportError},
         state_machine::{BotState, StateMachine},
     },
-    command_registry::{CommandContext, CommandRegistry, CommandRegistryError, CommandResult},
-    commands::{ChatParser, ChatParserConfig, MessageType, PermissionManager},
+    command_registry::{
+        CommandContext, CommandDefinition, CommandRegistry, CommandRegistryError, CommandResult,
+    },
+    commands::{ChatParser, ChatParserConfig, MessageType, PermissionConfig, PermissionManager},
     config::{AppConfig, BotConfig},
 };
 
@@ -45,6 +48,7 @@ pub struct MinecraftRuntime {
     state_machine: StateMachine,
     reconnect_attempt: u32,
     command_registry: CommandRegistry,
+    command_actions: mpsc::Receiver<RuntimeCommandAction>,
     chat_parser: ChatParser,
     permissions: PermissionManager,
     fatal_error: Option<MinecraftRuntimeError>,
@@ -73,9 +77,11 @@ impl MinecraftRuntime {
             chat_config.public_prefix.clone(),
             chat_config.admin_prefix.clone(),
         );
+        let (action_sender, command_actions) = mpsc::channel();
         let fatal_error = command_registry
             .register_help_command(chat_config.public_prefix.clone())
             .and_then(|_| command_registry.register_ping_command())
+            .and_then(|_| register_follow_commands(&command_registry, action_sender))
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
 
@@ -90,6 +96,7 @@ impl MinecraftRuntime {
             state_machine: StateMachine::default(),
             reconnect_attempt: 0,
             command_registry,
+            command_actions,
             chat_parser: ChatParser::new(chat_config),
             permissions,
             fatal_error,
@@ -312,10 +319,14 @@ impl MinecraftRuntime {
         );
         context.full_command = parsed.message.content.clone();
 
-        let result = self
+        let mut result = self
             .command_registry
             .execute(&command_name, &mut context)
             .await?;
+        let actions = self.command_actions.try_iter().collect::<Vec<_>>();
+        if result.success {
+            self.apply_command_actions(actions, &context, &mut result)?;
+        }
         let replies = reply_receiver.try_iter().collect();
         Ok(Some(CommandDispatch {
             event: MinecraftRuntimeEvent::CommandExecuted {
@@ -326,6 +337,42 @@ impl MinecraftRuntime {
             username: parsed.message.username,
             replies,
         }))
+    }
+
+    fn apply_command_actions(
+        &mut self,
+        actions: Vec<RuntimeCommandAction>,
+        context: &CommandContext,
+        result: &mut CommandResult,
+    ) -> Result<(), MinecraftRuntimeError> {
+        for action in actions {
+            let connection = self
+                .connection
+                .as_mut()
+                .ok_or(MinecraftTransportError::NotConnected)?;
+            match action {
+                RuntimeCommandAction::Follow { target, range } => {
+                    if connection.start_following(&target, range)? {
+                        context.reply(&format!("👣 Following {target}."));
+                    } else {
+                        let error = format!(
+                            "Player \"{target}\" is not available nearby; follow was not started."
+                        );
+                        context.error(&error);
+                        result.success = false;
+                        result.error = Some(error);
+                    }
+                }
+                RuntimeCommandAction::StopFollowing => {
+                    if let Some(target) = connection.stop_following() {
+                        context.reply(&format!("Stopped following {target}."));
+                    } else {
+                        context.reply("Not following a player.");
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn schedule_reconnect(
@@ -361,6 +408,82 @@ impl MinecraftRuntime {
         self.state_machine.transition(BotState::Shutdown)?;
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum RuntimeCommandAction {
+    Follow { target: String, range: f64 },
+    StopFollowing,
+}
+
+fn register_follow_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    let follow_sender = action_sender.clone();
+    let mut follow = CommandDefinition::new(
+        "follow",
+        "Follow a nearby player without breaking blocks",
+        std::sync::Arc::new(move |context, _| {
+            let sender = follow_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 2 {
+                    return Err("Usage: follow <player> [range]".to_owned());
+                }
+                let target = match context.args.args.first() {
+                    Some(ArgumentValue::Player(target)) if !target.trim().is_empty() => {
+                        target.clone()
+                    }
+                    _ => return Err("A player name is required.".to_owned()),
+                };
+                let range = match context.args.args.get(1) {
+                    Some(ArgumentValue::Number(range))
+                        if range.is_finite() && (0.5..=50.0).contains(range) =>
+                    {
+                        *range
+                    }
+                    Some(_) => return Err("Follow range must be between 0.5 and 50.".to_owned()),
+                    None => 2.0,
+                };
+                sender
+                    .send(RuntimeCommandAction::Follow { target, range })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    follow.aliases = vec!["followplayer".to_owned()];
+    follow.usage = Some("<player> [range]".to_owned());
+    follow.category = Some("Movement".to_owned());
+    follow.permission = Some(PermissionConfig::default());
+    follow.arguments = vec![
+        ArgumentDefinition::new("player", ArgumentType::Player, true),
+        ArgumentDefinition::new("range", ArgumentType::Number, false)
+            .with_default(ArgumentValue::Number(2.0))
+            .with_constraint(ArgumentConstraint::Minimum(0.5))
+            .with_constraint(ArgumentConstraint::Maximum(50.0)),
+    ];
+    registry.register(follow)?;
+
+    let mut stop_following = CommandDefinition::new(
+        "stopfollow",
+        "Stop following the current player",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stopfollow".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopFollowing)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stop_following.aliases = vec!["unfollow".to_owned()];
+    stop_following.category = Some("Movement".to_owned());
+    stop_following.permission = Some(PermissionConfig::default());
+    registry.register(stop_following)?;
+    Ok(())
 }
 
 struct CommandDispatch {
@@ -504,6 +627,84 @@ mod tests {
             ReplyDestination::Public
         ));
         assert_eq!(dispatch.replies[0].message, "🏓 Pong!");
+    }
+
+    #[test]
+    fn follow_command_schedules_valid_target_and_rejects_out_of_range_values() {
+        let registry = CommandRegistry::default();
+        let (sender, receiver) = mpsc::channel();
+        register_follow_commands(&registry, sender).unwrap();
+        let mut context = CommandContext::new(
+            "Alex",
+            vec!["Jordan".to_owned(), "4".to_owned()],
+            crate::commands::PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+
+        let result = run(registry.execute("follow", &mut context))
+            .unwrap()
+            .unwrap();
+        assert!(result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Follow {
+                target: "Jordan".to_owned(),
+                range: 4.0,
+            }
+        );
+
+        let mut invalid_context = CommandContext::new(
+            "Alex",
+            vec!["Jordan".to_owned(), "51".to_owned()],
+            crate::commands::PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let invalid_result = run(registry.execute("follow", &mut invalid_context))
+            .unwrap()
+            .unwrap();
+        assert!(!invalid_result.success);
+        assert!(receiver.try_recv().is_err());
+
+        let mut default_range_context = CommandContext::new(
+            "Alex",
+            vec!["Jordan".to_owned()],
+            crate::commands::PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let default_range_result = run(registry.execute("follow", &mut default_range_context))
+            .unwrap()
+            .unwrap();
+        assert!(default_range_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Follow {
+                target: "Jordan".to_owned(),
+                range: 2.0,
+            }
+        );
+
+        let mut stop_context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            crate::commands::PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let stop_result = run(registry.execute("unfollow", &mut stop_context))
+            .unwrap()
+            .unwrap();
+        assert!(stop_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::StopFollowing
+        );
     }
 
     #[test]

@@ -1,6 +1,14 @@
+use std::time::Duration;
+
+use azalea::{
+    ecs::query::With,
+    entity::{metadata::Player, Position},
+    pathfinder::{goals::RadiusGoal, PathfinderClientExt},
+    GameProfileComponent, Vec3,
+};
 use azalea::{Account, Client, Event};
 use thiserror::Error;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
 
 use crate::{
     bot::state_machine::{BotState, InvalidTransition, StateMachine},
@@ -51,6 +59,8 @@ pub struct MinecraftConnection {
     client: Client,
     events: UnboundedReceiver<Event>,
     state_machine: StateMachine,
+    follow_target: Option<String>,
+    follow_task: Option<JoinHandle<()>>,
 }
 
 impl MinecraftConnection {
@@ -89,6 +99,8 @@ impl MinecraftConnection {
             client,
             events,
             state_machine,
+            follow_target: None,
+            follow_task: None,
         })
     }
 
@@ -98,6 +110,83 @@ impl MinecraftConnection {
 
     pub fn username(&self) -> &str {
         &self.client.profile.name
+    }
+
+    pub fn following_target(&self) -> Option<&str> {
+        self.follow_task
+            .as_ref()
+            .filter(|task| !task.is_finished())
+            .and(self.follow_target.as_deref())
+    }
+
+    pub fn start_following(
+        &mut self,
+        target: &str,
+        range: f64,
+    ) -> Result<bool, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let target = target.trim();
+        if target.is_empty()
+            || target.eq_ignore_ascii_case(self.username())
+            || !range.is_finite()
+            || range <= 0.0
+        {
+            return Ok(false);
+        }
+
+        let mut follow_client = self.client.clone();
+        let Some(position) = player_position(&mut follow_client, target) else {
+            return Ok(false);
+        };
+        if distance_squared(follow_client.position(), position) > 50.0_f64.powi(2) {
+            return Ok(false);
+        }
+
+        self.stop_following();
+        follow_client.goto_without_mining(RadiusGoal {
+            pos: position,
+            radius: range as f32,
+        });
+
+        let target = target.to_owned();
+        let task_target = target.clone();
+        let task = tokio::spawn(async move {
+            loop {
+                sleep(Duration::from_secs(2)).await;
+                let Some(position) = player_position(&mut follow_client, &task_target) else {
+                    follow_client.stop_pathfinding();
+                    break;
+                };
+                if distance_squared(follow_client.position(), position) > 50.0_f64.powi(2) {
+                    follow_client.stop_pathfinding();
+                    break;
+                }
+                follow_client.goto_without_mining(RadiusGoal {
+                    pos: position,
+                    radius: range as f32,
+                });
+            }
+        });
+        self.follow_target = Some(target);
+        self.follow_task = Some(task);
+        Ok(true)
+    }
+
+    pub fn stop_following(&mut self) -> Option<String> {
+        let was_active = if let Some(task) = self.follow_task.take() {
+            let active = !task.is_finished();
+            task.abort();
+            active
+        } else {
+            false
+        };
+        let target = self.follow_target.take();
+        if was_active && self.state() == BotState::Connected {
+            self.client.stop_pathfinding();
+        }
+        was_active.then_some(target).flatten()
     }
 
     pub fn send_chat(&self, message: &str) -> Result<(), MinecraftTransportError> {
@@ -132,10 +221,22 @@ impl MinecraftConnection {
                     Some(MinecraftEvent::PlayerJoined(player.profile.name.clone()))
                 }
                 Event::RemovePlayer(player) => {
-                    Some(MinecraftEvent::PlayerLeft(player.profile.name.clone()))
+                    let username = player.profile.name.clone();
+                    if self
+                        .follow_target
+                        .as_deref()
+                        .is_some_and(|target| target.eq_ignore_ascii_case(&username))
+                    {
+                        self.stop_following();
+                    }
+                    Some(MinecraftEvent::PlayerLeft(username))
                 }
-                Event::Death(_) => Some(MinecraftEvent::Death),
+                Event::Death(_) => {
+                    self.stop_following();
+                    Some(MinecraftEvent::Death)
+                }
                 Event::Disconnect(reason) => {
+                    self.stop_following();
                     self.state_machine.transition(BotState::Disconnected)?;
                     Some(MinecraftEvent::Disconnected {
                         reason: reason.map(|message| message.to_string()),
@@ -148,6 +249,7 @@ impl MinecraftConnection {
             }
         }
 
+        self.stop_following();
         if self.state() != BotState::Disconnected {
             self.state_machine.transition(BotState::Disconnected)?;
         }
@@ -157,10 +259,28 @@ impl MinecraftConnection {
 
 impl Drop for MinecraftConnection {
     fn drop(&mut self) {
+        if let Some(task) = self.follow_task.take() {
+            task.abort();
+        }
         if self.state() == BotState::Connected {
             self.client.disconnect();
         }
     }
+}
+
+fn player_position(client: &mut Client, username: &str) -> Option<Vec3> {
+    let entity = client.entity_by::<With<Player>, (&GameProfileComponent,)>(|(profile,)| {
+        profile.name.eq_ignore_ascii_case(username)
+    })?;
+    let position: Position = client.get_entity_component(entity)?;
+    Some(Vec3::from(&position))
+}
+
+fn distance_squared(first: Vec3, second: Vec3) -> f64 {
+    let dx = first.x - second.x;
+    let dy = first.y - second.y;
+    let dz = first.z - second.z;
+    dx * dx + dy * dy + dz * dz
 }
 
 pub fn validate_config(config: &BotConfig) -> Result<(), MinecraftTransportError> {

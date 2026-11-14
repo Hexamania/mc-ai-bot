@@ -14,7 +14,7 @@ simdnbt = { path = "../vendor/simdnbt" }
 simdnbt-derive = { path = "../vendor/simdnbt-derive" }
 
 [dependencies]
-azalea = "=0.10.3+mc1.21.1"
+azalea = "=0.11.0+mc1.21.4"
 async-trait = "0.1"
 axum = { version = "0.7", features = ["macros", "json", "form", "ws", "multipart"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }

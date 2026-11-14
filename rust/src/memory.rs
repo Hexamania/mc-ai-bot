@@ -361,7 +361,7 @@ impl Memory {
     }
 
     /// Save memory to file
-    pub async fn save(&self, path: impl AsRef<Path> + Send) -> Result<(), MemoryError> {
+    pub async fn save<'a>(&'a self, path: impl AsRef<Path> + Send + 'a) -> Result<(), MemoryError> {
         let data = self.data.clone();
         tokio::task::spawn_blocking(move || save_memory(path, &data))
             .await
@@ -490,6 +490,33 @@ impl Memory {
     /// Get rules
     pub fn rules(&self) -> &Value {
         &self.data["rules"]
+    }
+
+    /// Get current task
+    pub fn current_task(&self) -> &Value {
+        &self.data["currentTask"]
+    }
+
+    /// Get players
+    pub fn players(&self) -> &Value {
+        &self.data["players"]
+    }
+
+    /// Remove a rule
+    pub fn remove_rule(&mut self, rule_id: &str) -> bool {
+        if let Some(rules) = self.data["rules"].as_array_mut() {
+            let len_before = rules.len();
+            rules.retain(|r| r["id"].as_str() != Some(rule_id));
+            rules.len() < len_before
+        } else {
+            false
+        }
+    }
+
+    /// Clear all memory
+    pub fn clear(&mut self) -> Result<(), MemoryError> {
+        self.data = default_memory();
+        Ok(())
     }
 }
 

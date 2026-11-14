@@ -553,14 +553,15 @@ async fn bot_players(
 ) -> Result<Json<PlayersResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
-        let players = runtime.get_players().await;
+        let players = runtime.get_players().await.unwrap_or_default();
         let bot_state = runtime.get_full_state().await;
 
+        let count = players.len();
         Ok(Json(PlayersResponse {
             success: true,
             data: json!({
                 "players": players,
-                "count": players.len(),
+                "count": count,
                 "admins": bot_state.admins,
             }),
         }))
@@ -676,7 +677,7 @@ async fn get_locations(
         .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
-        "data": memory.locations,
+        "data": memory.locations(),
     })))
 }
 
@@ -715,13 +716,8 @@ async fn save_location(
         }
     });
 
-    memory.save_location(
-        &payload.name,
-        pos,
-        payload
-            .location_type
-            .unwrap_or_else(|| "waypoint".to_string()),
-    );
+    let location_type = payload.location_type.as_deref().unwrap_or("waypoint");
+    memory.save_location(&payload.name, pos, location_type);
     memory
         .save(&state.config.memory.file_path)
         .await
@@ -752,11 +748,11 @@ async fn delete_location(
         .unwrap_or_default();
 
     if memory
-        .locations
+        .locations()
         .as_object()
         .is_some_and(|o| o.contains_key(&name))
     {
-        memory.locations.as_object_mut().unwrap().remove(&name);
+        memory.locations().as_object_mut().unwrap().remove(&name);
         memory
             .save(&state.config.memory.file_path)
             .await
@@ -815,7 +811,7 @@ async fn get_memory_facts(
         .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
-        "data": memory.learned_facts,
+        "data": memory.learned_facts(),
     })))
 }
 
@@ -884,7 +880,7 @@ async fn get_memory_rules(
         .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
-        "data": memory.rules,
+        "data": memory.rules(),
     })))
 }
 
@@ -923,12 +919,12 @@ async fn add_memory_rule(
 /// Delete memory rule
 async fn delete_memory_rule(
     State(state): State<Arc<WebState>>,
-    axum::extract::Path(rule): axum::extract::Path<String>,
+    axum::extract::Path(rule_id): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
     let mut memory = Memory::load(&state.config.memory.file_path)
         .await
         .unwrap_or_default();
-    let success = memory.remove_rule(&rule);
+    let success = memory.remove_rule(&rule_id);
     memory
         .save(&state.config.memory.file_path)
         .await
@@ -953,7 +949,7 @@ async fn get_memory_task(
         .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
-        "data": memory.current_task,
+        "data": memory.current_task(),
     })))
 }
 
@@ -966,7 +962,7 @@ async fn get_memory_players(
         .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
-        "data": memory.players,
+        "data": memory.players(),
     })))
 }
 

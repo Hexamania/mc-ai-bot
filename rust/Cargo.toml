@@ -11,8 +11,8 @@ publish = false
 # (removed the feature gate and uses stable as_chunks API)
 [patch.crates-io]
 simd_cesu8 = { git = "https://github.com/seancroach/simd_cesu8", rev = "v1.2.0" }
-simdnbt = { git = "https://github.com/azalea-rs/simdnbt", rev = "4d426efe074701bebec94b611ae90a78d07a11c3" }
-simdnbt-derive = { git = "https://github.com/azalea-rs/simdnbt", rev = "4d426efe074701bebec94b611ae90a78d07a11c3" }
+simdnbt = { git = "https://github.com/azalea-rs/simdnbt", rev = "4d426efe074701bebec94b611ae90a78d07a11c3", path = "simdnbt" }
+simdnbt-derive = { git = "https://github.com/azalea-rs/simdnbt", rev = "4d426efe074701bebec94b611ae90a78d07a11c3", path = "simdnbt-derive" }
 
 [dependencies]
 azalea = "=0.10.3"

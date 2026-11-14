@@ -87,7 +87,7 @@ impl MinecraftRuntime {
             chat_config.public_prefix.clone(),
             chat_config.admin_prefix.clone(),
         );
-        let (action_sender, command_actions) = mpsc::channel();
+        let (action_sender, command_actions) = mpsc::unbounded_channel();
         let command_actions = Mutex::new(command_actions);
         let fatal_error = command_registry
             .register_help_command(chat_config.public_prefix.clone())
@@ -903,7 +903,7 @@ impl MinecraftRuntime {
                 replies,
             }));
         }
-        let (reply_sender, reply_receiver) = mpsc::channel();
+        let (reply_sender, reply_receiver) = mpsc::unbounded_channel();
         let public_sender = reply_sender.clone();
         let mut context = CommandContext::new(
             parsed.message.username.clone(),
@@ -911,20 +911,16 @@ impl MinecraftRuntime {
             permission_level,
             is_private_message,
             move |message| {
-                public_sender
-                    .send(CommandReply {
-                        destination: ReplyDestination::Public,
-                        message: message.to_owned(),
-                    })
-                    .expect("command reply receiver remains alive during execution");
+                let _ = public_sender.send(CommandReply {
+                    destination: ReplyDestination::Public,
+                    message: message.to_owned(),
+                });
             },
             move |message| {
-                reply_sender
-                    .send(CommandReply {
-                        destination: ReplyDestination::Private,
-                        message: message.to_owned(),
-                    })
-                    .expect("command reply receiver remains alive during execution");
+                let _ = reply_sender.send(CommandReply {
+                    destination: ReplyDestination::Private,
+                    message: message.to_owned(),
+                });
             },
         );
         context.full_command = parsed.message.content.clone();
@@ -943,7 +939,10 @@ impl MinecraftRuntime {
         if result.success {
             self.apply_command_actions(actions, &context, &mut result)?;
         }
-        let replies = reply_receiver.try_iter().collect();
+        let mut replies = Vec::new();
+        while let Ok(reply) = reply_receiver.try_recv() {
+            replies.push(reply);
+        }
         Ok(Some(CommandDispatch {
             event: MinecraftRuntimeEvent::CommandExecuted {
                 username: parsed.message.username.clone(),

@@ -748,11 +748,17 @@ async fn delete_location(
         .unwrap_or_default();
 
     if memory
-        .locations()
-        .as_object()
+        .get("locations")
+        .and_then(Value::as_object)
         .is_some_and(|o| o.contains_key(&name))
     {
-        memory.locations().as_object_mut().unwrap().remove(&name);
+        if let Some(locations) = memory
+            .as_object_mut()
+            .and_then(|o| o.get_mut("locations"))
+            .and_then(Value::as_object_mut)
+        {
+            locations.remove(&name);
+        }
         memory
             .save(&state.config.memory.file_path)
             .await
@@ -970,7 +976,7 @@ async fn get_memory_players(
 async fn save_memory(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path)
+    let memory = Memory::load(&state.config.memory.file_path)
         .await
         .unwrap_or_default();
     let success = memory.save(&state.config.memory.file_path).await.is_ok();

@@ -351,9 +351,15 @@ impl std::ops::Deref for Memory {
     }
 }
 
+impl std::ops::DerefMut for Memory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
 impl Memory {
     /// Load memory from file
-    pub async fn load(path: impl AsRef<Path> + Send) -> Result<Self, MemoryError> {
+    pub async fn load(path: impl AsRef<Path> + Send + 'static) -> Result<Self, MemoryError> {
         let data = tokio::task::spawn_blocking(move || load_memory(path))
             .await
             .unwrap()?;
@@ -361,7 +367,7 @@ impl Memory {
     }
 
     /// Save memory to file
-    pub async fn save<'a>(&'a self, path: impl AsRef<Path> + Send + 'a) -> Result<(), MemoryError> {
+    pub async fn save<'a>(&'a self, path: impl AsRef<Path> + Send + 'static) -> Result<(), MemoryError> {
         let data = self.data.clone();
         tokio::task::spawn_blocking(move || save_memory(path, &data))
             .await

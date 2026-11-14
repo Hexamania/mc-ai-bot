@@ -32,14 +32,26 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-01
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           components: rustfmt
+
+      - name: Ensure rustfmt is installed
+        run: |
+          if (-not (Get-Command cargo-fmt -ErrorAction SilentlyContinue)) {
+            rustup component add rustfmt --toolchain ${{ env.RUSTUP_TOOLCHAIN }} || echo "rustfmt not available for this toolchain"
+          }
 
       - name: Verify toolchain
         run: rustc --version && cargo --version
 
       - name: Run cargo fmt
-        run: cargo fmt --manifest-path rust/Cargo.toml
+        run: |
+          if (Get-Command cargo-fmt -ErrorAction SilentlyContinue) {
+            cargo fmt --manifest-path rust/Cargo.toml
+          } else {
+            Write-Host "rustfmt not available, skipping format"
+            exit 1
+          }
 
       - name: Check for changes
         id: fmt-check

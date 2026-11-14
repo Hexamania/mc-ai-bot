@@ -19,8 +19,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          autocrlf: false
+      - name: Configure git to use LF line endings
+        run: git config --global core.autocrlf false
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:

@@ -3057,7 +3057,7 @@ impl MinecraftConnection {
     /// Save location
     pub fn save_location(
         &mut self,
-        name: &str,
+        _name: &str,
         pos: crate::web::socket::events::BotPosition,
         _location_type: &str,
     ) {

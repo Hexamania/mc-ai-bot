@@ -165,7 +165,7 @@ impl IntoResponse for ErrorResponse {
 }
 
 /// Create API router with all routes
-pub fn create_api_router(state: Arc<WebState>) -> Router {
+pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
     let rate_limiters = Arc::new(create_rate_limiters(&state.config));
 
     Router::new()

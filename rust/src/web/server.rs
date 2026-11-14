@@ -13,6 +13,7 @@ use socketioxide::SocketIo;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower::ServiceBuilder;
+use tower::layer::Identity;
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
@@ -39,7 +40,7 @@ pub struct WebServer {
     state: Arc<WebState>,
     app: Router,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<ServiceBuilder<socketioxide::layer::SocketIoLayer>>,
+    socket_io_layer: Option<ServiceBuilder<tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>>>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -135,8 +136,8 @@ impl WebServer {
 fn create_router(
     state: Arc<WebState>,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<ServiceBuilder<socketioxide::layer::SocketIoLayer>>,
-) -> Router {
+    socket_io_layer: Option<ServiceBuilder<tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>>>,
+) -> Router<Arc<WebState>> {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([

@@ -8,6 +8,6 @@ use axum::Router;
 use std::sync::Arc;
 
 /// Create all routes
-pub fn create_routes(state: Arc<WebState>) -> Router {
+pub fn create_routes(state: Arc<WebState>) -> Router<Arc<WebState>> {
     api::create_api_router(state)
 }

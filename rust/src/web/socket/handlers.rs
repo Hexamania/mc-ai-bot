@@ -23,6 +23,34 @@ use crate::{
     },
 };
 
+/// Extension key for storing SocketUser data
+#[derive(Clone)]
+struct SocketUserKey;
+
+/// Extension key for storing HandshakeData
+#[derive(Clone)]
+struct HandshakeDataKey;
+
+/// Helper to get SocketUser from socket extensions
+fn get_socket_user(socket: &SocketRef) -> Option<SocketUser> {
+    socket.extensions.get::<SocketUserKey>().cloned()
+}
+
+/// Helper to set SocketUser in socket extensions
+fn set_socket_user(socket: &SocketRef, user: SocketUser) {
+    socket.extensions.insert::<SocketUserKey>(user);
+}
+
+/// Helper to get HandshakeData from socket extensions
+fn get_handshake_data(socket: &SocketRef) -> Option<HandshakeData> {
+    socket.extensions.get::<HandshakeDataKey>().cloned()
+}
+
+/// Helper to set HandshakeData in socket extensions
+fn set_handshake_data(socket: &SocketRef, data: HandshakeData) {
+    socket.extensions.insert::<HandshakeDataKey>(data);
+}
+
 /// Socket user data
 #[derive(Debug, Clone)]
 pub struct SocketUser {
@@ -40,16 +68,14 @@ pub fn setup_main_namespace(
     io.ns(namespaces::MAIN, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
-        ns.on_connect(move |socket: SocketRef| {
+        ns.on_connect(move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
             let state = state.clone();
 
+            // Store handshake data in extensions for later use
+            set_handshake_data(socket, handshake.clone());
+
             // Authentication - extract token from socket handshake auth
-            let handshake = socket.data::<HandshakeData>().cloned();
-            let (auth_value, query_value) = if let Some(hs) = handshake {
-                (hs.auth, hs.query)
-            } else {
-                (None, None)
-            };
+            let (auth_value, query_value) = (handshake.auth, handshake.query);
 
             let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
@@ -62,7 +88,7 @@ pub fn setup_main_namespace(
                     };
 
                     // Store user data in socket
-                    socket.set_data(user.clone());
+                    set_socket_user(socket, user.clone());
 
                     // Join default rooms
                     socket.join(rooms::ALL).ok();
@@ -114,12 +140,14 @@ pub fn setup_admin_namespace(
     io.ns(namespaces::ADMIN, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
-        ns.on_connect(move |socket: SocketRef| {
+        ns.on_connect(move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
             let state = state.clone();
 
+            // Store handshake data in extensions
+            set_handshake_data(socket, handshake);
+
             // Check if user is admin - get user from socket data
-            let is_admin = socket
-                .data::<SocketUser>()
+            let is_admin = get_socket_user(socket)
                 .map(|user| matches!(user.role, crate::web::auth::UserRole::Admin))
                 .unwrap_or(false);
 
@@ -181,23 +209,21 @@ pub fn setup_commands_namespace(
     io.ns(namespaces::COMMANDS, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
-        ns.on_connect(move |socket: SocketRef| {
+        ns.on_connect(move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
             let state = state.clone();
 
+            // Store handshake data in extensions
+            set_handshake_data(socket, handshake);
+
             // Authentication
-            let handshake = socket.data::<HandshakeData>().cloned();
-            let (auth_value, query_value) = if let Some(hs) = handshake {
-                (hs.auth, hs.query)
-            } else {
-                (None, None)
-            };
+            let (auth_value, query_value) = (handshake.auth, handshake.query);
 
             let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
             if let Some(token) = token {
                 let config = state.config.clone();
                 if verify_socket_token(&config, &token).is_ok() {
-                    socket.set_data(SocketUser {
+                    set_socket_user(socket, SocketUser {
                         username: "dashboard".to_string(),
                         role: crate::web::auth::UserRole::Admin,
                     });

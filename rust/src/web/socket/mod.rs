@@ -13,7 +13,7 @@ use tower::ServiceBuilder;
 pub fn initialize_socket_io(
     state: Arc<WebState>,
 ) -> Result<
-    (ServiceBuilder<socketioxide::layer::SocketIoLayer>, SocketIo),
+    (ServiceBuilder<tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>>, SocketIo),
     Box<dyn std::error::Error + Send + Sync>,
 > {
     let (layer, io) = SocketIo::new_layer();

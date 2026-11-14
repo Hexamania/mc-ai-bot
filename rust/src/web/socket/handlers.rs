@@ -330,7 +330,9 @@ pub fn setup_commands_namespace(
                                 private_sender: None,
                             };
 
-                            let result = runtime.execute_command_with_context(&data.command, context).await;
+                            let result = runtime
+                                .execute_command_with_context(&data.command, context)
+                                .await;
                             let execution_time = start_time.elapsed().as_millis() as u64;
 
                             socket
@@ -503,7 +505,9 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                         private_sender: None,
                     };
 
-                    let result = runtime.execute_command_with_context(&data.command, context).await;
+                    let result = runtime
+                        .execute_command_with_context(&data.command, context)
+                        .await;
                     let execution_time = start_time.elapsed().as_millis() as u64;
 
                     socket

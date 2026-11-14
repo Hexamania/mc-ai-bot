@@ -7,14 +7,13 @@ use azalea::{
     entity::{metadata::Player, Position},
     inventory::SetSelectedHotbarSlotEvent,
     pathfinder::{
-        extras::utils::can_reach_block,
-        goals::{RadiusGoal, ReachBlockPosGoal},
+        goals::{Goal, RadiusGoal, ReachBlockPosGoal},
         PathfinderClientExt,
     },
     registry::Block as RegistryBlock,
     GameProfileComponent, Vec3,
 };
-use azalea::{mining::StopMiningBlockEvent, Account, Client, Event};
+use azalea::{mining::StopMiningBlockEvent, Account, BotClientExt, Client, Event};
 use rand::Rng;
 use thiserror::Error;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
@@ -500,16 +499,15 @@ async fn mine_block_task(
         pos: target,
         chunk_storage: chunk_storage.clone(),
     };
-    client.goto_without_mining(goal);
+    client.goto_without_mining(ReachBlockPosGoal {
+        pos: target,
+        chunk_storage: chunk_storage.clone(),
+    });
 
     let mut ticks = client.get_tick_broadcaster();
     let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     loop {
-        if can_reach_block(
-            &chunk_storage,
-            azalea::BlockPos::from(client.position()),
-            target,
-        ) {
+        if goal.success(azalea::BlockPos::from(client.position())) {
             break;
         }
         match tokio::time::timeout_at(deadline, ticks.recv()).await {

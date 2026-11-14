@@ -1,5 +1,5 @@
 use std::time::Duration;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use thiserror::Error;
 use tokio::time::sleep;

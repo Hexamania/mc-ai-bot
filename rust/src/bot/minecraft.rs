@@ -12,6 +12,7 @@ use thiserror::Error;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
 
 use crate::{
+    bot::inventory::InventorySnapshot,
     bot::state_machine::{BotState, InvalidTransition, StateMachine},
     config::BotConfig,
 };
@@ -115,6 +116,17 @@ impl MinecraftConnection {
 
     pub fn username(&self) -> &str {
         &self.client.profile.name
+    }
+
+    pub fn inventory_snapshot(&self) -> Result<InventorySnapshot, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let inventory = self.client.component::<azalea::inventory::Inventory>();
+        Ok(InventorySnapshot::from_player(
+            inventory.inventory_menu.as_player(),
+            inventory.selected_hotbar_slot,
+        ))
     }
 
     pub fn following_target(&self) -> Option<&str> {

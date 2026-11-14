@@ -89,7 +89,8 @@ impl MinecraftRuntime {
             .and_then(|_| command_registry.register_ping_command())
             .and_then(|_| register_follow_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_roam_commands(&command_registry, action_sender.clone()))
-            .and_then(|_| register_navigation_commands(&command_registry, action_sender))
+            .and_then(|_| register_navigation_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_inventory_commands(&command_registry, action_sender))
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
 
@@ -417,6 +418,19 @@ impl MinecraftRuntime {
                         result.error = Some(error.to_owned());
                     }
                 }
+                RuntimeCommandAction::Inventory { slot } => {
+                    let snapshot = connection.inventory_snapshot()?;
+                    context.private_reply(&snapshot.inventory_report(slot));
+                }
+                RuntimeCommandAction::ItemCount { name } => {
+                    let snapshot = connection.inventory_snapshot()?;
+                    let count = snapshot.count_item(&name);
+                    context.private_reply(&format!("📦 {count}x {name}"));
+                }
+                RuntimeCommandAction::Equipment => {
+                    let snapshot = connection.inventory_snapshot()?;
+                    context.private_reply(&snapshot.equipment_report());
+                }
             }
         }
         Ok(())
@@ -476,6 +490,13 @@ enum RuntimeCommandAction {
         z: f64,
         range: f64,
     },
+    Inventory {
+        slot: Option<usize>,
+    },
+    ItemCount {
+        name: String,
+    },
+    Equipment,
 }
 
 fn register_follow_commands(
@@ -714,6 +735,99 @@ fn register_navigation_commands(
             .with_constraint(ArgumentConstraint::Maximum(50.0)),
     ];
     registry.register(go_to)?;
+    Ok(())
+}
+
+fn register_inventory_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    let inventory_sender = action_sender.clone();
+    let mut inventory = CommandDefinition::new(
+        "inventory",
+        "Show inventory contents or inspect a slot",
+        std::sync::Arc::new(move |context, _| {
+            let sender = inventory_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 1 {
+                    return Err("Usage: inventory [slot 0-35]".to_owned());
+                }
+                let slot = match context.args.args.first() {
+                    Some(ArgumentValue::Number(slot))
+                        if slot.is_finite()
+                            && slot.fract() == 0.0
+                            && (0.0..36.0).contains(slot) =>
+                    {
+                        Some(*slot as usize)
+                    }
+                    Some(_) => return Err("Inventory slot must be between 0 and 35.".to_owned()),
+                    None => None,
+                };
+                sender
+                    .send(RuntimeCommandAction::Inventory { slot })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    inventory.aliases = vec!["inv".to_owned()];
+    inventory.usage = Some("[slot 0-35]".to_owned());
+    inventory.category = Some("Inventory".to_owned());
+    inventory.permission = Some(PermissionConfig::default());
+    inventory.arguments = vec![ArgumentDefinition::new("slot", ArgumentType::Number, false)
+        .with_constraint(ArgumentConstraint::Integer)
+        .with_constraint(ArgumentConstraint::Minimum(0.0))
+        .with_constraint(ArgumentConstraint::Maximum(35.0))];
+    registry.register(inventory)?;
+
+    let item_count_sender = action_sender.clone();
+    let mut item_count = CommandDefinition::new(
+        "itemcount",
+        "Count an item in the inventory",
+        std::sync::Arc::new(move |context, _| {
+            let sender = item_count_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() != 1 {
+                    return Err("Usage: itemcount <item-name>".to_owned());
+                }
+                let Some(ArgumentValue::String(name)) = context.args.args.first() else {
+                    return Err("An item name is required.".to_owned());
+                };
+                sender
+                    .send(RuntimeCommandAction::ItemCount { name: name.clone() })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    item_count.aliases = vec!["countitem".to_owned()];
+    item_count.usage = Some("<item-name>".to_owned());
+    item_count.category = Some("Inventory".to_owned());
+    item_count.permission = Some(PermissionConfig::default());
+    item_count.arguments = vec![ArgumentDefinition::new(
+        "item-name",
+        ArgumentType::String,
+        true,
+    )];
+    registry.register(item_count)?;
+
+    let mut equipment = CommandDefinition::new(
+        "equipment",
+        "Show equipped armor and held items",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: equipment".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Equipment)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    equipment.aliases = vec!["gear".to_owned()];
+    equipment.category = Some("Inventory".to_owned());
+    equipment.permission = Some(PermissionConfig::default());
+    registry.register(equipment)?;
     Ok(())
 }
 
@@ -1120,6 +1234,87 @@ mod tests {
             run(registry.execute("goto", &mut invalid_range_context)).unwrap();
         assert!(!invalid_range_result.success);
         assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
+    fn inventory_commands_schedule_read_only_queries_for_guest_users() {
+        let registry = CommandRegistry::default();
+        let (sender, receiver) = mpsc::channel();
+        register_inventory_commands(&registry, sender).unwrap();
+        let mut inventory_context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let inventory_result = run(registry.execute("inventory", &mut inventory_context)).unwrap();
+        assert!(inventory_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Inventory { slot: None }
+        );
+
+        let mut slot_context = CommandContext::new(
+            "Alex",
+            vec!["35".to_owned()],
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let slot_result = run(registry.execute("inv", &mut slot_context)).unwrap();
+        assert!(slot_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Inventory { slot: Some(35) }
+        );
+
+        let mut invalid_slot_context = CommandContext::new(
+            "Alex",
+            vec!["36".to_owned()],
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let invalid_slot_result =
+            run(registry.execute("inventory", &mut invalid_slot_context)).unwrap();
+        assert!(!invalid_slot_result.success);
+        assert!(receiver.try_recv().is_err());
+
+        let mut count_context = CommandContext::new(
+            "Alex",
+            vec!["minecraft:diamond".to_owned()],
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let count_result = run(registry.execute("countitem", &mut count_context)).unwrap();
+        assert!(count_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::ItemCount {
+                name: "minecraft:diamond".to_owned(),
+            }
+        );
+
+        let mut equipment_context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let equipment_result = run(registry.execute("gear", &mut equipment_context)).unwrap();
+        assert!(equipment_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Equipment
+        );
     }
 
     #[test]

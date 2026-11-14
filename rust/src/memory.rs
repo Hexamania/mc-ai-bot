@@ -354,14 +354,18 @@ impl std::ops::Deref for Memory {
 impl Memory {
     /// Load memory from file
     pub async fn load(path: impl AsRef<Path> + Send) -> Result<Self, MemoryError> {
-        let data = tokio::task::spawn_blocking(move || load_memory(path)).await.unwrap()?;
+        let data = tokio::task::spawn_blocking(move || load_memory(path))
+            .await
+            .unwrap()?;
         Ok(Self { data })
     }
 
     /// Save memory to file
     pub async fn save(&self, path: impl AsRef<Path> + Send) -> Result<(), MemoryError> {
         let data = self.data.clone();
-        tokio::task::spawn_blocking(move || save_memory(path, &data)).await.unwrap()
+        tokio::task::spawn_blocking(move || save_memory(path, &data))
+            .await
+            .unwrap()
     }
 
     /// Save a location

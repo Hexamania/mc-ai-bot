@@ -10,8 +10,6 @@ azalea = "=0.10.3"
 async-trait = "0.1"
 axum = { version = "0.7", features = ["macros", "json", "form", "ws", "multipart"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
-time = "0.3.33"
-time-macros = "0.2.30"
 jsonwebtoken = "9"
 rand = { version = "=0.8.5", features = ["small_rng"] }
 serde = { version = "1", features = ["derive"] }
@@ -32,8 +30,3 @@ tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 uuid = { version = "1", features = ["v4", "serde", "fast-rng"] }
-
-[patch.crates-io]
-time = { version = "=0.3.33" }
-time-macros = { version = "=0.2.30" }
-time-core = { version = "=0.1.7" }

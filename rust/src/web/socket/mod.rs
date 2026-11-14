@@ -17,6 +17,7 @@ pub fn initialize_socket_io(
     Box<dyn std::error::Error + Send + Sync>,
 > {
     let (layer, io) = SocketIo::new_layer();
+    let layer = ServiceBuilder::new().layer(layer);
 
     // Initialize all namespaces
     handlers::initialize_all_namespaces(&io, state)?;

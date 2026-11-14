@@ -3067,7 +3067,7 @@ impl MinecraftConnection {
     }
 
     /// Add favorite location
-    pub fn add_favorite(&mut self, name: &str, pos: crate::web::socket::events::BotPosition) {
+    pub fn add_favorite(&mut self, _name: &str, pos: crate::web::socket::events::BotPosition) {
         let vec3 = Vec3::new(pos.x, pos.y, pos.z);
         self.set_base(Some(vec3.x), Some(vec3.y), Some(vec3.z)).ok();
     }

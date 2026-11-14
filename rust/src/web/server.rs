@@ -36,7 +36,7 @@ use crate::{
 /// Web server wrapper
 pub struct WebServer {
     config: Arc<AppConfig>,
-    state: Arc<RwLock<WebState>>,
+    state: Arc<WebState>,
     app: Router,
     socket_io: Option<SocketIo>,
     socket_io_layer: Option<ServiceBuilder<socketioxide::layer::SocketIoLayer>>,
@@ -48,13 +48,13 @@ impl WebServer {
     pub async fn new(
         config: Arc<AppConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let state = Arc::new(RwLock::new(WebState::new(config.clone())));
+        let state = Arc::new(WebState::new(config.clone()));
 
         // Initialize Socket.io
         let (socket_io_layer, socket_io) = socket::initialize_socket_io(state.clone())?;
 
         // Set socket_io on WebState for broadcast functions
-        state.write().await.set_socket_io(socket_io.clone());
+        state.set_socket_io(socket_io.clone()).await;
 
         // Create the HTTP router
         let app = create_router(state.clone(), socket_io.clone(), socket_io_layer.clone());
@@ -71,17 +71,17 @@ impl WebServer {
 
     /// Set the Minecraft connection
     pub async fn set_connection(&self, connection: MinecraftConnection) {
-        self.state.write().await.set_connection(connection).await;
+        self.state.set_connection(connection).await;
     }
 
     /// Set the Minecraft runtime (shared with main loop)
     pub async fn set_runtime(&self, runtime: Arc<RwLock<MinecraftRuntime>>) {
-        self.state.write().await.set_runtime(runtime);
+        self.state.set_runtime(runtime).await;
     }
 
     /// Clear connection and runtime
     pub async fn clear(&self) {
-        self.state.write().await.clear().await;
+        self.state.clear().await;
     }
 
     /// Start the web server
@@ -121,7 +121,7 @@ impl WebServer {
     }
 
     /// Get the web state
-    pub fn state(&self) -> Arc<RwLock<WebState>> {
+    pub fn state(&self) -> Arc<WebState> {
         self.state.clone()
     }
 
@@ -133,9 +133,9 @@ impl WebServer {
 
 /// Create the main router with all middleware and routes
 fn create_router(
-    state: Arc<RwLock<WebState>>,
+    state: Arc<WebState>,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<tower::Layer>,
+    socket_io_layer: Option<ServiceBuilder<socketioxide::layer::SocketIoLayer>>,
 ) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)

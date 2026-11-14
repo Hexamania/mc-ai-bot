@@ -1,6 +1,6 @@
 use axum::extract::State;
 use socketioxide::{
-    Extensions, SocketIo,
+    SocketIo,
     extract::{Data, SocketRef},
     socket::{DisconnectReason, HandshakeData},
 };
@@ -44,7 +44,7 @@ pub fn setup_main_namespace(
             let state = state.clone();
 
             // Authentication - extract token from socket handshake auth
-            let handshake = socket.extensions.get::<HandshakeData>().cloned();
+            let handshake = socket.data::<HandshakeData>().cloned();
             let (auth_value, query_value) = if let Some(hs) = handshake {
                 (hs.auth, hs.query)
             } else {
@@ -61,8 +61,8 @@ pub fn setup_main_namespace(
                         role: claims.role,
                     };
 
-                    // Store user data in socket extensions
-                    socket.extensions.insert(user.clone());
+                    // Store user data in socket
+                    socket.set_data(user.clone());
 
                     // Join default rooms
                     socket.join(rooms::ALL).ok();
@@ -117,10 +117,9 @@ pub fn setup_admin_namespace(
         ns.on_connect(move |socket: SocketRef| {
             let state = state.clone();
 
-            // Check if user is admin - get user from socket extensions
+            // Check if user is admin - get user from socket data
             let is_admin = socket
-                .extensions
-                .get::<SocketUser>()
+                .data::<SocketUser>()
                 .map(|user| matches!(user.role, crate::web::auth::UserRole::Admin))
                 .unwrap_or(false);
 
@@ -186,7 +185,7 @@ pub fn setup_commands_namespace(
             let state = state.clone();
 
             // Authentication
-            let handshake = socket.extensions.get::<HandshakeData>().cloned();
+            let handshake = socket.data::<HandshakeData>().cloned();
             let (auth_value, query_value) = if let Some(hs) = handshake {
                 (hs.auth, hs.query)
             } else {
@@ -198,7 +197,7 @@ pub fn setup_commands_namespace(
             if let Some(token) = token {
                 let config = state.config.clone();
                 if verify_socket_token(&config, &token).is_ok() {
-                    socket.extensions.insert(SocketUser {
+                    socket.set_data(SocketUser {
                         username: "dashboard".to_string(),
                         role: crate::web::auth::UserRole::Admin,
                     });

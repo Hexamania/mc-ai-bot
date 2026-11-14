@@ -172,11 +172,11 @@ fn extract_token(headers: &HeaderMap, cookies: &str, query_token: Option<&str>) 
 
 /// Authentication middleware - requires valid token
 pub async fn auth_middleware(
-    State(state): State<Arc<RwLock<WebState>>>,
+    State(state): State<Arc<WebState>>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AuthError> {
-    let config = state.read().await.config.clone();
+    let config = state.config.clone();
     let headers = request.headers().clone();
     let cookies = headers
         .get(header::COOKIE)
@@ -199,11 +199,11 @@ pub async fn auth_middleware(
 
 /// Optional authentication middleware - adds user if token is valid but doesn't require it
 pub async fn optional_auth_middleware(
-    State(state): State<Arc<RwLock<WebState>>>,
+    State(state): State<Arc<WebState>>,
     mut request: Request,
     next: Next,
 ) -> Response {
-    let config = state.read().await.config.clone();
+    let config = state.config.clone();
     let headers = request.headers().clone();
     let cookies = headers
         .get(header::COOKIE)
@@ -227,7 +227,7 @@ pub async fn optional_auth_middleware(
 /// Role-based authorization middleware
 pub fn require_role(allowed_roles: Vec<UserRole>) -> axum::middleware::Middleware<axum::Router> {
     axum::middleware::from_fn(
-        move |State(state): State<Arc<RwLock<WebState>>>, mut request: Request, next: Next| {
+        move |State(_state): State<Arc<WebState>>, mut request: Request, next: Next| {
             let allowed = allowed_roles.clone();
             async move {
                 let claims = request

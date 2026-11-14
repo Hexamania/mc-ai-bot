@@ -19,8 +19,8 @@ use tokio::sync::RwLock;
 pub struct WebState {
     pub config: Arc<AppConfig>,
     pub connection: Arc<RwLock<Option<MinecraftConnection>>>,
-    pub runtime: Option<Arc<RwLock<MinecraftRuntime>>>,
-    pub socket_io: Option<socketioxide::SocketIo>,
+    pub runtime: Arc<RwLock<Option<Arc<RwLock<MinecraftRuntime>>>>>,
+    pub socket_io: Arc<RwLock<Option<socketioxide::SocketIo>>>,
 }
 
 impl WebState {
@@ -28,8 +28,8 @@ impl WebState {
         Self {
             config,
             connection: Arc::new(RwLock::new(None)),
-            runtime: None,
-            socket_io: None,
+            runtime: Arc::new(RwLock::new(None)),
+            socket_io: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -37,17 +37,19 @@ impl WebState {
         *self.connection.write().await = Some(conn);
     }
 
-    pub fn set_runtime(&mut self, runtime: Arc<RwLock<MinecraftRuntime>>) {
-        self.runtime = Some(runtime);
+    pub async fn set_runtime(&self, runtime: Arc<RwLock<MinecraftRuntime>>) {
+        *self.runtime.write().await = Some(runtime);
     }
 
-    pub fn set_socket_io(&mut self, socket_io: socketioxide::SocketIo) {
-        self.socket_io = Some(socket_io);
+    pub async fn set_socket_io(&self, socket_io: socketioxide::SocketIo) {
+        *self.socket_io.write().await = Some(socket_io);
     }
 
-    pub fn get_socket_io(&self) -> Result<&socketioxide::SocketIo, String> {
+    pub async fn get_socket_io(&self) -> Result<socketioxide::SocketIo, String> {
         self.socket_io
-            .as_ref()
+            .read()
+            .await
+            .clone()
             .ok_or_else(|| "Socket.io not initialized".to_string())
     }
 

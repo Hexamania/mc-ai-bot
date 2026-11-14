@@ -367,7 +367,10 @@ impl Memory {
     }
 
     /// Save memory to file
-    pub async fn save<'a>(&'a self, path: impl AsRef<Path> + Send + 'static) -> Result<(), MemoryError> {
+    pub async fn save<'a>(
+        &'a self,
+        path: impl AsRef<Path> + Send + 'static,
+    ) -> Result<(), MemoryError> {
         let data = self.data.clone();
         tokio::task::spawn_blocking(move || save_memory(path, &data))
             .await

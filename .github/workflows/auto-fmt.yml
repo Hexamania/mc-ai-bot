@@ -43,7 +43,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if (git diff --quiet rust/) {
+          git diff --quiet rust/
+          if ($LASTEXITCODE -eq 0) {
             "changed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             Write-Host "No formatting changes needed"
           } else {

@@ -189,8 +189,9 @@ Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle tr
 chat formats, command dispatch, typed argument validation, registry execution, permission checks,
 cooldowns, legacy migration, fact updates, persistence, transport configuration, roaming bounds,
 and inventory snapshots.
-See the [targeted mining guide](./docs/rust-targeted-mining.md) for the `!mine`
-command's behavior, implementation, limits, and verification.
+See the [Rust migration status](./docs/rust-migration-status.md) for what has
+and has not been ported, and the [targeted mining guide](./docs/rust-targeted-mining.md)
+for the `!mine` command's behavior, implementation, limits, and verification.
 The Rust bot can be started with `cargo run --manifest-path rust/Cargo.toml`; it reads the existing
 environment configuration, processes commands, and exits cleanly on Ctrl+C. The `Rust core` GitHub
 Actions workflow checks formatting, all targets, and tests on Windows.

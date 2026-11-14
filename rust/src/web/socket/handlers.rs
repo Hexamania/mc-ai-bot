@@ -304,36 +304,21 @@ pub fn setup_commands_namespace(
                     tokio::spawn(async move {
                         if let Some(runtime_arc) = state.runtime.as_ref() {
                             let runtime = runtime_arc.read().await;
-                            let args: Vec<String> = match &data.args {
-                                Some(serde_json::Value::String(s)) => vec![s.clone()],
-                                Some(serde_json::Value::Array(arr)) => arr
-                                    .iter()
-                                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                    .collect(),
-                                _ => vec![],
-                            };
 
-                            let user = socket.extensions().get::<SocketUser>().cloned();
-                            let context = crate::bot::runtime::CommandContext {
-                                bot: runtime.get_bot().await,
-                                username: user
-                                    .as_ref()
-                                    .map(|u| u.username.clone())
-                                    .unwrap_or_else(|| "dashboard".to_string()),
-                                args,
-                                is_admin: user
-                                    .as_ref()
-                                    .map(|u| matches!(u.role, crate::web::auth::UserRole::Admin))
-                                    .unwrap_or(false),
-                                is_pm: true,
-                                reply_sender: None,
-                                private_sender: None,
-                            };
-
-                            let result = runtime
-                                .execute_command_with_context(&data.command, context)
-                                .await;
+                            let result = runtime.execute_command(&data.command).await;
                             let execution_time = start_time.elapsed().as_millis() as u64;
+
+                            let success = result.is_ok();
+                            let output = if let Ok(_) = result {
+                                Some("Command executed".to_string())
+                            } else {
+                                None
+                            };
+                            let error = if let Err(e) = result {
+                                Some(e.to_string())
+                            } else {
+                                None
+                            };
 
                             socket
                                 .emit(
@@ -341,17 +326,9 @@ pub fn setup_commands_namespace(
                                     CommandResultPayload {
                                         request_id: Some(request_id),
                                         command: data.command,
-                                        success: result,
-                                        output: if result {
-                                            Some("Command executed".to_string())
-                                        } else {
-                                            None
-                                        },
-                                        error: if !result {
-                                            Some("Command failed or not found".to_string())
-                                        } else {
-                                            None
-                                        },
+                                        success,
+                                        output,
+                                        error,
                                         execution_time: Some(execution_time),
                                     },
                                 )
@@ -457,94 +434,6 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let runtime = runtime_arc.read().await;
                     let status = runtime.get_status().await;
                     socket.emit(server_events::BOT_STATUS, status).ok();
-                }
-            });
-        },
-    );
-
-    // Send command (legacy support)
-    socket.on(
-        client_events::SEND_COMMAND,
-        move |socket: SocketRef, Data(data): Data<SendCommandPayload>| {
-            let state = state.clone();
-            let request_id = data.request_id.clone().unwrap_or_else(|| {
-                format!(
-                    "cmd_{}_{}",
-                    chrono::Utc::now().timestamp_millis(),
-                    uuid::Uuid::new_v4().simple()
-                )
-            });
-            let start_time = std::time::Instant::now();
-
-            tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    let args: Vec<String> = match &data.args {
-                        Some(serde_json::Value::String(s)) => vec![s.clone()],
-                        Some(serde_json::Value::Array(arr)) => arr
-                            .iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect(),
-                        _ => vec![],
-                    };
-
-                    let user = socket.extensions().get::<SocketUser>().cloned();
-                    let context = crate::bot::runtime::CommandContext {
-                        bot: runtime.get_bot().await,
-                        username: user
-                            .as_ref()
-                            .map(|u| u.username.clone())
-                            .unwrap_or_else(|| "dashboard".to_string()),
-                        args,
-                        is_admin: user
-                            .as_ref()
-                            .map(|u| matches!(u.role, crate::web::auth::UserRole::Admin))
-                            .unwrap_or(false),
-                        is_pm: true,
-                        reply_sender: None,
-                        private_sender: None,
-                    };
-
-                    let result = runtime
-                        .execute_command_with_context(&data.command, context)
-                        .await;
-                    let execution_time = start_time.elapsed().as_millis() as u64;
-
-                    socket
-                        .emit(
-                            server_events::COMMAND_RESULT,
-                            CommandResultPayload {
-                                request_id: Some(request_id),
-                                command: data.command,
-                                success: result,
-                                output: if result {
-                                    Some("Command executed".to_string())
-                                } else {
-                                    None
-                                },
-                                error: if !result {
-                                    Some("Command failed or not found".to_string())
-                                } else {
-                                    None
-                                },
-                                execution_time: Some(execution_time),
-                            },
-                        )
-                        .ok();
-                } else {
-                    socket
-                        .emit(
-                            server_events::COMMAND_RESULT,
-                            CommandResultPayload {
-                                request_id: Some(request_id),
-                                command: data.command,
-                                success: false,
-                                output: None,
-                                error: Some("Bot is offline".to_string()),
-                                execution_time: Some(start_time.elapsed().as_millis() as u64),
-                            },
-                        )
-                        .ok();
                 }
             });
         },

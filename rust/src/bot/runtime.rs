@@ -200,6 +200,18 @@ impl MinecraftRuntime {
             })
     }
 
+    /// Get base/home location
+    pub fn get_base_location(&self) -> Option<crate::web::socket::events::BotPosition> {
+        self.connection
+            .as_ref()
+            .and_then(|c| c.get_base_location())
+            .map(|pos| crate::web::socket::events::BotPosition {
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+            })
+    }
+
     /// Get bot status (simple status for dashboard)
     pub async fn get_status(&self) -> crate::web::socket::events::BotStatusPayload {
         let uptime = std::time::SystemTime::now()

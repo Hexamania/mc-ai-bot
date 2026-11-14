@@ -362,7 +362,7 @@ pub enum PermissionLevel {
     Admin,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct PermissionConfig {
     pub level: PermissionLevel,
     pub allowed_users: Vec<String>,

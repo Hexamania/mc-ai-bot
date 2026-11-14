@@ -17,6 +17,8 @@ use crate::{
 };
 
 pub const SUPPORTED_MINECRAFT_VERSION: &str = "1.21.1";
+pub(crate) const MAX_WORLD_COORDINATE: f64 = 29_999_984.0;
+pub(crate) const MAX_SUPPORTED_Y_COORDINATE: f64 = 2_048.0;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MinecraftEvent {
@@ -226,6 +228,45 @@ impl MinecraftConnection {
             self.client.stop_pathfinding();
         }
         was_active
+    }
+
+    pub fn move_to_position(
+        &mut self,
+        x: f64,
+        y: f64,
+        z: f64,
+        range: f64,
+    ) -> Result<bool, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        if !x.is_finite()
+            || !y.is_finite()
+            || !z.is_finite()
+            || x.abs() > MAX_WORLD_COORDINATE
+            || z.abs() > MAX_WORLD_COORDINATE
+            || y.abs() > MAX_SUPPORTED_Y_COORDINATE
+            || !range.is_finite()
+            || !(0.5..=50.0).contains(&range)
+        {
+            return Ok(false);
+        }
+
+        self.stop_following();
+        self.stop_roaming();
+        self.client.goto_without_mining(RadiusGoal {
+            pos: Vec3::new(x, y, z),
+            radius: range as f32,
+        });
+        Ok(true)
+    }
+
+    pub fn stop_movement(&mut self) {
+        self.stop_following();
+        self.stop_roaming();
+        if self.state() == BotState::Connected {
+            self.client.stop_pathfinding();
+        }
     }
 
     pub fn stop_following(&mut self) -> Option<String> {

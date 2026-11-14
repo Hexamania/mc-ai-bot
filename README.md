@@ -172,12 +172,13 @@ protocol versions and authentication modes are rejected explicitly; the Rust tra
 Azalea-compatible `nightly-2024-10-23` toolchain.
 The runtime dispatches parsed incoming chat commands through the Rust registry, applies configured
 permission levels, and sends command replies back to public chat or private messages. It registers
-`!help`, `!ping`, `!follow`, `!stopfollow`, `!roam`, `!stoproam`, and `!stop` by default; additional
-commands can be registered through the runtime's command registry. Following uses pathfinding
-without block breaking and stops if the target leaves, dies, or moves more than 50 blocks away.
-Admin users can start roaming with `!roam [radius] [interval-ms]` (defaults: 3 blocks and 7000 ms;
-valid ranges: 1–50 blocks and 1000–60000 ms); roaming uses no block breaking. Send
-`$loginadmin <password>` in a private message to establish an admin session.
+`!help`, `!ping`, `!follow`, `!stopfollow`, `!roam`, `!stoproam`, `!goto`, and `!stop` by default;
+additional commands can be registered through the runtime's command registry. Following uses
+pathfinding without block breaking and stops if the target leaves, dies, or moves more than 50
+blocks away. Admin users can start roaming with `!roam [radius] [interval-ms]` (defaults: 3 blocks
+and 7000 ms; valid ranges: 1–50 blocks and 1000–60000 ms) or navigate with
+`!goto <x> <y> <z> [range]`; both use pathfinding without block breaking. Send a private message
+with `$loginadmin <password>` to establish an admin session.
 Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions,
 chat formats, command dispatch, typed argument validation, registry execution, permission checks,
 cooldowns, legacy migration, fact updates, persistence, transport configuration, and roaming bounds.

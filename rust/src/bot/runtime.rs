@@ -7,7 +7,10 @@ use crate::{
     arguments::{ArgumentConstraint, ArgumentDefinition, ArgumentType, ArgumentValue},
     bot::minecraft::MinecraftEvent::Chat,
     bot::{
-        minecraft::{MinecraftConnection, MinecraftEvent, MinecraftTransportError},
+        minecraft::{
+            MinecraftConnection, MinecraftEvent, MinecraftTransportError,
+            MAX_SUPPORTED_Y_COORDINATE, MAX_WORLD_COORDINATE,
+        },
         state_machine::{BotState, StateMachine},
     },
     command_registry::{
@@ -85,7 +88,8 @@ impl MinecraftRuntime {
             .register_help_command(chat_config.public_prefix.clone())
             .and_then(|_| command_registry.register_ping_command())
             .and_then(|_| register_follow_commands(&command_registry, action_sender.clone()))
-            .and_then(|_| register_roam_commands(&command_registry, action_sender))
+            .and_then(|_| register_roam_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_navigation_commands(&command_registry, action_sender))
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
 
@@ -399,9 +403,19 @@ impl MinecraftRuntime {
                     }
                 }
                 RuntimeCommandAction::StopAll => {
-                    connection.stop_following();
-                    connection.stop_roaming();
+                    connection.stop_movement();
                     context.reply("⛔ All movement operations halted.");
+                }
+                RuntimeCommandAction::MoveToPosition { x, y, z, range } => {
+                    if connection.move_to_position(x, y, z, range)? {
+                        context.reply(&format!("🏃 Moving to {x:.1}, {y:.1}, {z:.1}."));
+                    } else {
+                        let error =
+                            "Coordinates must be within supported world bounds and range 0.5–50.";
+                        context.error(error);
+                        result.success = false;
+                        result.error = Some(error.to_owned());
+                    }
                 }
             }
         }
@@ -456,6 +470,12 @@ enum RuntimeCommandAction {
     },
     StopRoaming,
     StopAll,
+    MoveToPosition {
+        x: f64,
+        y: f64,
+        z: f64,
+        range: f64,
+    },
 }
 
 fn register_follow_commands(
@@ -637,6 +657,63 @@ fn register_roam_commands(
     stop_all.category = Some("Movement".to_owned());
     stop_all.permission = Some(PermissionConfig::default());
     registry.register(stop_all)?;
+    Ok(())
+}
+
+fn register_navigation_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    let mut go_to = CommandDefinition::new(
+        "goto",
+        "Move to a world position without breaking blocks",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 4 {
+                    return Err("Usage: goto <x> <y> <z> [range]".to_owned());
+                }
+                let coordinate = |index: usize| match context.args.args.get(index) {
+                    Some(ArgumentValue::Number(value)) => Some(*value),
+                    _ => None,
+                };
+                let (Some(x), Some(y), Some(z)) = (coordinate(0), coordinate(1), coordinate(2))
+                else {
+                    return Err("Three coordinates are required.".to_owned());
+                };
+                let range = match context.args.args.get(3) {
+                    Some(ArgumentValue::Number(range)) if range.is_finite() => *range,
+                    _ => return Err("Move range must be between 0.5 and 50.".to_owned()),
+                };
+                sender
+                    .send(RuntimeCommandAction::MoveToPosition { x, y, z, range })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    go_to.aliases = vec!["move".to_owned(), "moveto".to_owned()];
+    go_to.usage = Some("<x> <y> <z> [range]".to_owned());
+    go_to.category = Some("Movement".to_owned());
+    go_to.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    go_to.arguments = vec![
+        ArgumentDefinition::new("x", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Minimum(-MAX_WORLD_COORDINATE))
+            .with_constraint(ArgumentConstraint::Maximum(MAX_WORLD_COORDINATE)),
+        ArgumentDefinition::new("y", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Minimum(-MAX_SUPPORTED_Y_COORDINATE))
+            .with_constraint(ArgumentConstraint::Maximum(MAX_SUPPORTED_Y_COORDINATE)),
+        ArgumentDefinition::new("z", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Minimum(-MAX_WORLD_COORDINATE))
+            .with_constraint(ArgumentConstraint::Maximum(MAX_WORLD_COORDINATE)),
+        ArgumentDefinition::new("range", ArgumentType::Number, false)
+            .with_default(ArgumentValue::Number(1.0))
+            .with_constraint(ArgumentConstraint::Minimum(0.5))
+            .with_constraint(ArgumentConstraint::Maximum(50.0)),
+    ];
+    registry.register(go_to)?;
     Ok(())
 }
 
@@ -945,6 +1022,104 @@ mod tests {
         let stop_all_result = run(registry.execute("stopall", &mut stop_all_context)).unwrap();
         assert!(stop_all_result.success);
         assert_eq!(receiver.try_recv().unwrap(), RuntimeCommandAction::StopAll);
+    }
+
+    #[test]
+    fn goto_command_requires_admin_and_validates_coordinates() {
+        let registry = CommandRegistry::default();
+        let (sender, receiver) = mpsc::channel();
+        register_navigation_commands(&registry, sender).unwrap();
+        let mut guest_context = CommandContext::new(
+            "Alex",
+            vec!["12".to_owned(), "64".to_owned(), "-4".to_owned()],
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let denied_result = run(registry.execute("goto", &mut guest_context)).unwrap();
+        assert!(!denied_result.success);
+        assert!(receiver.try_recv().is_err());
+
+        let mut admin_context = CommandContext::new(
+            "Alex",
+            vec!["12.5".to_owned(), "64".to_owned(), "-4.5".to_owned()],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let default_result = run(registry.execute("move", &mut admin_context)).unwrap();
+        assert!(default_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::MoveToPosition {
+                x: 12.5,
+                y: 64.0,
+                z: -4.5,
+                range: 1.0,
+            }
+        );
+
+        let mut custom_range_context = CommandContext::new(
+            "Alex",
+            vec![
+                "12".to_owned(),
+                "64".to_owned(),
+                "-4".to_owned(),
+                "3".to_owned(),
+            ],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let custom_range_result = run(registry.execute("goto", &mut custom_range_context)).unwrap();
+        assert!(custom_range_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::MoveToPosition {
+                x: 12.0,
+                y: 64.0,
+                z: -4.0,
+                range: 3.0,
+            }
+        );
+
+        let mut invalid_context = CommandContext::new(
+            "Alex",
+            vec![
+                "30000000".to_owned(),
+                "64".to_owned(),
+                "0".to_owned(),
+                "1".to_owned(),
+            ],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let invalid_result = run(registry.execute("goto", &mut invalid_context)).unwrap();
+        assert!(!invalid_result.success);
+        assert!(receiver.try_recv().is_err());
+
+        let mut invalid_range_context = CommandContext::new(
+            "Alex",
+            vec![
+                "12".to_owned(),
+                "64".to_owned(),
+                "-4".to_owned(),
+                "51".to_owned(),
+            ],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let invalid_range_result =
+            run(registry.execute("goto", &mut invalid_range_context)).unwrap();
+        assert!(!invalid_range_result.success);
+        assert!(receiver.try_recv().is_err());
     }
 
     #[test]

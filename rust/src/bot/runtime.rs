@@ -259,6 +259,33 @@ impl MinecraftRuntime {
             parsed.message.message_type,
             MessageType::PrivateMessage | MessageType::Whisper
         );
+        if parsed.is_admin_command && is_private_message && command_name == "loginadmin" {
+            let success = self
+                .permissions
+                .try_admin_login(&parsed.message.username, &parsed.args.join(" "));
+            let replies = if success {
+                vec![CommandReply {
+                    destination: ReplyDestination::Private,
+                    message: "✅ Admin login successful".to_owned(),
+                }]
+            } else {
+                Vec::new()
+            };
+            return Ok(Some(CommandDispatch {
+                event: MinecraftRuntimeEvent::CommandExecuted {
+                    username: parsed.message.username.clone(),
+                    command: command_name,
+                    result: CommandResult {
+                        success,
+                        found: true,
+                        error: None,
+                        execution_time_ms: Some(0),
+                    },
+                },
+                username: parsed.message.username,
+                replies,
+            }));
+        }
         let (reply_sender, reply_receiver) = mpsc::channel();
         let public_sender = reply_sender.clone();
         let mut context = CommandContext::new(
@@ -480,7 +507,13 @@ mod tests {
     }
 
     #[test]
-    fn runtime_uses_application_prefix_and_admin_password() {
+    fn runtime_uses_application_prefix_and_authenticates_admin_private_messages() {
+        use crate::{
+            command_registry::CommandDefinition,
+            commands::{PermissionConfig, PermissionLevel},
+        };
+        use std::sync::Arc;
+
         let app_config = AppConfig::from_values(&std::collections::HashMap::from([
             ("PREFIX".to_owned(), ":".to_owned()),
             ("ADMIN_PASSWORD".to_owned(), "secret".to_owned()),
@@ -488,8 +521,39 @@ mod tests {
         .unwrap();
         let mut runtime = MinecraftRuntime::from_app_config(app_config);
 
-        assert!(runtime.permissions.try_admin_login("Alex", "secret"));
-        let dispatch = run(runtime.dispatch_chat_command(Some("Alex"), ":ping", false))
+        let login = run(runtime.dispatch_chat_command(Some("Alex"), "$loginadmin secret", true))
+            .unwrap()
+            .unwrap();
+        assert_eq!(login.replies[0].message, "✅ Admin login successful");
+        assert!(matches!(
+            login.replies[0].destination,
+            ReplyDestination::Private
+        ));
+        assert_eq!(
+            runtime.permissions.permission_level("Alex"),
+            crate::commands::PermissionLevel::Admin
+        );
+
+        let mut protected_command = CommandDefinition::new(
+            "secure",
+            "Admin-only test command",
+            Arc::new(|context, _| {
+                Box::pin(async move {
+                    context.reply("authorized");
+                    Ok(())
+                })
+            }),
+        );
+        protected_command.permission = Some(PermissionConfig {
+            level: PermissionLevel::Admin,
+            ..PermissionConfig::default()
+        });
+        runtime
+            .command_registry()
+            .register(protected_command)
+            .unwrap();
+
+        let dispatch = run(runtime.dispatch_chat_command(Some("Alex"), ":secure", false))
             .unwrap()
             .unwrap();
 
@@ -499,7 +563,8 @@ mod tests {
         else {
             panic!("expected command execution event");
         };
-        assert_eq!(command, "ping");
+        assert_eq!(command, "secure");
         assert!(result.success);
+        assert_eq!(dispatch.replies[0].message, "authorized");
     }
 }

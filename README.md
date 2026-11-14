@@ -173,7 +173,8 @@ Azalea-compatible `nightly-2024-10-23` toolchain.
 The runtime dispatches parsed incoming chat commands through the Rust registry, applies configured
 permission levels, and sends command replies back to public chat or private messages. It registers
 `!help` and `!ping` by default; additional commands can be registered through the runtime's command
-registry. Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions,
+registry. Send `$loginadmin <password>` in a private message to establish an admin session.
+Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions,
 chat formats, command dispatch, typed argument validation, registry execution, permission checks,
 cooldowns, legacy migration, fact updates, persistence, and transport configuration.
 The Rust bot can be started with `cargo run --manifest-path rust/Cargo.toml`; it reads the existing

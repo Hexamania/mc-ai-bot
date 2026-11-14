@@ -699,11 +699,13 @@ async fn save_location(
     let pos = payload.position.unwrap_or_else(|| {
         if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
             let runtime = runtime_arc.read().await;
-            runtime.get_position_blocking().unwrap_or(crate::web::socket::events::BotPosition {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            })
+            runtime
+                .get_position_blocking()
+                .unwrap_or(crate::web::socket::events::BotPosition {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                })
         } else {
             crate::web::socket::events::BotPosition {
                 x: 0.0,

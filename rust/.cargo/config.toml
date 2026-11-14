@@ -1,2 +1,7 @@
 [net]
 git-fetch-with-cli = true
+
+[credential]
+# Use the GITHUB_TOKEN from environment for git authentication
+# This will be set by the CI workflow
+helper = "store --file ${env:GITHUB_WORKSPACE}/.git-credentials"

@@ -19,6 +19,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          components: rustfmt
+
       - name: Run cargo fmt
         run: cargo fmt --manifest-path rust/Cargo.toml
 

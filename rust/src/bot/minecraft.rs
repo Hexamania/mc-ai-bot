@@ -1,4 +1,8 @@
-use std::{collections::HashMap, str::FromStr, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 
 use serde_json::{json, Value};
 use azalea::{
@@ -21,7 +25,11 @@ use azalea::{mining::StopMiningBlockEvent, Account, BotClientExt, Client, Event}
 use azalea_inventory::Inventory;
 use rand::Rng;
 use thiserror::Error;
-use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
+use tokio::{
+    sync::mpsc::UnboundedReceiver,
+    task::JoinHandle,
+    time::sleep,
+};
 
 use crate::{
     bot::inventory::InventorySnapshot,

@@ -12,7 +12,10 @@ use tower::ServiceBuilder;
 /// Initialize Socket.io with all namespaces
 pub fn initialize_socket_io(
     state: Arc<WebState>,
-) -> Result<(ServiceBuilder<socketioxide::layer::SocketIoLayer>, SocketIo), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<
+    (ServiceBuilder<socketioxide::layer::SocketIoLayer>, SocketIo),
+    Box<dyn std::error::Error + Send + Sync>,
+> {
     let (layer, io) = SocketIo::new_layer();
 
     // Initialize all namespaces

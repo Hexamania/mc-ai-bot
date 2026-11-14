@@ -1,4 +1,5 @@
 use axum::extract::State;
+use socketioxide::Extensions;
 /**
  * Socket.io event handlers for web server
  * Handles all real-time communication between bot and dashboard
@@ -6,7 +7,6 @@ use axum::extract::State;
 use socketioxide::SocketIo;
 use socketioxide::extract::{Data, SocketRef};
 use socketioxide::socket::{DisconnectReason, HandshakeData};
-use socketioxide::Extensions;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};

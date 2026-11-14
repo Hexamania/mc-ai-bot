@@ -1,4 +1,5 @@
-use std::{sync::mpsc, time::Duration};
+use std::time::Duration;
+use tokio::sync::{mpsc, Mutex};
 
 use thiserror::Error;
 use tokio::time::sleep;
@@ -56,7 +57,7 @@ pub struct MinecraftRuntime {
     state_machine: StateMachine,
     reconnect_attempt: u32,
     command_registry: CommandRegistry,
-    command_actions: mpsc::Receiver<RuntimeCommandAction>,
+    command_actions: Mutex<mpsc::Receiver<RuntimeCommandAction>>,
     chat_parser: ChatParser,
     permissions: PermissionManager,
     fatal_error: Option<MinecraftRuntimeError>,
@@ -87,6 +88,7 @@ impl MinecraftRuntime {
             chat_config.admin_prefix.clone(),
         );
         let (action_sender, command_actions) = mpsc::channel();
+        let command_actions = Mutex::new(command_actions);
         let fatal_error = command_registry
             .register_help_command(chat_config.public_prefix.clone())
             .and_then(|_| command_registry.register_ping_command())
@@ -895,7 +897,13 @@ impl MinecraftRuntime {
             .command_registry
             .execute(&command_name, &mut context)
             .await?;
-        let actions = self.command_actions.try_iter().collect::<Vec<_>>();
+        let mut actions = Vec::new();
+        {
+            let mut receiver = self.command_actions.lock().await;
+            while let Ok(action) = receiver.try_recv() {
+                actions.push(action);
+            }
+        }
         if result.success {
             self.apply_command_actions(actions, &context, &mut result)?;
         }

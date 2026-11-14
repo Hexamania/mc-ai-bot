@@ -264,18 +264,19 @@ pub fn setup_commands_namespace(
                             if let Some(runtime_arc) = state.runtime.as_ref() {
                                 let runtime = runtime_arc.read().await;
                                 let help = runtime.get_command_help(command, prefix).await;
+                                let has_help = !help.contains("Unknown command");
                                 socket
                                     .emit(
                                         server_events::COMMAND_RESULT,
                                         CommandResultPayload {
                                             request_id: None,
                                             command: command.to_string(),
-                                            success: help.is_some(),
-                                            output: help,
-                                            error: if help.is_none() {
-                                                Some(format!("No help found for \"{}\"", command))
-                                            } else {
+                                            success: has_help,
+                                            output: Some(help),
+                                            error: if has_help {
                                                 None
+                                            } else {
+                                                Some(format!("No help found for \"{}\"", command))
                                             },
                                             execution_time: None,
                                         },
@@ -572,12 +573,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let mut runtime = runtime_arc.write().await;
                     runtime.go_home().await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
-                        let pos = runtime.get_base_location().await;
-                        conn.say(&format!(
-                            "🏠 Returning home to {}, {}, {}",
-                            pos.x as i32, pos.y as i32, pos.z as i32
-                        ))
-                        .await;
+                        if let Some(pos) = runtime.get_base_location() {
+                            conn.say(&format!(
+                                "🏠 Returning home to {}, {}, {}",
+                                pos.x as i32, pos.y as i32, pos.z as i32
+                            ))
+                            .await;
+                        }
                     }
                 }
             });

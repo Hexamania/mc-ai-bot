@@ -6,10 +6,16 @@ on:
   pull_request:
     branches: [rust-rewrite]
 
+env:
+  RUSTUP_TOOLCHAIN: nightly-2025-11-01
+
 jobs:
   check-and-test:
     name: Check and test Rust core
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,6 +24,9 @@ jobs:
         with:
           toolchain: nightly-2025-11-01
           components: rustfmt
+          override: true
+      - name: Verify toolchain
+        run: rustc --version && cargo --version
       - name: Check formatting
         run: cargo fmt --manifest-path rust/Cargo.toml -- --check
       - name: Check all targets

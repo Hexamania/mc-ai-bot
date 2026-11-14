@@ -485,3 +485,4 @@ ISC License - see [LICENSE](LICENSE) for details.
 - Bot actions that mine, build, or interact with other players can change a shared world. Test those
   actions in a safe area or server.
 - This project uses Electron 28, Vue 3, Pinia, TypeScript, and Mineflayer 4.
+# CI Trigger

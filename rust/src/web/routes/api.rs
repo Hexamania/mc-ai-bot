@@ -1008,6 +1008,8 @@ async fn get_commands(
         let commands_list: Vec<serde_json::Value> = commands
             .into_iter()
             .map(|cmd| {
+                let admin_only = cmd.permission.as_ref().map(|p| p.level == crate::commands::PermissionLevel::Admin).unwrap_or(false);
+                let pm_only = cmd.permission.as_ref().map(|p| p.pm_only).unwrap_or(false);
                 json!({
                     "name": cmd.name,
                     "aliases": cmd.aliases,
@@ -1015,8 +1017,8 @@ async fn get_commands(
                     "usage": cmd.usage,
                     "category": cmd.category,
                     "permission": cmd.permission,
-                    "adminOnly": cmd.admin_only,
-                    "pmOnly": cmd.pm_only,
+                    "adminOnly": admin_only,
+                    "pmOnly": pm_only,
                     "hidden": cmd.hidden,
                 })
             })
@@ -1244,7 +1246,7 @@ async fn restart_bot(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
-        let runtime = runtime_arc.read().await;
+        let mut runtime = runtime_arc.write().await;
         runtime.restart().await;
         Ok(Json(json!({
             "success": true,
@@ -1264,7 +1266,7 @@ async fn shutdown_bot(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
-        let runtime = runtime_arc.read().await;
+        let mut runtime = runtime_arc.write().await;
         runtime.shutdown().await;
         Ok(Json(json!({
             "success": true,

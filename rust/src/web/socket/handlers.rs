@@ -2,12 +2,13 @@
 use axum::extract::State;
 use socketioxide::{
     SocketIo,
-    extract::{Data, HandshakeData, SocketRef},
+    extract::{Data, SocketRef},
     socket::DisconnectReason,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
+use serde_json::Value;
 
 /**
  * Socket.io event handlers for web server
@@ -57,14 +58,19 @@ pub fn setup_main_namespace(
         let state = state_clone.clone();
 
         ns.on_connect(
-            move |socket: SocketRef, Data(handshake): Data<HandshakeData>| {
+            move |socket: SocketRef| {
                 let state = state.clone();
                 let socket_id = socket.id.to_string();
 
+                // Get handshake data from socket
+                let handshake = socket.handshake();
+                let auth_value = handshake.auth.clone().unwrap_or_default();
+                let query_value = handshake.query.clone().unwrap_or_default();
+
                 // Store handshake data in state
                 let socket_data = crate::web::SocketData {
-                    handshake_auth: handshake.auth.clone(),
-                    handshake_query: handshake.query.clone(),
+                    handshake_auth: Some(auth_value.clone()),
+                    handshake_query: Some(query_value.clone()),
                     ..Default::default()
                 };
                 let state_clone = state.clone();
@@ -74,9 +80,7 @@ pub fn setup_main_namespace(
                 });
 
                 // Authentication - extract token from socket handshake auth
-                let (auth_value, query_value) = (handshake.auth, handshake.query);
-
-                let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
+                let token = extract_socket_token(Some(&auth_value), Some(&query_value));
 
                 if let Some(token) = token {
                     let config = state.config.clone();
@@ -1271,7 +1275,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 
 /// Broadcast bot status to all connected dashboards
 pub async fn broadcast_bot_status(state: &WebState, status: serde_json::Value) {
-    if let Ok(io) = state.get_socket_io() {
+    if let Ok(io) = state.get_socket_io().await {
         if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(server_events::BOT_STATUS, status)
@@ -1282,7 +1286,7 @@ pub async fn broadcast_bot_status(state: &WebState, status: serde_json::Value) {
 
 /// Broadcast bot state to all connected dashboards
 pub async fn broadcast_bot_state(state: &WebState, bot_state: serde_json::Value) {
-    if let Ok(io) = state.get_socket_io() {
+    if let Ok(io) = state.get_socket_io().await {
         if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(server_events::BOT_STATE, bot_state)
@@ -1293,7 +1297,7 @@ pub async fn broadcast_bot_state(state: &WebState, bot_state: serde_json::Value)
 
 /// Broadcast log entry to all connected dashboards
 pub async fn broadcast_log(state: &WebState, level: &str, tag: &str, message: &str) {
-    if let Ok(io) = state.get_socket_io() {
+    if let Ok(io) = state.get_socket_io().await {
         if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::LOGS)
                 .emit(
@@ -1317,7 +1321,7 @@ pub async fn broadcast_chat_message(
     message: &str,
     message_type: &str,
 ) {
-    if let Ok(io) = state.get_socket_io() {
+    if let Ok(io) = state.get_socket_io().await {
         if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(
@@ -1336,7 +1340,7 @@ pub async fn broadcast_chat_message(
 
 /// Broadcast command output to all connected dashboards
 pub async fn broadcast_command_output(state: &WebState, message: &str, output_type: &str) {
-    if let Ok(io) = state.get_socket_io() {
+    if let Ok(io) = state.get_socket_io().await {
         if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(

@@ -8,8 +8,9 @@ use azalea::{
     Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3,
     auto_tool::AutoToolClientExt,
     blocks::BlockState,
+    block::BlockTrait,
     ecs::{
-        event::{EntityEvent, Event as EcsEvent},
+        event::Event as EcsEvent,
         query::With,
     },
     entity::{Attributes, Hand, Position, metadata::Player},
@@ -17,8 +18,8 @@ use azalea::{
     interact::InteractBlockEvent,
     inventory::{
         Inventory, SetSelectedHotbarSlotEvent,
-        click::{ClickMode, ClickOperation, ClickType, MouseButton},
         components::Container,
+        click::{ClickMode, ClickOperation, ClickType, MouseButton},
     },
     mining::{Mining, StopMiningBlockEvent},
     pathfinder::{
@@ -351,7 +352,7 @@ impl MinecraftConnection {
             return Ok(false);
         }
 
-        let block_states = BlockStates::from(block);
+        let block_states = vec![block];
         let world = self.client.world();
         let world = world.read();
         let position = self.client.position();

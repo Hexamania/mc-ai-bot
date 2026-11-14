@@ -36,7 +36,7 @@ use crate::{
 pub struct WebServer {
     config: Arc<AppConfig>,
     state: Arc<WebState>,
-    app: Router,
+    app: Router<Arc<WebState>>,
     socket_io: Option<SocketIo>,
     socket_io_layer: Option<SocketIoLayer>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
@@ -53,10 +53,10 @@ impl WebServer {
         let (socket_io_layer, socket_io) = socket::initialize_socket_io(state.clone())?;
 
         // Set socket_io on WebState for broadcast functions
-        state.set_socket_io(socket_io.clone()).await;
+        state.set_socket_io(Some(socket_io.clone())).await;
 
         // Create the HTTP router
-        let app = create_router(state.clone(), socket_io.clone(), socket_io_layer.clone());
+        let app = create_router(state.clone(), Some(socket_io.clone()), Some(socket_io_layer.clone()));
 
         Ok(Self {
             config,

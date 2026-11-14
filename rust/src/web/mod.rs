@@ -53,8 +53,8 @@ impl WebState {
         *self.runtime.write().await = Some(runtime);
     }
 
-    pub async fn set_socket_io(&self, socket_io: socketioxide::SocketIo) {
-        *self.socket_io.write().await = Some(socket_io);
+    pub async fn set_socket_io(&self, socket_io: Option<socketioxide::SocketIo>) {
+        *self.socket_io.write().await = socket_io;
     }
 
     pub async fn get_socket_io(&self) -> Result<socketioxide::SocketIo, String> {

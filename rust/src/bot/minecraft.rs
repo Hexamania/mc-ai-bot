@@ -17,8 +17,8 @@ use azalea::{
     interact::InteractBlockEvent,
     inventory::{
         Inventory, SetSelectedHotbarSlotEvent,
-        components::Container,
         click::{ClickMode, ClickOperation, ClickType, MouseButton},
+        components::Container,
     },
     mining::{Mining, StopMiningBlockEvent},
     pathfinder::{

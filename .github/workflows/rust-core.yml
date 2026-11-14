@@ -26,8 +26,8 @@ jobs:
       - name: Configure git credentials for private dependencies
         run: |
           git config --local url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          git config --local credential.helper store
-          echo "https://${{ secrets.GITHUB_TOKEN }}:@github.com" > ~/.git-credentials
+          git config --local credential.helper "store --file ${env:GITHUB_WORKSPACE}/.git-credentials"
+          echo "https://${{ secrets.GITHUB_TOKEN }}:@github.com" > "${env:GITHUB_WORKSPACE}/.git-credentials"
       - name: Set cargo environment for git fetching
         run: echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $env:GITHUB_ENV
       - name: Set up Rust toolchain

@@ -32,6 +32,7 @@ use crate::{
         routes, socket,
     },
 };
+use tower::Layer;
 
 /// Web server wrapper
 pub struct WebServer {
@@ -39,6 +40,7 @@ pub struct WebServer {
     state: Arc<WebState>,
     app: Router,
     socket_io: Option<SocketIo>,
+    socket_io_layer: Option<tower::Layer>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -50,16 +52,17 @@ impl WebServer {
         let state = Arc::new(WebState::new(config.clone()));
 
         // Initialize Socket.io
-        let socket_io = socket::initialize_socket_io(state.clone())?;
+        let (socket_io_layer, socket_io) = socket::initialize_socket_io(state.clone())?;
 
         // Create the HTTP router
-        let app = create_router(state.clone(), socket_io.clone());
+        let app = create_router(state.clone(), socket_io.clone(), socket_io_layer.clone());
 
         Ok(Self {
             config,
             state,
             app,
             socket_io: Some(socket_io),
+            socket_io_layer: Some(socket_io_layer),
             server_handle: None,
         })
     }
@@ -127,7 +130,11 @@ impl WebServer {
 }
 
 /// Create the main router with all middleware and routes
-fn create_router(state: Arc<WebState>, socket_io: Option<SocketIo>) -> Router {
+fn create_router(
+    state: Arc<WebState>,
+    socket_io: Option<SocketIo>,
+    socket_io_layer: Option<tower::Layer>,
+) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([
@@ -140,9 +147,6 @@ fn create_router(state: Arc<WebState>, socket_io: Option<SocketIo>) -> Router {
         ])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::COOKIE])
         .allow_credentials(true);
-
-    // Get Socket.io layer if available
-    let socket_io_layer = socket_io.map(|io| io.into_layer());
 
     let mut router = Router::new()
         // Health check (no auth, no rate limit)

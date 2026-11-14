@@ -11,11 +11,11 @@ use std::sync::Arc;
 /// Initialize Socket.io with all namespaces
 pub fn initialize_socket_io(
     state: Arc<WebState>,
-) -> Result<SocketIo, Box<dyn std::error::Error + Send + Sync>> {
-    let (io, _) = SocketIo::new_serv();
+) -> Result<(tower::Layer, SocketIo), Box<dyn std::error::Error + Send + Sync>> {
+    let (layer, io) = SocketIo::new_layer();
 
     // Initialize all namespaces
     handlers::initialize_all_namespaces(&io, state)?;
 
-    Ok(io)
+    Ok((layer, io))
 }

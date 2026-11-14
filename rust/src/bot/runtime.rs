@@ -188,6 +188,144 @@ impl MinecraftRuntime {
             .map_err(MinecraftRuntimeError::Transport)
     }
 
+    /// Get bot position
+    pub fn get_position(&mut self) -> Option<crate::web::socket::events::BotPosition> {
+        self.connection
+            .as_mut()
+            .and_then(|c| c.position())
+            .map(|pos| crate::web::socket::events::BotPosition {
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+            })
+    }
+
+    /// Get bot status (simple status for dashboard)
+    pub async fn get_status(&self) -> crate::web::socket::events::BotStatusPayload {
+        let uptime = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        crate::web::socket::events::BotStatusPayload {
+            status: format!("{:?}", self.state()),
+            username: self.username().map(|s| s.to_owned()),
+            uptime,
+            ping: None, // TODO: Get actual ping
+        }
+    }
+
+    /// Get full bot state for dashboard
+    pub async fn get_full_state(&self) -> crate::web::socket::events::BotStatePayload {
+        // Get vitals for health, food, saturation, position
+        let vitals = self.get_vitals().await.unwrap_or(serde_json::Value::Null);
+        let position = vitals.get("position").and_then(|p| {
+            Some(crate::web::socket::events::BotPosition {
+                x: p.get("x")?.as_f64()?,
+                y: p.get("y")?.as_f64()?,
+                z: p.get("z")?.as_f64()?,
+            })
+        });
+        let health = vitals.get("health").and_then(|h| h.as_f64()).unwrap_or(0.0) as f32;
+        let food = vitals.get("food").and_then(|f| f.as_i64()).unwrap_or(0) as i32;
+        let saturation = vitals.get("saturation").and_then(|s| s.as_f64()).unwrap_or(0.0) as f32;
+
+        // Get inventory
+        let inventory = self.get_inventory().await.unwrap_or(serde_json::Value::Null);
+        let inventory_items: Vec<crate::web::socket::events::InventoryItemPayload> = inventory
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| {
+                        Some(crate::web::socket::events::InventoryItemPayload {
+                            slot: item.get("slot")?.as_i64()? as i32,
+                            name: item.get("name")?.as_str()?.to_owned(),
+                            display_name: item.get("displayName")?.as_str()?.to_owned(),
+                            count: item.get("count")?.as_i64()? as i32,
+                            max_stack_size: item.get("maxStackSize")?.as_i64()? as i32,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Get equipment
+        let equipment = self.get_equipment().await.unwrap_or(serde_json::Value::Null);
+        let equipment_payload = crate::web::socket::events::EquipmentPayload {
+            head: equipment.get("head").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            chest: equipment.get("chest").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            legs: equipment.get("legs").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            feet: equipment.get("feet").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            hand: equipment.get("hand").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            offhand: equipment.get("offhand").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+        };
+
+        // Get players
+        let players = self.get_players().await.unwrap_or_default();
+        let players_payload: Vec<crate::web::socket::events::PlayerInfoPayload> = players
+            .into_iter()
+            .filter_map(|p| {
+                Some(crate::web::socket::events::PlayerInfoPayload {
+                    username: p.get("username")?.as_str()?.to_owned(),
+                    entity_id: p.get("entityId").and_then(|v| v.as_i64()).map(|v| v as i32),
+                    position: p.get("position").and_then(|pos| {
+                        Some(crate::web::socket::events::BotPosition {
+                            x: pos.get("x")?.as_f64()?,
+                            y: pos.get("y")?.as_f64()?,
+                            z: pos.get("z")?.as_f64()?,
+                        })
+                    }),
+                    health: p.get("health").and_then(|h| h.as_f64()).map(|h| h as f32),
+                    gamemode: p.get("gamemode").and_then(|g| g.as_str()).map(|s| s.to_owned()),
+                    ping: p.get("ping").and_then(|p| p.as_i64()).map(|p| p as i32),
+                })
+            })
+            .collect();
+
+        // Get features state
+        let features = crate::web::socket::events::FeatureStatePayload {
+            movement: self.feature_registry.is_initialized("movement"),
+            combat: self.feature_registry.is_initialized("combat"),
+            automation: self.feature_registry.is_initialized("automation"),
+            memory: self.feature_registry.is_initialized("memory"),
+            web: self.feature_registry.is_initialized("web"),
+        };
+
+        // Get settings from config
+        let settings = std::collections::HashMap::new(); // TODO: Get from config
+
+        // Get favorites from connection if available
+        let favorites = std::collections::HashMap::new(); // TODO: Get from connection
+
+        // Get logs
+        let logs = vec![]; // TODO: Get from logger
+
+        // Get admins and users from permission manager
+        let admins: Vec<String> = self.permissions.get_admins().into_iter().cloned().collect();
+        let users: Vec<String> = self.permissions.get_users().into_iter().cloned().collect();
+
+        crate::web::socket::events::BotStatePayload {
+            position,
+            health,
+            food,
+            saturation,
+            inventory: inventory_items,
+            equipment: equipment_payload,
+            players: players_payload,
+            features,
+            settings,
+            favorites,
+            logs,
+            admins,
+            users,
+        }
+    }
+
+    /// Get command definitions for dashboard
+    pub async fn get_command_definitions(&self) -> Vec<crate::command_registry::CommandDefinition> {
+        self.command_registry.get_all().unwrap_or_default()
+    }
+
     /// Get inventory items
     pub async fn get_inventory(&self) -> Result<serde_json::Value, MinecraftRuntimeError> {
         self.connection

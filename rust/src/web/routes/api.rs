@@ -473,7 +473,7 @@ async fn bot_state(
 ) -> Result<Json<StatusResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
-        let bot_state = runtime.get_state().await;
+        let bot_state = runtime.get_full_state().await;
         Ok(Json(StatusResponse {
             success: true,
             data: serde_json::to_value(bot_state).unwrap_or(json!({})),
@@ -554,14 +554,14 @@ async fn bot_players(
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let players = runtime.get_players().await;
-        let runtime_state = runtime.get_state().await;
+        let bot_state = runtime.get_full_state().await;
 
         Ok(Json(PlayersResponse {
             success: true,
             data: json!({
                 "players": players,
                 "count": players.len(),
-                "admins": runtime_state.get("admins").cloned().unwrap_or(json!([])),
+                "admins": bot_state.admins,
             }),
         }))
     } else {
@@ -1108,10 +1108,10 @@ async fn get_stats(
 ) -> Result<Json<StatsResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
-        let bot_state = runtime.get_state().await;
+        let bot_state = runtime.get_full_state().await;
         let bot = runtime.get_bot().await;
 
-        let features = bot_state.get("features").cloned().unwrap_or(json!({}));
+        let features = serde_json::to_value(&bot_state.features).unwrap_or(json!({}));
 
         Ok(Json(StatsResponse {
             success: true,
@@ -1131,11 +1131,11 @@ async fn get_stats(
                     "position": bot.as_ref().map(|b| b.position()),
                 },
                 "state": {
-                    "logsCount": bot_state.get("logs").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-                    "inventoryCount": bot_state.get("inventory").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-                    "favoritesCount": bot_state.get("favorites").and_then(|v| v.as_object()).map(|o| o.len()).unwrap_or(0),
-                    "adminsCount": bot_state.get("admins").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-                    "usersCount": bot_state.get("users").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
+                    "logsCount": bot_state.logs.len(),
+                    "inventoryCount": bot_state.inventory.len(),
+                    "favoritesCount": bot_state.favorites.len(),
+                    "adminsCount": bot_state.admins.len(),
+                    "usersCount": bot_state.users.len(),
                 },
                 "features": features,
             }),

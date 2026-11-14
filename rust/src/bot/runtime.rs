@@ -214,6 +214,18 @@ impl MinecraftRuntime {
             })
     }
 
+    /// Get bot position (non-mutating, delegates to connection's blocking method)
+    pub fn get_position_blocking(&self) -> Option<crate::web::socket::events::BotPosition> {
+        self.connection
+            .as_ref()
+            .and_then(|c| c.get_position_blocking())
+            .map(|pos| crate::web::socket::events::BotPosition {
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+            })
+    }
+
     /// Get bot status (simple status for dashboard)
     pub async fn get_status(&self) -> crate::web::socket::events::BotStatusPayload {
         let uptime = std::time::SystemTime::now()
@@ -614,6 +626,30 @@ impl MinecraftRuntime {
         if let Some(connection) = self.connection.as_ref() {
             connection.update_settings(settings).await;
         }
+    }
+
+    /// Get logs (stub implementation - returns empty for now)
+    pub async fn get_logs(&self, _limit: usize) -> Vec<serde_json::Value> {
+        // TODO: Implement actual log retrieval from a log buffer
+        Vec::new()
+    }
+
+    /// Get logs count (stub implementation - returns 0 for now)
+    pub async fn get_logs_count(&self) -> usize {
+        // TODO: Implement actual log count
+        0
+    }
+
+    /// Get settings (stub implementation - returns empty object for now)
+    pub async fn get_settings(&self) -> serde_json::Value {
+        // TODO: Implement actual settings retrieval
+        serde_json::json!({})
+    }
+
+    /// Get chat logs (stub implementation - returns empty for now)
+    pub async fn get_chat_logs(&self, _limit: usize) -> Vec<serde_json::Value> {
+        // TODO: Implement actual chat log retrieval
+        Vec::new()
     }
 
     /// Drop item

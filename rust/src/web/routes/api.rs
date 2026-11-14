@@ -699,7 +699,11 @@ async fn save_location(
     let pos = payload.position.unwrap_or_else(|| {
         if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
             let runtime = runtime_arc.read().await;
-            runtime.get_position_blocking()
+            runtime.get_position_blocking().unwrap_or(crate::web::socket::events::BotPosition {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            })
         } else {
             crate::web::socket::events::BotPosition {
                 x: 0.0,
@@ -726,8 +730,8 @@ async fn save_location(
         })?;
 
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
-        let runtime = runtime_arc.read().await;
-        runtime.add_favorite(&payload.name, pos).await;
+        let mut runtime = runtime_arc.write().await;
+        runtime.add_favorite(&payload.name, pos);
     }
 
     Ok(Json(json!({
@@ -1034,34 +1038,27 @@ async fn execute_command(
     State(state): State<Arc<WebState>>,
     Json(payload): Json<CommandExecuteRequest>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    if payload.command.is_empty() {
+        return Err(ErrorResponse {
+            success: false,
+            error: "Command required".to_string(),
+            code: "BAD_REQUEST".to_string(),
+        });
+    }
+
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
-        let args: Vec<String> = match &payload.args {
-            Some(serde_json::Value::String(s)) => vec![s.clone()],
-            Some(serde_json::Value::Array(arr)) => arr
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
-            _ => vec![],
-        };
-
-        // We need auth claims - for now use placeholder
-        let context = crate::bot::runtime::CommandContext {
-            bot: runtime.get_bot().await,
-            username: "api".to_string(),
-            args,
-            is_admin: true,
-            is_pm: true,
-            reply_sender: None,
-            private_sender: None,
-        };
-
-        let result = runtime.execute_command(&payload.command, context).await;
-
+        runtime
+            .execute_command(&format!("/{}", payload.command))
+            .await
+            .map_err(|e| ErrorResponse {
+                success: false,
+                error: e.to_string(),
+                code: "INTERNAL_ERROR".to_string(),
+            })?;
         Ok(Json(json!({
-            "success": result,
-            "command": payload.command,
-            "message": if result { "Command executed" } else { "Command failed or not found" },
+            "success": true,
+            "message": format!("Executed: /{}", payload.command),
         })))
     } else {
         Err(ErrorResponse {
@@ -1109,7 +1106,6 @@ async fn get_stats(
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let bot_state = runtime.get_full_state().await;
-        let bot = runtime.get_bot().await;
 
         let features = serde_json::to_value(&bot_state.features).unwrap_or(json!({}));
 
@@ -1124,11 +1120,11 @@ async fn get_stats(
                     "rss": 0, // Would need sysinfo crate
                 }),
                 "bot": {
-                    "online": bot.is_some(),
-                    "username": bot.as_ref().map(|b| b.username()),
-                    "health": bot.as_ref().map(|b| b.health()),
-                    "food": bot.as_ref().map(|b| b.food()),
-                    "position": bot.as_ref().map(|b| b.position()),
+                    "online": bot_state.position.is_some(),
+                    "username": runtime.username(),
+                    "health": bot_state.health,
+                    "food": bot_state.food,
+                    "position": bot_state.position,
                 },
                 "state": {
                     "logsCount": bot_state.logs.len(),
@@ -1187,7 +1183,6 @@ async fn send_chat(
         let runtime = runtime_arc.read().await;
         runtime
             .send_chat(&payload.message)
-            .await
             .map_err(|e| ErrorResponse {
                 success: false,
                 error: e.to_string(),

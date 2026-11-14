@@ -62,7 +62,7 @@ pub enum MinecraftEvent {
     },
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq, serde::Serialize)]
 pub enum MinecraftTransportError {
     #[error("Minecraft host is required")]
     MissingHost,
@@ -278,7 +278,7 @@ impl MinecraftConnection {
         self.stop_mining();
         self.stop_following();
         self.stop_roaming();
-        let mut roam_client = self.client.clone();
+        let roam_client = self.client.clone();
         let goal = roam_goal(roam_client.position(), radius);
         roam_client.goto_without_mining(goal);
 
@@ -2985,7 +2985,7 @@ impl MinecraftConnection {
     }
 
     /// Toggle safe mode
-    pub fn toggle_safe_mode(&mut self, enabled: bool) {
+    pub fn toggle_safe_mode(&mut self, _enabled: bool) {
         // Implementation would depend on feature system
     }
 
@@ -3000,17 +3000,17 @@ impl MinecraftConnection {
     }
 
     /// Toggle auto armor
-    pub fn toggle_auto_armor(&mut self, enabled: bool) {
+    pub fn toggle_auto_armor(&mut self, _enabled: bool) {
         // Implementation would depend on feature system
     }
 
-    /// Start roaming
-    pub fn start_roaming(&mut self) {
+    /// Start roaming (web API - default params)
+    pub fn start_roaming_default(&mut self) {
         let _ = self.start_roaming(10, Duration::from_secs(5));
     }
 
-    /// Stop roaming
-    pub fn stop_roaming(&mut self) {
+    /// Stop roaming (web API)
+    pub fn stop_roaming_web(&mut self) {
         self.stop_roaming();
     }
 
@@ -3029,8 +3029,8 @@ impl MinecraftConnection {
         // Implementation would depend on feature system
     }
 
-    /// Stop mining
-    pub fn stop_mining(&mut self) {
+    /// Stop mining (web API)
+    pub fn stop_mining_web(&mut self) {
         self.stop_mining();
     }
 

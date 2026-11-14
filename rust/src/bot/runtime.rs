@@ -41,7 +41,7 @@ pub enum MinecraftRuntimeEvent {
     },
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq, serde::Serialize)]
 pub enum MinecraftRuntimeError {
     #[error(transparent)]
     Transport(#[from] MinecraftTransportError),
@@ -491,14 +491,14 @@ impl MinecraftRuntime {
     /// Start roaming
     pub fn start_roaming(&mut self) {
         if let Some(connection) = self.connection.as_mut() {
-            connection.start_roaming();
+            connection.start_roaming_default();
         }
     }
 
     /// Stop roaming
     pub fn stop_roaming(&mut self) {
         if let Some(connection) = self.connection.as_mut() {
-            connection.stop_roaming();
+            connection.stop_roaming_web();
         }
     }
 
@@ -526,7 +526,7 @@ impl MinecraftRuntime {
     /// Stop mining
     pub fn stop_mining(&mut self) {
         if let Some(connection) = self.connection.as_mut() {
-            connection.stop_mining();
+            connection.stop_mining_web();
         }
     }
 

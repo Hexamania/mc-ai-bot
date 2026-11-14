@@ -18,7 +18,7 @@ pub trait Feature: Send + Sync + Debug {
     fn name(&self) -> &str;
     fn version(&self) -> &str;
     fn description(&self) -> &str;
-    fn dependencies(&self) -> &[String];
+    fn dependencies(&self) -> &'static [&'static str];
     fn enabled(&self) -> bool;
 
     async fn initialize(
@@ -123,7 +123,7 @@ impl FeatureRegistry {
     pub fn get_dependencies(&self, name: &str) -> Vec<String> {
         self.features
             .get(&name.to_lowercase())
-            .map(|f| f.dependencies().to_vec())
+            .map(|f| f.dependencies().iter().map(|s| (*s).to_string()).collect())
             .unwrap_or_default()
     }
 
@@ -151,7 +151,7 @@ impl FeatureRegistry {
             let missing_deps: Vec<_> = deps
                 .iter()
                 .filter(|dep| !self.initialized.contains(&dep.to_lowercase()))
-                .cloned()
+                .map(|s| (*s).to_string())
                 .collect();
 
             if !missing_deps.is_empty() {
@@ -292,7 +292,7 @@ impl Feature for CoreFeature {
         "Core bot functionality and lifecycle management"
     }
 
-    fn dependencies(&self) -> &[String] {
+    fn dependencies(&self) -> &'static [&'static str] {
         &[]
     }
 
@@ -353,8 +353,8 @@ impl Feature for MovementFeature {
         "Pathfinding, movement, and navigation utilities"
     }
 
-    fn dependencies(&self) -> &[String] {
-        &["core".to_owned()]
+    fn dependencies(&self) -> &'static [&'static str] {
+        &["core"]
     }
 
     fn enabled(&self) -> bool {
@@ -414,8 +414,8 @@ impl Feature for CombatFeature {
         "Combat mechanics, PvP, and auto-defense"
     }
 
-    fn dependencies(&self) -> &[String] {
-        &["core".to_owned(), "movement".to_owned()]
+    fn dependencies(&self) -> &'static [&'static str] {
+        &["core", "movement"]
     }
 
     fn enabled(&self) -> bool {
@@ -475,8 +475,8 @@ impl Feature for AutomationFeature {
         "Automation tasks: mining, farming, building, progression"
     }
 
-    fn dependencies(&self) -> &[String] {
-        &["core".to_owned(), "movement".to_owned()]
+    fn dependencies(&self) -> &'static [&'static str] {
+        &["core", "movement"]
     }
 
     fn enabled(&self) -> bool {
@@ -536,8 +536,8 @@ impl Feature for MemoryFeature {
         "Persistent memory system for locations, players, tasks"
     }
 
-    fn dependencies(&self) -> &[String] {
-        &["core".to_owned()]
+    fn dependencies(&self) -> &'static [&'static str] {
+        &["core"]
     }
 
     fn enabled(&self) -> bool {
@@ -597,8 +597,8 @@ impl Feature for WebFeature {
         "Web dashboard and Socket.io server"
     }
 
-    fn dependencies(&self) -> &[String] {
-        &["core".to_owned(), "memory".to_owned()]
+    fn dependencies(&self) -> &'static [&'static str] {
+        &["core", "memory"]
     }
 
     fn enabled(&self) -> bool {

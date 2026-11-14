@@ -5,7 +5,8 @@ use axum::extract::State;
  */
 use socketioxide::SocketIo;
 use socketioxide::extract::{Data, SocketRef};
-use socketioxide::socket::DisconnectReason;
+use socketioxide::socket::{DisconnectReason, HandshakeData};
+use socketioxide::Extensions;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -35,16 +36,19 @@ pub fn setup_main_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::MAIN, move |ns| {
+    io.ns(namespaces::MAIN, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
         ns.on_connect(move |socket: SocketRef| {
             let state = state.clone();
 
             // Authentication - extract token from socket handshake auth
-            let handshake = socket.handshake();
-            let auth_value = handshake.auth.clone();
-            let query_value = handshake.query.clone();
+            let handshake = socket.extensions.get::<HandshakeData>().cloned();
+            let (auth_value, query_value) = if let Some(hs) = handshake {
+                (hs.auth, hs.query)
+            } else {
+                (None, None)
+            };
 
             let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
@@ -56,8 +60,8 @@ pub fn setup_main_namespace(
                         role: claims.role,
                     };
 
-                    // Store user data in socket
-                    socket.data().insert(user.clone());
+                    // Store user data in socket extensions
+                    socket.extensions.insert(user.clone());
 
                     // Join default rooms
                     socket.join(rooms::ALL).ok();
@@ -71,8 +75,8 @@ pub fn setup_main_namespace(
                         _ => {}
                     }
 
-                    // Send initial state
-                    send_initial_state(&socket, &state);
+                    // Send initial state - pass owned values
+                    send_initial_state(socket, state.clone());
 
                     // Set up event handlers
                     setup_socket_event_handlers(socket, state, ns.io().clone());
@@ -106,15 +110,15 @@ pub fn setup_admin_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::ADMIN, move |ns| {
+    io.ns(namespaces::ADMIN, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
         ns.on_connect(move |socket: SocketRef| {
             let state = state.clone();
 
-            // Check if user is admin - get user from socket data
+            // Check if user is admin - get user from socket extensions
             let is_admin = socket
-                .data()
+                .extensions
                 .get::<SocketUser>()
                 .map(|user| matches!(user.role, crate::web::auth::UserRole::Admin))
                 .unwrap_or(false);
@@ -174,23 +178,26 @@ pub fn setup_commands_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::COMMANDS, move |ns| {
+    io.ns(namespaces::COMMANDS, move |ns: socketioxide::Namespace| {
         let state = state_clone.clone();
 
         ns.on_connect(move |socket: SocketRef| {
             let state = state.clone();
 
             // Authentication
-            let handshake = socket.handshake();
-            let auth_value = handshake.auth.clone();
-            let query_value = handshake.query.clone();
+            let handshake = socket.extensions.get::<HandshakeData>().cloned();
+            let (auth_value, query_value) = if let Some(hs) = handshake {
+                (hs.auth, hs.query)
+            } else {
+                (None, None)
+            };
 
             let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
             if let Some(token) = token {
                 let config = state.config.clone();
                 if verify_socket_token(&config, &token).is_ok() {
-                    socket.data().insert(SocketUser {
+                    socket.extensions.insert(SocketUser {
                         username: "dashboard".to_string(),
                         role: crate::web::auth::UserRole::Admin,
                     });
@@ -367,7 +374,7 @@ pub fn initialize_all_namespaces(
 }
 
 /// Send initial state to newly connected client
-fn send_initial_state(socket: &SocketRef, state: &WebState) {
+fn send_initial_state(socket: SocketRef, state: Arc<WebState>) {
     tokio::spawn(async move {
         if let Some(runtime_arc) = state.runtime.as_ref() {
             let runtime = runtime_arc.read().await;

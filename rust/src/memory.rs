@@ -330,7 +330,7 @@ fn timestamp() -> String {
 }
 
 /// Memory struct providing a convenient interface for memory operations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Memory {
     data: Value,
 }

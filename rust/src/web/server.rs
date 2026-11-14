@@ -32,7 +32,6 @@ use crate::{
         routes, socket,
     },
 };
-use tower::Layer;
 
 /// Web server wrapper
 pub struct WebServer {
@@ -40,7 +39,7 @@ pub struct WebServer {
     state: Arc<RwLock<WebState>>,
     app: Router,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<tower::Layer>,
+    socket_io_layer: Option<ServiceBuilder<socketioxide::layer::SocketIoLayer>>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
 }
 

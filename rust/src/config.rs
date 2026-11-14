@@ -47,7 +47,7 @@ pub struct AdminConfig {
     pub password: String,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PrefixConfig {
     pub public: String,
     pub admin: String,

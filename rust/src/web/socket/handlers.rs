@@ -1,16 +1,17 @@
 use axum::extract::State;
-/**
- * Socket.io event handlers for web server
- * Handles all real-time communication between bot and dashboard
- */
-use socketioxide::SocketIo;
-use socketioxide::extract::{Data, SocketRef};
-use socketioxide::socket::{DisconnectReason, HandshakeData};
-use socketioxide::Extensions;
+use socketioxide::{
+    Extensions, SocketIo,
+    extract::{Data, SocketRef},
+    socket::{DisconnectReason, HandshakeData},
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+/**
+ * Socket.io event handlers for web server
+ * Handles all real-time communication between bot and dashboard
+ */
 use crate::{
     bot::minecraft::MinecraftConnection,
     bot::runtime::MinecraftRuntime,

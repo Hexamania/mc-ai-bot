@@ -1743,6 +1743,7 @@ dependencies = [
  "azalea",
  "chrono",
  "jsonwebtoken",
+ "log",
  "rand",
  "serde",
  "serde_json",

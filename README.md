@@ -173,10 +173,13 @@ Azalea-compatible `nightly-2024-10-23` toolchain.
 The runtime dispatches parsed incoming chat commands through the Rust registry, applies configured
 permission levels, and sends command replies back to public chat or private messages. It registers
 `!help`, `!ping`, `!follow`, `!stopfollow`, `!roam`, `!stoproam`, `!goto`, `!inventory`,
-`!itemcount`, `!equipment`, and `!stop` by default; additional commands can be registered through
-the runtime's command registry. Inventory inspection reports carried slots, item counts, and
-equipment via private replies. Following uses pathfinding without block breaking and stops if the
-target leaves, dies, or moves more than 50 blocks away. Admin users can start roaming with
+`!itemcount`, `!equipment`, `!mine`, and `!stop` by default; additional commands can be registered
+through the runtime's command registry. Inventory inspection reports carried slots, item counts,
+and equipment via private replies. Admin users can use `!mine <block-name>` to path to and mine the
+nearest loaded, breakable block of that type within 32 blocks; the bot selects its fastest hotbar
+tool and reports completion privately. `!stop` cancels active mining as well as movement. Following
+uses pathfinding without block breaking and stops if the target leaves, dies, or moves more than 50
+blocks away. Admin users can start roaming with
 `!roam [radius] [interval-ms]` (defaults: 3 blocks and 7000 ms; valid ranges: 1–50 blocks and
 1000–60000 ms) or navigate with `!goto <x> <y> <z> [range]`; both use pathfinding without block
 breaking. Send a private message with `$loginadmin <password>` to establish an admin session.

@@ -1,12 +1,20 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use azalea::{
+    auto_tool::AutoToolClientExt,
+    blocks::{Block as BlockTrait, BlockState, BlockStates},
     ecs::query::With,
     entity::{metadata::Player, Position},
-    pathfinder::{goals::RadiusGoal, PathfinderClientExt},
+    inventory::SetSelectedHotbarSlotEvent,
+    pathfinder::{
+        extras::utils::can_reach_block,
+        goals::{RadiusGoal, ReachBlockPosGoal},
+        PathfinderClientExt,
+    },
+    registry::Block as RegistryBlock,
     GameProfileComponent, Vec3,
 };
-use azalea::{Account, Client, Event};
+use azalea::{mining::StopMiningBlockEvent, Account, Client, Event};
 use rand::Rng;
 use thiserror::Error;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
@@ -66,6 +74,7 @@ pub struct MinecraftConnection {
     follow_target: Option<String>,
     follow_task: Option<JoinHandle<()>>,
     roam_task: Option<JoinHandle<()>>,
+    mining_task: Option<JoinHandle<()>>,
 }
 
 impl MinecraftConnection {
@@ -107,6 +116,7 @@ impl MinecraftConnection {
             follow_target: None,
             follow_task: None,
             roam_task: None,
+            mining_task: None,
         })
     }
 
@@ -161,6 +171,7 @@ impl MinecraftConnection {
             return Ok(false);
         }
 
+        self.stop_mining();
         self.stop_roaming();
         self.stop_following();
         follow_client.goto_without_mining(RadiusGoal {
@@ -214,6 +225,7 @@ impl MinecraftConnection {
             return Ok(false);
         }
 
+        self.stop_mining();
         self.stop_following();
         self.stop_roaming();
         let mut roam_client = self.client.clone();
@@ -264,6 +276,7 @@ impl MinecraftConnection {
             return Ok(false);
         }
 
+        self.stop_mining();
         self.stop_following();
         self.stop_roaming();
         self.client.goto_without_mining(RadiusGoal {
@@ -273,7 +286,87 @@ impl MinecraftConnection {
         Ok(true)
     }
 
+    pub fn start_mining_block(
+        &mut self,
+        block_name: &str,
+        requester: &str,
+    ) -> Result<bool, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        let Some(block) = parse_mineable_block(block_name) else {
+            return Ok(false);
+        };
+        if self
+            .mining_task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
+            return Ok(false);
+        }
+
+        let block_states = BlockStates::from(block);
+        let world = self.client.world();
+        let world = world.read();
+        let position = self.client.position();
+        let Some((target, _)) = world
+            .find_blocks(position, &block_states)
+            .filter_map(|target| {
+                if distance_squared(position, target.center()) > 32.0_f64.powi(2) {
+                    return None;
+                }
+                let state = world.get_block_state(&target)?;
+                let behavior = Box::<dyn BlockTrait>::from(state).behavior();
+                (state != BlockState::AIR && behavior.destroy_time >= 0.0)
+                    .then_some((target, state))
+            })
+            .min_by(|(first, _), (second, _)| {
+                distance_squared(position, first.center())
+                    .total_cmp(&distance_squared(position, second.center()))
+            })
+        else {
+            return Ok(false);
+        };
+        let chunk_storage = world.chunks.clone();
+        drop(world);
+
+        self.stop_following();
+        self.stop_roaming();
+
+        let mut client = self.client.clone();
+        let block_id = block.to_string();
+        let block_name = block_id
+            .strip_prefix("minecraft:")
+            .unwrap_or(&block_id)
+            .to_owned();
+        let requester = requester.to_owned();
+        self.mining_task = Some(tokio::spawn(async move {
+            let result = mine_block_task(&mut client, target, block, chunk_storage).await;
+            let message = match result {
+                Ok(()) => format!("⛏️ Mined {block_name}."),
+                Err(error) => format!("❌ Could not mine {block_name}: {error}"),
+            };
+            client.chat(&format!("/msg {requester} {message}"));
+        }));
+        Ok(true)
+    }
+
+    pub fn stop_mining(&mut self) -> bool {
+        let Some(task) = self.mining_task.take() else {
+            return false;
+        };
+        if task.is_finished() {
+            return false;
+        }
+
+        stop_active_mining(&self.client);
+        self.client.stop_pathfinding();
+        task.abort();
+        true
+    }
+
     pub fn stop_movement(&mut self) {
+        self.stop_mining();
         self.stop_following();
         self.stop_roaming();
         if self.state() == BotState::Connected {
@@ -306,6 +399,7 @@ impl MinecraftConnection {
 
     pub fn disconnect(&mut self) -> Result<(), MinecraftTransportError> {
         if self.state() == BotState::Connected {
+            self.stop_mining();
             self.client.disconnect();
             self.state_machine.transition(BotState::Disconnected)?;
         }
@@ -339,11 +433,13 @@ impl MinecraftConnection {
                     Some(MinecraftEvent::PlayerLeft(username))
                 }
                 Event::Death(_) => {
+                    self.stop_mining();
                     self.stop_following();
                     self.stop_roaming();
                     Some(MinecraftEvent::Death)
                 }
                 Event::Disconnect(reason) => {
+                    self.stop_mining();
                     self.stop_following();
                     self.stop_roaming();
                     self.state_machine.transition(BotState::Disconnected)?;
@@ -360,6 +456,7 @@ impl MinecraftConnection {
 
         self.stop_following();
         self.stop_roaming();
+        self.stop_mining();
         if self.state() != BotState::Disconnected {
             self.state_machine.transition(BotState::Disconnected)?;
         }
@@ -375,9 +472,103 @@ impl Drop for MinecraftConnection {
         if let Some(task) = self.roam_task.take() {
             task.abort();
         }
+        self.stop_mining();
         if self.state() == BotState::Connected {
             self.client.disconnect();
         }
+    }
+}
+
+pub(crate) fn parse_mineable_block(name: &str) -> Option<RegistryBlock> {
+    let name = name.trim().to_ascii_lowercase();
+    let name = name.strip_prefix("minecraft:").unwrap_or(&name);
+    let block = RegistryBlock::from_str(&format!("minecraft:{}", name.replace(' ', "_"))).ok()?;
+    (!matches!(
+        block,
+        RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
+    ))
+    .then_some(block)
+}
+
+async fn mine_block_task(
+    client: &mut Client,
+    target: azalea::BlockPos,
+    expected_block: RegistryBlock,
+    chunk_storage: azalea::world::ChunkStorage,
+) -> Result<(), &'static str> {
+    let goal = ReachBlockPosGoal {
+        pos: target,
+        chunk_storage: chunk_storage.clone(),
+    };
+    client.goto_without_mining(goal);
+
+    let mut ticks = client.get_tick_broadcaster();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        if can_reach_block(
+            &chunk_storage,
+            azalea::BlockPos::from(client.position()),
+            target,
+        ) {
+            break;
+        }
+        match tokio::time::timeout_at(deadline, ticks.recv()).await {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) => {
+                client.stop_pathfinding();
+                return Err("connection ended while approaching the target");
+            }
+            Err(_) => {
+                client.stop_pathfinding();
+                return Err("target is out of reach");
+            }
+        }
+    }
+
+    client.stop_pathfinding();
+    let world = client.world();
+    let world = world.read();
+    let Some(state) = world.get_block_state(&target) else {
+        return Err("target is no longer loaded");
+    };
+    if state.is_air()
+        || RegistryBlock::from(state) != expected_block
+        || Box::<dyn BlockTrait>::from(state).behavior().destroy_time < 0.0
+    {
+        return Err("target is no longer breakable");
+    }
+    drop(world);
+
+    let best_tool = client.best_tool_in_hotbar_for_block(state);
+    if best_tool.percentage_per_tick <= 0.0 {
+        return Err("no suitable tool is available in the hotbar");
+    }
+    client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+        entity: client.entity,
+        slot: best_tool.index as u8,
+    });
+    client.look_at(target.center());
+    let mut ticks = client.get_tick_broadcaster();
+    match tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await {
+        Ok(Ok(())) => {}
+        _ => return Err("could not prepare the bot to mine"),
+    }
+    if tokio::time::timeout(Duration::from_secs(30), client.mine(target))
+        .await
+        .is_err()
+    {
+        stop_active_mining(client);
+        return Err("mining timed out");
+    }
+    Ok(())
+}
+
+fn stop_active_mining(client: &Client) {
+    let mut ecs = client.ecs.lock();
+    if ecs.get::<azalea::mining::Mining>(client.entity).is_some() {
+        ecs.send_event(StopMiningBlockEvent {
+            entity: client.entity,
+        });
     }
 }
 
@@ -530,5 +721,16 @@ mod tests {
             assert_eq!(goal.pos.y, 64.0);
             assert_eq!(goal.radius, 1.0);
         }
+    }
+
+    #[test]
+    fn mineable_block_names_accept_namespaced_and_case_insensitive_ids() {
+        assert_eq!(parse_mineable_block("Stone"), Some(RegistryBlock::Stone));
+        assert_eq!(
+            parse_mineable_block("minecraft:diamond_ore"),
+            Some(RegistryBlock::DiamondOre)
+        );
+        assert_eq!(parse_mineable_block("not_a_block"), None);
+        assert_eq!(parse_mineable_block("air"), None);
     }
 }

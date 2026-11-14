@@ -8,7 +8,7 @@ use crate::{
     bot::minecraft::MinecraftEvent::Chat,
     bot::{
         minecraft::{
-            MinecraftConnection, MinecraftEvent, MinecraftTransportError,
+            parse_mineable_block, MinecraftConnection, MinecraftEvent, MinecraftTransportError,
             MAX_SUPPORTED_Y_COORDINATE, MAX_WORLD_COORDINATE,
         },
         state_machine::{BotState, StateMachine},
@@ -90,7 +90,8 @@ impl MinecraftRuntime {
             .and_then(|_| register_follow_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_roam_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_navigation_commands(&command_registry, action_sender.clone()))
-            .and_then(|_| register_inventory_commands(&command_registry, action_sender))
+            .and_then(|_| register_inventory_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_mining_commands(&command_registry, action_sender))
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
 
@@ -405,7 +406,7 @@ impl MinecraftRuntime {
                 }
                 RuntimeCommandAction::StopAll => {
                     connection.stop_movement();
-                    context.reply("⛔ All movement operations halted.");
+                    context.reply("⛔ All movement and mining operations halted.");
                 }
                 RuntimeCommandAction::MoveToPosition { x, y, z, range } => {
                     if connection.move_to_position(x, y, z, range)? {
@@ -430,6 +431,20 @@ impl MinecraftRuntime {
                 RuntimeCommandAction::Equipment => {
                     let snapshot = connection.inventory_snapshot()?;
                     context.private_reply(&snapshot.equipment_report());
+                }
+                RuntimeCommandAction::MineBlock { name } => {
+                    if connection.start_mining_block(&name, &context.username)? {
+                        context.private_reply(&format!(
+                            "⛏️ Mining the nearest {name} within 32 blocks."
+                        ));
+                    } else {
+                        let error = format!(
+                            "No breakable {name} block was found nearby, or mining is already active."
+                        );
+                        context.error(&error);
+                        result.success = false;
+                        result.error = Some(error);
+                    }
                 }
             }
         }
@@ -497,6 +512,9 @@ enum RuntimeCommandAction {
         name: String,
     },
     Equipment,
+    MineBlock {
+        name: String,
+    },
 }
 
 fn register_follow_commands(
@@ -828,6 +846,48 @@ fn register_inventory_commands(
     equipment.category = Some("Inventory".to_owned());
     equipment.permission = Some(PermissionConfig::default());
     registry.register(equipment)?;
+    Ok(())
+}
+
+fn register_mining_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    let mut mine = CommandDefinition::new(
+        "mine",
+        "Mine the nearest nearby block of a type",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() != 1 {
+                    return Err("Usage: mine <block-name>".to_owned());
+                }
+                let Some(ArgumentValue::String(name)) = context.args.args.first() else {
+                    return Err("A block name is required.".to_owned());
+                };
+                let Some(block) = parse_mineable_block(name) else {
+                    return Err("Enter a valid breakable Minecraft block name.".to_owned());
+                };
+                let id = block.to_string();
+                let name = id.strip_prefix("minecraft:").unwrap_or(&id).to_owned();
+                sender
+                    .send(RuntimeCommandAction::MineBlock { name })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    mine.usage = Some("<block-name>".to_owned());
+    mine.category = Some("Mining".to_owned());
+    mine.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    mine.arguments = vec![ArgumentDefinition::new(
+        "block-name",
+        ArgumentType::String,
+        true,
+    )];
+    registry.register(mine)?;
     Ok(())
 }
 
@@ -1315,6 +1375,54 @@ mod tests {
             receiver.try_recv().unwrap(),
             RuntimeCommandAction::Equipment
         );
+    }
+
+    #[test]
+    fn mine_command_requires_admin_and_validates_block_names() {
+        let registry = CommandRegistry::default();
+        let (sender, receiver) = mpsc::channel();
+        register_mining_commands(&registry, sender).unwrap();
+
+        let mut guest_context = CommandContext::new(
+            "Alex",
+            vec!["diamond_ore".to_owned()],
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let guest_result = run(registry.execute("mine", &mut guest_context)).unwrap();
+        assert!(!guest_result.success);
+        assert!(receiver.try_recv().is_err());
+
+        let mut admin_context = CommandContext::new(
+            "Alex",
+            vec!["minecraft:diamond_ore".to_owned()],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let admin_result = run(registry.execute("mine", &mut admin_context)).unwrap();
+        assert!(admin_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::MineBlock {
+                name: "diamond_ore".to_owned(),
+            }
+        );
+
+        let mut invalid_context = CommandContext::new(
+            "Alex",
+            vec!["not_a_block".to_owned()],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let invalid_result = run(registry.execute("mine", &mut invalid_context)).unwrap();
+        assert!(!invalid_result.success);
+        assert!(receiver.try_recv().is_err());
     }
 
     #[test]

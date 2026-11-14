@@ -8,7 +8,7 @@ publish = false
 # Patch simd_cesu8 to fix array_chunks issue on Rust 1.85+
 # The fix changes `remainder.array_chunks()` to `remainder.into_iter().array_chunks()`
 [patch.crates-io]
-simd_cesu8 = { git = "https://github.com/bevyengine/simd_cesu8", rev = "main" }
+simd_cesu8 = { git = "https://github.com/seancroach/simd_cesu8", rev = "main" }
 
 [dependencies]
 azalea = "=0.10.3"

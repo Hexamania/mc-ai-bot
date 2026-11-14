@@ -23,15 +23,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure git to use LF line endings
         run: git config --global core.autocrlf false
-      - name: Configure git credentials for private dependencies
-        run: |
-          git config --local url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          git config --local credential.helper "store --file ${env:GITHUB_WORKSPACE}/.git-credentials"
-          echo "https://${{ secrets.GITHUB_TOKEN }}:@github.com" > "${env:GITHUB_WORKSPACE}/.git-credentials"
       - name: Set cargo environment for git fetching
-        run: |
-          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $env:GITHUB_ENV
-          echo "CARGO_CREDENTIAL_HELPER=store --file ${env:GITHUB_WORKSPACE}/.git-credentials" >> $env:GITHUB_ENV
+        run: echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $env:GITHUB_ENV
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:

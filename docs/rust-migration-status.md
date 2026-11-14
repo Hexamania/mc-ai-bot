@@ -33,27 +33,36 @@ implementation; the Rust binary is not yet a replacement for it.
 | `!home` | Return to base location. |
 | `!sminebase` | Set mining base location at current position. |
 | `!minebase` | Go to mining base location. |
-| `!basechest` | View base chest contents (navigates to base). |
-| `!sort` | Auto-sort nearby chest (placeholder). |
-| `!deposit` | Deposit non-essential items to chest (placeholder). |
-| `!miner <dir> [len]` | Admin: start mining tunnel (north/south/east/west). |
+| `!basechest` | View base chest contents (navigates to base, opens chest). |
+| `!sort` | Auto-sort nearby chest (groups similar items). |
+| `!deposit` | Deposit non-essential items to chest (keeps tools, armor, food, building blocks). |
+| `!miner <dir> [len]` | Admin: start mining 2-high tunnel (north/south/east/west) with block breaking. |
 | `!stopminer` | Admin: stop mining tunnel. |
-| `!minearea <x1> <y1> <z1> <x2> <y2> <z2>` | Admin: mine area between two positions. |
+| `!minearea <x1> <y1> <z1> <x2> <y2> <z2>` | Admin: mine area between two positions (top-down, with block breaking). |
 | `!stopminearea` | Admin: stop mining area. |
-| `!refuel` | Search for and mine coal (placeholder). |
-| `!lumberjack [radius]` | Start lumberjack mode (placeholder). |
-| `!roof [radius]` | Admin: build roof at base (placeholder). |
-| `!guard` | Admin: guard current location. |
+| `!refuel` | Search for and mine coal ore / deepslate coal ore (up to 8). |
+| `!lumberjack [radius]` | Find and chop trees in radius (bottom-to-top, up to 20 logs). |
+| `!roof [radius]` | Admin: build flat roof at base with blocks from inventory. |
+| `!guard` | Admin: guard current location (attacks nearby hostile mobs). |
 | `!stopguard` | Admin: stop guarding. |
-| `!pvp <player>` | Admin: engage PVP with player. |
+| `!pvp <player>` | Admin: engage PVP with player (combat loop with weapon switching, eating). |
 | `!stoppvp` | Admin: stop PVP. |
-| `!panic` | Admin: activate panic mode (flee to safety). |
+| `!panic` | Admin: activate panic mode (flee to Y=250, build shelter). |
 | `!stealth` | Admin: toggle stealth/sneak mode. |
-| `!dstop` | Admin: stop auto-defense. |
+| `!dstop` | Admin: stop auto-defense (guard, PVP). |
 | `!remember <key>=<fact>` | Remember a fact to persistent memory. |
 | `!forget <key>` | Forget a remembered fact. |
 | `!chat <message>` | Chat with AI assistant (placeholder). |
 | `!servercmd <command>` | Admin: execute server command. |
+| **New General Commands** | |
+| `!status` (`!info`) | Show bot status (state, position, uptime). |
+| `!test` | Test if bot is responsive. |
+| `!version` (`!ver`) | Show version information. |
+| `!uptime` | Show bot uptime. |
+| `!list` (`!commands`, `!help`) | List all available commands. |
+| **New Survival Commands** | |
+| `!rescue <player>` | Rescue a player (pathfind, give food, protect from mobs). |
+| `!medic <player>` | Continuous heal/protect loop for target player. |
 
 Command names use the Rust runtime's configured prefixes. The defaults shown in
 the current README use `!` for public commands and `$` for the private admin
@@ -62,28 +71,24 @@ login.
 ## Partially converted
 
 - **Inventory:** Rust can inspect carried slots and equipment. Sorting,
-  depositing, refueling, and other inventory mutations are implemented as
-  command stubs but need full integration with Azalea's inventory and
-  container APIs.
-- **Mining:** Rust now registers tunnel/area mining, refuel, and lumberjack
-  commands, but they need full implementation with proper block digging and
-  pathfinding integration.
+  depositing, refueling, and chest operations are now implemented with
+  full integration with Azalea's inventory and container APIs.
+- **Mining:** Tunnel mining (`miner`), area mining (`minearea`), refuel,
+  and lumberjack commands are fully implemented with block breaking
+  and pathfinding integration.
 - **Movement:** Follow, roaming, coordinate navigation, miner, mine area,
-  and base navigation are implemented; some need full pathfinding integration.
+  and base navigation are fully implemented with pathfinding.
 - **Minecraft support:** The Rust transport currently targets `1.21.1` and
   offline or Microsoft authentication, not every protocol/auth mode supported
   elsewhere in the project.
-- **Building/Combat:** Guard, PVP, roof building commands registered but need
-  full implementation.
+- **Building/Combat:** Guard, PVP, roof building, panic mode, stealth,
+  rescue, and medic commands are fully implemented.
 
 ## Not yet converted
 
 The following Node command families and their integrations are not available in
 the Rust runtime yet:
 
-- General commands such as `status`, `test`, `version`, `uptime`, and `list`.
-- Gathering and survival: `rescue`, `medic` (commands registered but need full
-  implementation).
 - The TypeScript plugin/feature system and full Node bot command integrations.
 - Existing TypeScript feature modules for auto-farming, building, combat/defense,
   and automated inventory management.

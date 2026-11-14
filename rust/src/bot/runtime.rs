@@ -101,7 +101,8 @@ impl MinecraftRuntime {
             .and_then(|_| register_utility_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_memory_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_chat_commands(&command_registry, action_sender.clone()))
-            .and_then(|_| register_admin_commands(&command_registry, action_sender))
+            .and_then(|_| register_admin_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_general_commands(&command_registry, action_sender))
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
 
@@ -707,6 +708,70 @@ impl MinecraftRuntime {
                     connection.send_chat(&format!("/{command}"))?;
                     context.reply(&format!("📤 Sent server command: /{command}"));
                 }
+                // General commands
+                RuntimeCommandAction::Status => {
+                    let state = connection.state();
+                    let pos = connection.position();
+                    let uptime = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    context.reply(&format!(
+                        "📊 **Bot Status**\nState: {:?}\nPosition: {}\nUptime: {}s",
+                        state,
+                        pos.map(|p| format!("X:{:.1} Y:{:.1} Z:{:.1}", p.x, p.y, p.z))
+                            .unwrap_or("Unknown".to_owned()),
+                        uptime
+                    ));
+                }
+                RuntimeCommandAction::Test => {
+                    context.reply("✅ Test command working! Rust runtime is operational.");
+                }
+                RuntimeCommandAction::Version => {
+                    context.reply(&format!(
+                        "🤖 **mc-ai-bot Rust Runtime**\nVersion: 0.1.0-rust\nMinecraft: {}\nRust: {}",
+                        crate::config::SUPPORTED_MINECRAFT_VERSION,
+                        env!("CARGO_PKG_VERSION")
+                    ));
+                }
+                RuntimeCommandAction::Uptime => {
+                    let uptime = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let hours = uptime / 3600;
+                    let minutes = (uptime % 3600) / 60;
+                    let seconds = uptime % 60;
+                    context.reply(&format!("⏱️ Uptime: {}h {}m {}s", hours, minutes, seconds));
+                }
+                RuntimeCommandAction::List => {
+                    let commands = connection.command_registry().get_all().unwrap_or_default();
+                    let cmd_list = commands
+                        .iter()
+                        .map(|c| format!("  {} - {}", c.name, c.description.as_deref().unwrap_or("")))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    context.private_reply(&format!("📋 **Available Commands** ({}):\n{}", commands.len(), cmd_list));
+                }
+                // Rescue/Survival commands
+                RuntimeCommandAction::Rescue { target } => {
+                    if let Err(e) = connection.rescue_player(&target) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!("🚑 Rescue mission started for {target}."));
+                    }
+                }
+                RuntimeCommandAction::Medic { target } => {
+                    if let Err(e) = connection.medic_player(&target) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!("🏥 Medic mode activated for {target}."));
+                    }
+                }
             }
         }
         Ok(())
@@ -838,6 +903,19 @@ enum RuntimeCommandAction {
     // Server command
     ServerCommand {
         command: String,
+    },
+    // General commands
+    Status,
+    Test,
+    Version,
+    Uptime,
+    List,
+    // Rescue/Survival commands
+    Rescue {
+        target: String,
+    },
+    Medic {
+        target: String,
     },
 }
 
@@ -1941,6 +2019,166 @@ fn register_admin_commands(
         ..PermissionConfig::default()
     });
     registry.register(server_cmd)?;
+
+    Ok(())
+}
+
+fn register_general_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // status - Show bot status
+    let mut status = CommandDefinition::new(
+        "status",
+        "Show bot status",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: status".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Status)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    status.aliases = vec!["info".to_owned()];
+    status.category = Some("General".to_owned());
+    status.permission = Some(PermissionConfig::default());
+    registry.register(status)?;
+
+    // test - Test command
+    let mut test = CommandDefinition::new(
+        "test",
+        "Test if bot is responsive",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: test".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Test)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    test.category = Some("General".to_owned());
+    test.permission = Some(PermissionConfig::default());
+    registry.register(test)?;
+
+    // version - Show version info
+    let mut version = CommandDefinition::new(
+        "version",
+        "Show version information",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: version".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Version)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    version.aliases = vec!["ver".to_owned()];
+    version.category = Some("General".to_owned());
+    version.permission = Some(PermissionConfig::default());
+    registry.register(version)?;
+
+    // uptime - Show uptime
+    let mut uptime = CommandDefinition::new(
+        "uptime",
+        "Show bot uptime",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: uptime".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Uptime)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    uptime.category = Some("General".to_owned());
+    uptime.permission = Some(PermissionConfig::default());
+    registry.register(uptime)?;
+
+    // list - List all commands
+    let mut list = CommandDefinition::new(
+        "list",
+        "List all available commands",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: list".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::List)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    list.aliases = vec!["commands".to_owned(), "help".to_owned()];
+    list.category = Some("General".to_owned());
+    list.permission = Some(PermissionConfig::default());
+    registry.register(list)?;
+
+    // rescue - Rescue a player
+    let mut rescue = CommandDefinition::new(
+        "rescue",
+        "Rescue a player (bring food, protect)",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() != 1 {
+                    return Err("Usage: rescue <player>".to_owned());
+                }
+                let Some(ArgumentValue::Player(target)) = context.args.args.first() else {
+                    return Err("A player name is required.".to_owned());
+                };
+                sender
+                    .send(RuntimeCommandAction::Rescue { target: target.clone() })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    rescue.usage = Some("<player>".to_owned());
+    rescue.category = Some("Survival".to_owned());
+    rescue.permission = Some(PermissionConfig::default());
+    rescue.arguments = vec![ArgumentDefinition::new("player", ArgumentType::Player, true)];
+    registry.register(rescue)?;
+
+    // medic - Medic mode for a player
+    let mut medic = CommandDefinition::new(
+        "medic",
+        "Continuous heal/protect a player",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() != 1 {
+                    return Err("Usage: medic <player>".to_owned());
+                }
+                let Some(ArgumentValue::Player(target)) = context.args.args.first() else {
+                    return Err("A player name is required.".to_owned());
+                };
+                sender
+                    .send(RuntimeCommandAction::Medic { target: target.clone() })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    medic.usage = Some("<player>".to_owned());
+    medic.category = Some("Survival".to_owned());
+    medic.permission = Some(PermissionConfig::default());
+    medic.arguments = vec![ArgumentDefinition::new("player", ArgumentType::Player, true)];
+    registry.register(medic)?;
 
     Ok(())
 }

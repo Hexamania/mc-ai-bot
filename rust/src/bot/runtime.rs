@@ -326,6 +326,22 @@ impl MinecraftRuntime {
         self.command_registry.get_all().unwrap_or_default()
     }
 
+    /// Get command help
+    pub async fn get_command_help(&self, command: &str, prefix: &str) -> String {
+        if let Some(cmd) = self.command_registry.get(command) {
+            format!(
+                "{} {} - {}\nUsage: {}\nAliases: {}",
+                prefix,
+                cmd.name,
+                cmd.description,
+                cmd.usage,
+                cmd.aliases.join(", ")
+            )
+        } else {
+            format!("Unknown command: {}", command)
+        }
+    }
+
     /// Get inventory items
     pub async fn get_inventory(&self) -> Result<serde_json::Value, MinecraftRuntimeError> {
         self.connection
@@ -374,6 +390,17 @@ impl MinecraftRuntime {
             .execute_command(command)
             .await
             .map_err(MinecraftRuntimeError::Transport)
+    }
+
+    /// Execute a command with context (for permissions, etc.)
+    pub async fn execute_command_with_context(
+        &self,
+        command: &str,
+        context: crate::bot::runtime::CommandContext,
+    ) -> Result<(), MinecraftRuntimeError> {
+        // For now, just execute the command string
+        // In the future, this could check permissions from context
+        self.execute_command(command).await
     }
 
     /// Toggle kill aura

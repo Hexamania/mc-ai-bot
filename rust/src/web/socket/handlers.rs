@@ -330,7 +330,7 @@ pub fn setup_commands_namespace(
                                 private_sender: None,
                             };
 
-                            let result = runtime.execute_command(&data.command, context).await;
+                            let result = runtime.execute_command_with_context(&data.command, context).await;
                             let execution_time = start_time.elapsed().as_millis() as u64;
 
                             socket
@@ -503,7 +503,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                         private_sender: None,
                     };
 
-                    let result = runtime.execute_command(&data.command, context).await;
+                    let result = runtime.execute_command_with_context(&data.command, context).await;
                     let execution_time = start_time.elapsed().as_millis() as u64;
 
                     socket
@@ -553,7 +553,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.move_to(data.x, data.y, data.z).await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
                         conn.say(&format!(
@@ -573,7 +573,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     let result = runtime.follow_player(&data.username).await;
                     if !result {
                         socket
@@ -602,7 +602,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let io = io.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.stop_all_movement().await;
 
                     // Broadcast feature toggled
@@ -668,7 +668,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.go_home().await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
                         let pos = runtime.get_base_location().await;
@@ -690,7 +690,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.drop_item(data.slot, data.count).await;
                 }
             });
@@ -703,7 +703,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.drop_all_items().await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
                         conn.say("🗑️ Dashboard triggered: Dropped entire inventory.")
@@ -720,7 +720,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.move_item(data.from, data.to).await;
                 }
             });
@@ -733,7 +733,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.set_hotbar_slot(slot).await;
                 }
             });
@@ -747,7 +747,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime.mine_block(data.x, data.y, data.z).await;
                     socket
                         .emit(
@@ -769,7 +769,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     runtime
                         .place_block(data.x, data.y, data.z, data.block_type)
                         .await;
@@ -795,8 +795,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let io = io.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    runtime.toggle_kill_aura(enabled).await;
+                    let mut runtime = runtime_arc.write().await;
+                    runtime.toggle_kill_aura(enabled);
 
                     // Broadcast feature toggled
                     io.of(namespaces::MAIN)
@@ -828,8 +828,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let io = io.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    runtime.toggle_auto_defense(enabled).await;
+                    let mut runtime = runtime_arc.write().await;
+                    runtime.toggle_auto_defense(enabled);
 
                     io.of(namespaces::MAIN)
                         .to(rooms::ALL)
@@ -859,14 +859,14 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     if enabled {
-                        runtime.start_roaming().await;
+                        runtime.start_roaming();
                         if let Some(conn) = state.connection.read().await.as_ref() {
                             conn.say("🚶 Roaming protocol active").await;
                         }
                     } else {
-                        runtime.stop_roaming().await;
+                        runtime.stop_roaming();
                         if let Some(conn) = state.connection.read().await.as_ref() {
                             conn.say("⛔ Roaming stopped").await;
                         }
@@ -892,11 +892,11 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     if enabled {
-                        runtime.start_farming().await;
+                        runtime.start_farming();
                     } else {
-                        runtime.stop_farming().await;
+                        runtime.stop_farming();
                     }
                     socket
                         .emit(
@@ -918,11 +918,11 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     if enabled {
-                        runtime.start_mining().await;
+                        runtime.start_mining();
                     } else {
-                        runtime.stop_mining().await;
+                        runtime.stop_mining();
                     }
                     socket
                         .emit(
@@ -944,11 +944,11 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
+                    let mut runtime = runtime_arc.write().await;
                     if enabled {
-                        runtime.start_lumberjack().await;
+                        runtime.start_lumberjack();
                     } else {
-                        runtime.stop_lumberjack().await;
+                        runtime.stop_lumberjack();
                     }
                     socket
                         .emit(
@@ -970,8 +970,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    runtime.start_progression().await;
+                    let mut runtime = runtime_arc.write().await;
+                    runtime.start_progression();
                     if let Some(conn) = state.connection.read().await.as_ref() {
                         conn.say("🚀 Speedrun Protocol initiated!").await;
                     }
@@ -987,8 +987,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let io = io.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    runtime.stop_all_tasks().await;
+                    let mut runtime = runtime_arc.write().await;
+                    runtime.stop_all_tasks();
 
                     // Broadcast feature toggled
                     io.of(namespaces::MAIN)
@@ -1017,8 +1017,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    runtime.toggle_safe_mode(enabled).await;
+                    let mut runtime = runtime_arc.write().await;
+                    runtime.toggle_safe_mode(enabled);
                 }
             });
         },
@@ -1030,8 +1030,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    runtime.toggle_stealth(enabled).await;
+                    let mut runtime = runtime_arc.write().await;
+                    runtime.toggle_stealth(enabled);
                 }
             });
         },
@@ -1043,8 +1043,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             tokio::spawn(async move {
                 if let Some(runtime_arc) = state.runtime.as_ref() {
-                    let runtime = runtime_arc.read().await;
-                    runtime.toggle_auto_armor(enabled).await;
+                    let mut runtime = runtime_arc.write().await;
+                    runtime.toggle_auto_armor(enabled);
                 }
             });
         },

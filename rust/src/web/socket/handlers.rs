@@ -144,7 +144,7 @@ pub fn setup_admin_namespace(
                     if !command.is_empty() {
                         // Execute console command via bot
                         tokio::spawn(async move {
-                            if let Some(runtime_arc) = state.runtime.as_ref() {
+                            if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                                 let runtime = runtime_arc.read().await;
                                 runtime.execute_command(command).await;
                                 socket
@@ -222,7 +222,7 @@ pub fn setup_commands_namespace(
                 move |socket: SocketRef, _data: Data<()>| {
                     let state = state.clone();
                     tokio::spawn(async move {
-                        if let Some(runtime_arc) = state.runtime.as_ref() {
+                        if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                             let runtime = runtime_arc.read().await;
                             let commands = runtime.get_command_definitions().await;
                             let commands_list: Vec<serde_json::Value> = commands
@@ -263,7 +263,7 @@ pub fn setup_commands_namespace(
                     if !command.is_empty() {
                         let state = state.clone();
                         tokio::spawn(async move {
-                            if let Some(runtime_arc) = state.runtime.as_ref() {
+                            if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                                 let runtime = runtime_arc.read().await;
                                 let help = runtime.get_command_help(command, prefix).await;
                                 let has_help = !help.contains("Unknown command");
@@ -305,7 +305,7 @@ pub fn setup_commands_namespace(
                     let start_time = std::time::Instant::now();
 
                     tokio::spawn(async move {
-                        if let Some(runtime_arc) = state.runtime.as_ref() {
+                        if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                             let runtime = runtime_arc.read().await;
 
                             let result = runtime.execute_command(&data.command).await;
@@ -376,7 +376,7 @@ pub fn initialize_all_namespaces(
 /// Send initial state to newly connected client
 fn send_initial_state(socket: SocketRef, state: Arc<WebState>) {
     tokio::spawn(async move {
-        if let Some(runtime_arc) = state.runtime.as_ref() {
+        if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
             let runtime = runtime_arc.read().await;
             let status = runtime.get_status().await;
             let bot_state = runtime.get_full_state().await;
@@ -420,7 +420,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, _data: Data<()>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let runtime = runtime_arc.read().await;
                     let bot_state = runtime.get_full_state().await;
                     socket.emit(server_events::BOT_STATE, bot_state).ok();
@@ -434,7 +434,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, _data: Data<()>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let runtime = runtime_arc.read().await;
                     let status = runtime.get_status().await;
                     socket.emit(server_events::BOT_STATUS, status).ok();
@@ -449,7 +449,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, Data(data): Data<MoveToPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.move_to(data.x, data.y, data.z).await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
@@ -469,7 +469,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(data): Data<FollowPlayerPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     let result = runtime.follow_player(&data.username).await;
                     if !result {
@@ -498,7 +498,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let io = io.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.stop_all_movement().await;
 
@@ -536,7 +536,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, _data: Data<()>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.set_home().await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
@@ -572,7 +572,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, _data: Data<()>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.go_home().await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
@@ -595,7 +595,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, Data(data): Data<DropItemPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.drop_item(data.slot, data.count).await;
                 }
@@ -608,7 +608,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, _data: Data<()>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.drop_all_items().await;
                     if let Some(conn) = state.connection.read().await.as_ref() {
@@ -625,7 +625,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, Data(data): Data<MoveItemPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.move_item(data.from, data.to).await;
                 }
@@ -638,7 +638,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, Data(slot): Data<i32>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.set_hotbar_slot(slot).await;
                 }
@@ -652,7 +652,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(data): Data<MineBlockPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.mine_block(data.x, data.y, data.z).await;
                     socket
@@ -674,7 +674,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(data): Data<PlaceBlockPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime
                         .place_block(data.x, data.y, data.z, data.block_type)
@@ -700,7 +700,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let io = io.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_kill_aura(enabled);
 
@@ -735,7 +735,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let io = io.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_auto_defense(enabled);
 
@@ -768,7 +768,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(enabled): Data<bool>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     if enabled {
                         runtime.start_roaming();
@@ -801,7 +801,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(enabled): Data<bool>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     if enabled {
                         runtime.start_farming();
@@ -827,7 +827,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(enabled): Data<bool>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     if enabled {
                         runtime.start_mining();
@@ -853,7 +853,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(enabled): Data<bool>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     if enabled {
                         runtime.start_lumberjack();
@@ -879,7 +879,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, _data: Data<()>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.start_progression();
                     if let Some(conn) = state.connection.read().await.as_ref() {
@@ -896,7 +896,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let io = io.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.stop_all_tasks();
 
@@ -927,7 +927,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, Data(enabled): Data<bool>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_safe_mode(enabled);
                 }
@@ -940,7 +940,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, Data(enabled): Data<bool>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_stealth(enabled);
                 }
@@ -953,7 +953,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |_socket: SocketRef, Data(enabled): Data<bool>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_auto_armor(enabled);
                 }
@@ -967,7 +967,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let io = io.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let runtime = runtime_arc.read().await;
                     // Convert HashMap to Value
                     let settings_value =
@@ -991,7 +991,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(data): Data<SaveLocationPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let mut runtime = runtime_arc.write().await;
                     let pos = data.position.unwrap_or_else(|| {
                         runtime.get_position().unwrap_or_else(|| {
@@ -1025,7 +1025,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(data): Data<RememberFactPayload>| {
             let state = state.clone();
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let runtime = runtime_arc.read().await;
                     let success = runtime.remember_fact(&data.key, &data.fact).await;
                     socket
@@ -1060,7 +1060,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let key = data.get("key").and_then(|v| v.as_str()).unwrap_or("");
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let runtime = runtime_arc.read().await;
                     let success = runtime.forget_fact(key).await;
                     socket
@@ -1095,7 +1095,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let rule = data.get("rule").and_then(|v| v.as_str()).unwrap_or("");
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let runtime = runtime_arc.read().await;
                     let success = runtime.add_rule(rule).await;
                     socket
@@ -1130,7 +1130,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
             let state = state.clone();
             let rule = data.get("rule").and_then(|v| v.as_str()).unwrap_or("");
             tokio::spawn(async move {
-                if let Some(runtime_arc) = state.runtime.as_ref() {
+                if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
                     let runtime = runtime_arc.read().await;
                     let success = runtime.remove_rule(rule).await;
                     socket

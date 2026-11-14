@@ -451,7 +451,7 @@ async fn health_check() -> Json<HealthResponse> {
 async fn bot_status(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<StatusResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let status = runtime.get_status().await;
         Ok(Json(StatusResponse {
@@ -471,7 +471,7 @@ async fn bot_status(
 async fn bot_state(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<StatusResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let bot_state = runtime.get_full_state().await;
         Ok(Json(StatusResponse {
@@ -491,7 +491,7 @@ async fn bot_state(
 async fn bot_vitals(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<VitalsResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let vitals = runtime.get_vitals().await;
         Ok(Json(VitalsResponse {
@@ -511,7 +511,7 @@ async fn bot_vitals(
 async fn bot_inventory(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<InventoryResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let inventory = runtime.get_inventory().await;
         Ok(Json(InventoryResponse {
@@ -531,7 +531,7 @@ async fn bot_inventory(
 async fn bot_equipment(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<EquipmentResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let equipment = runtime.get_equipment().await;
         Ok(Json(EquipmentResponse {
@@ -551,7 +551,7 @@ async fn bot_equipment(
 async fn bot_players(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<PlayersResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let players = runtime.get_players().await;
         let bot_state = runtime.get_full_state().await;
@@ -578,7 +578,7 @@ async fn bot_map(
     State(state): State<Arc<WebState>>,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<MapResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let radius = params
             .get("radius")
@@ -603,7 +603,7 @@ async fn bot_logs(
     State(state): State<Arc<WebState>>,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<LogsResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let limit = params
             .get("limit")
@@ -630,7 +630,7 @@ async fn bot_logs(
 async fn get_settings(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<SettingsResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let settings = runtime.get_settings().await;
         Ok(Json(SettingsResponse {
@@ -651,7 +651,7 @@ async fn update_settings(
     State(state): State<Arc<WebState>>,
     Json(settings): Json<serde_json::Value>,
 ) -> Result<Json<SettingsResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime.update_settings(settings.clone()).await;
         Ok(Json(SettingsResponse {
@@ -697,7 +697,7 @@ async fn save_location(
         .await
         .unwrap_or_default();
     let pos = payload.position.unwrap_or_else(|| {
-        if let Some(runtime_arc) = state.runtime.as_ref() {
+        if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
             let runtime = runtime_arc.read().await;
             runtime.get_position_blocking()
         } else {
@@ -725,7 +725,7 @@ async fn save_location(
             code: "INTERNAL_ERROR".to_string(),
         })?;
 
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime.add_favorite(&payload.name, pos).await;
     }
@@ -996,7 +996,7 @@ async fn clear_memory(
 async fn get_commands(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let commands = runtime.get_command_definitions().await;
         let commands_list: Vec<serde_json::Value> = commands
@@ -1034,7 +1034,7 @@ async fn execute_command(
     State(state): State<Arc<WebState>>,
     Json(payload): Json<CommandExecuteRequest>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let args: Vec<String> = match &payload.args {
             Some(serde_json::Value::String(s)) => vec![s.clone()],
@@ -1106,7 +1106,7 @@ async fn get_config(
 async fn get_stats(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<StatsResponse>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let bot_state = runtime.get_full_state().await;
         let bot = runtime.get_bot().await;
@@ -1153,7 +1153,7 @@ async fn get_stats(
 async fn get_chat(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         let limit = 50;
         let logs = runtime.get_chat_logs(limit).await;
@@ -1183,7 +1183,7 @@ async fn send_chat(
         });
     }
 
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime
             .send_chat(&payload.message)
@@ -1219,7 +1219,7 @@ async fn execute_console(
         });
     }
 
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime
             .execute_command(&format!("/{}", payload.command))
@@ -1246,7 +1246,7 @@ async fn execute_console(
 async fn restart_bot(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime.restart().await;
         Ok(Json(json!({
@@ -1266,7 +1266,7 @@ async fn restart_bot(
 async fn shutdown_bot(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    if let Some(runtime_arc) = state.runtime.as_ref() {
+    if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime.shutdown().await;
         Ok(Json(json!({

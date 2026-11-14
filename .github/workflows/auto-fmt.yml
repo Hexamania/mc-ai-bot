@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  RUSTUP_TOOLCHAIN: nightly-2026-01-01
+  RUSTUP_TOOLCHAIN: nightly-2025-11-01
 
 jobs:
   fmt:

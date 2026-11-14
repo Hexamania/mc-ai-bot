@@ -606,23 +606,25 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.stop_all_movement().await;
 
                     // Broadcast feature toggled
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(
-                            server_events::FEATURE_TOGGLED,
-                            FeatureToggledPayload {
-                                feature: "all".to_string(),
-                                enabled: false,
-                            },
-                        )
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(
+                                server_events::FEATURE_TOGGLED,
+                                FeatureToggledPayload {
+                                    feature: "all".to_string(),
+                                    enabled: false,
+                                },
+                            )
+                            .ok();
+                    }
 
                     // Broadcast bulk update
                     let bot_state = runtime.get_full_state().await;
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(server_events::BULK_UPDATE, bot_state)
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(server_events::BULK_UPDATE, bot_state)
+                            .ok();
+                    }
 
                     if let Some(conn) = state.connection.read().await.as_ref() {
                         conn.say("⛔ Movement halted via dashboard").await;
@@ -805,23 +807,25 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.toggle_kill_aura(enabled);
 
                     // Broadcast feature toggled
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(
-                            server_events::FEATURE_TOGGLED,
-                            FeatureToggledPayload {
-                                feature: "killAura".to_string(),
-                                enabled,
-                            },
-                        )
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(
+                                server_events::FEATURE_TOGGLED,
+                                FeatureToggledPayload {
+                                    feature: "killAura".to_string(),
+                                    enabled,
+                                },
+                            )
+                            .ok();
+                    }
 
                     // Broadcast bulk update
                     let bot_state = runtime.get_full_state().await;
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(server_events::BULK_UPDATE, bot_state)
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(server_events::BULK_UPDATE, bot_state)
+                            .ok();
+                    }
                 }
             });
         },
@@ -837,22 +841,24 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_auto_defense(enabled);
 
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(
-                            server_events::FEATURE_TOGGLED,
-                            FeatureToggledPayload {
-                                feature: "autoDefense".to_string(),
-                                enabled,
-                            },
-                        )
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(
+                                server_events::FEATURE_TOGGLED,
+                                FeatureToggledPayload {
+                                    feature: "autoDefense".to_string(),
+                                    enabled,
+                                },
+                            )
+                            .ok();
+                    }
 
                     let bot_state = runtime.get_full_state().await;
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(server_events::BULK_UPDATE, bot_state)
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(server_events::BULK_UPDATE, bot_state)
+                            .ok();
+                    }
                 }
             });
         },
@@ -997,16 +1003,17 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.stop_all_tasks();
 
                     // Broadcast feature toggled
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(
-                            server_events::FEATURE_TOGGLED,
-                            FeatureToggledPayload {
-                                feature: "all".to_string(),
-                                enabled: false,
-                            },
-                        )
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(
+                                server_events::FEATURE_TOGGLED,
+                                FeatureToggledPayload {
+                                    feature: "all".to_string(),
+                                    enabled: false,
+                                },
+                            )
+                            .ok();
+                    }
 
                     if let Some(conn) = state.connection.read().await.as_ref() {
                         conn.say("⛔ All tasks stopped via dashboard").await;
@@ -1070,10 +1077,11 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.update_settings(settings_value).await;
 
                     let bot_state = runtime.get_full_state().await;
-                    io.of(namespaces::MAIN)
-                        .to(rooms::ALL)
-                        .emit(server_events::BULK_UPDATE, bot_state)
-                        .ok();
+                    if let Some(ns) = io.of(namespaces::MAIN) {
+                        ns.to(rooms::ALL)
+                            .emit(server_events::BULK_UPDATE, bot_state)
+                            .ok();
+                    }
                 }
             });
         },
@@ -1097,9 +1105,8 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                             }
                         })
                     });
-                    runtime
-                        .save_location(&data.name, pos, data.location_type)
-                        .await;
+                    let location_type = data.location_type.as_deref().unwrap_or("custom");
+                    runtime.save_location(&data.name, pos, location_type);
 
                     socket
                         .emit(
@@ -1303,38 +1310,41 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 /// Broadcast bot status to all connected dashboards
 pub async fn broadcast_bot_status(state: &WebState, status: serde_json::Value) {
     if let Ok(io) = state.get_socket_io() {
-        io.of(namespaces::MAIN)
-            .to(rooms::ALL)
-            .emit(server_events::BOT_STATUS, status)
-            .ok();
+        if let Some(ns) = io.of(namespaces::MAIN) {
+            ns.to(rooms::ALL)
+                .emit(server_events::BOT_STATUS, status)
+                .ok();
+        }
     }
 }
 
 /// Broadcast bot state to all connected dashboards
 pub async fn broadcast_bot_state(state: &WebState, bot_state: serde_json::Value) {
     if let Ok(io) = state.get_socket_io() {
-        io.of(namespaces::MAIN)
-            .to(rooms::ALL)
-            .emit(server_events::BOT_STATE, bot_state)
-            .ok();
+        if let Some(ns) = io.of(namespaces::MAIN) {
+            ns.to(rooms::ALL)
+                .emit(server_events::BOT_STATE, bot_state)
+                .ok();
+        }
     }
 }
 
 /// Broadcast log entry to all connected dashboards
 pub async fn broadcast_log(state: &WebState, level: &str, tag: &str, message: &str) {
     if let Ok(io) = state.get_socket_io() {
-        io.of(namespaces::MAIN)
-            .to(rooms::LOGS)
-            .emit(
-                server_events::LOG_ENTRY,
-                LogEntryPayload {
-                    level: level.to_string(),
-                    tag: tag.to_string(),
-                    message: message.to_string(),
-                    timestamp: chrono::Utc::now().to_rfc3339(),
-                },
-            )
-            .ok();
+        if let Some(ns) = io.of(namespaces::MAIN) {
+            ns.to(rooms::LOGS)
+                .emit(
+                    server_events::LOG_ENTRY,
+                    LogEntryPayload {
+                        level: level.to_string(),
+                        tag: tag.to_string(),
+                        message: message.to_string(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    },
+                )
+                .ok();
+        }
     }
 }
 
@@ -1346,34 +1356,36 @@ pub async fn broadcast_chat_message(
     message_type: &str,
 ) {
     if let Ok(io) = state.get_socket_io() {
-        io.of(namespaces::MAIN)
-            .to(rooms::ALL)
-            .emit(
-                server_events::CHAT_MESSAGE,
-                ChatMessagePayload {
-                    username: username.to_string(),
-                    message: message.to_string(),
-                    message_type: message_type.to_string(),
-                    timestamp: chrono::Utc::now().to_rfc3339(),
-                },
-            )
-            .ok();
+        if let Some(ns) = io.of(namespaces::MAIN) {
+            ns.to(rooms::ALL)
+                .emit(
+                    server_events::CHAT_MESSAGE,
+                    ChatMessagePayload {
+                        username: username.to_string(),
+                        message: message.to_string(),
+                        message_type: message_type.to_string(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    },
+                )
+                .ok();
+        }
     }
 }
 
 /// Broadcast command output to all connected dashboards
 pub async fn broadcast_command_output(state: &WebState, message: &str, output_type: &str) {
     if let Ok(io) = state.get_socket_io() {
-        io.of(namespaces::MAIN)
-            .to(rooms::ALL)
-            .emit(
-                server_events::COMMAND_OUTPUT,
-                CommandOutputPayload {
-                    message: message.to_string(),
-                    output_type: output_type.to_string(),
-                    timestamp: chrono::Utc::now().to_rfc3339(),
-                },
-            )
-            .ok();
+        if let Some(ns) = io.of(namespaces::MAIN) {
+            ns.to(rooms::ALL)
+                .emit(
+                    server_events::COMMAND_OUTPUT,
+                    CommandOutputPayload {
+                        message: message.to_string(),
+                        output_type: output_type.to_string(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    },
+                )
+                .ok();
+        }
     }
 }

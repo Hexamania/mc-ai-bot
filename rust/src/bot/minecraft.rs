@@ -9,26 +9,27 @@ use azalea::{
     Account, BotClientExt, Client, Event, GameProfileComponent, Vec3,
     auto_tool::AutoToolClientExt,
     blocks::{Block as BlockTrait, BlockState, BlockStates},
-    container::Container,
     ecs::{
-        event::{AttackEvent, DropItemEvent, SetControlStateEvent},
+        event::{AttackEvent, DropItemEvent},
         query::With,
     },
     entity::{Attributes, Position, metadata::Player},
-    interact::InteractBlockEvent,
     inventory::{
+        components::Container,
         SetSelectedHotbarSlotEvent,
-        operations::click::{ClickMode, ClickOperation, ClickType, MouseButton},
+        operations::{ClickMode, ClickOperation, ClickType, MouseButton},
     },
     mining::StopMiningBlockEvent,
     pathfinder::{
         PathfinderClientExt,
         goals::{Goal, RadiusGoal, ReachBlockPosGoal},
     },
-    protocol::packets::game::Hand,
+    protocol::packets::game::PlayerAction,
     registry::Block as RegistryBlock,
-    world::{chunk::ChunkStorage, direction::Direction},
+    world::{chunks::ChunkStorage, Direction},
 };
+use azalea::attack::AttackEvent as AzaleaAttackEvent;
+use azalea::entity::Hand;
 use rand::Rng;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -628,7 +629,7 @@ impl MinecraftConnection {
                         entity: client.entity,
                         position: chest_pos,
                         direction: Direction::Up,
-                        hand: azalea::protocol::packets::game::Hand::MainHand,
+                        hand: Hand::MainHand,
                         cursor_position: None,
                         inside_block: false,
                         sequence: 0,
@@ -761,7 +762,7 @@ impl MinecraftConnection {
                         entity: client.entity,
                         position: chest_pos,
                         direction: Direction::Up,
-                        hand: azalea::protocol::packets::game::Hand::MainHand,
+                        hand: Hand::MainHand,
                         cursor_position: None,
                         inside_block: false,
                         sequence: 0,
@@ -944,7 +945,7 @@ impl MinecraftConnection {
                         entity: client.entity,
                         position: chest_pos,
                         direction: Direction::Up,
-                        hand: azalea::protocol::packets::game::Hand::MainHand,
+                        hand: Hand::MainHand,
                         cursor_position: None,
                         inside_block: false,
                         sequence: 0,
@@ -1952,7 +1953,7 @@ impl MinecraftConnection {
                                 entity: client.entity,
                                 position: target_pos,
                                 direction: Direction::Up,
-                                hand: azalea::protocol::packets::game::Hand::MainHand,
+                                hand: Hand::MainHand,
                                 cursor_position: None,
                                 inside_block: false,
                                 sequence: 0,
@@ -2449,7 +2450,7 @@ impl MinecraftConnection {
                                     entity: client.entity,
                                     position: target_pos,
                                     direction: Direction::Up,
-                                    hand: azalea::protocol::packets::game::Hand::MainHand,
+                                    hand: Hand::MainHand,
                                     cursor_position: None,
                                     inside_block: false,
                                     sequence: 0,
@@ -2777,6 +2778,11 @@ impl MinecraftConnection {
         }
         self.client.chat(message);
         Ok(())
+    }
+
+    /// Send a chat message (async alias for send_chat)
+    pub async fn say(&self, message: &str) -> Result<(), MinecraftTransportError> {
+        self.send_chat(message)
     }
 
     // Web API support methods
@@ -3297,7 +3303,7 @@ impl MinecraftConnection {
                 entity: self.client.entity,
                 position: block_pos,
                 direction: Direction::Up,
-                hand: azalea::protocol::packets::game::Hand::MainHand,
+                hand: Hand::MainHand,
                 cursor_position: None,
                 inside_block: false,
                 sequence: 0,
@@ -3517,7 +3523,7 @@ async fn mine_block_task(
     client: &mut Client,
     target: azalea::BlockPos,
     expected_block: RegistryBlock,
-    chunk_storage: azalea::world::ChunkStorage,
+    chunk_storage: ChunkStorage,
 ) -> Result<(), &'static str> {
     let goal = ReachBlockPosGoal {
         pos: target,

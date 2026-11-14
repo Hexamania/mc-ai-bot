@@ -7,6 +7,7 @@ use azalea::{
     GameProfileComponent, Vec3,
 };
 use azalea::{Account, Client, Event};
+use rand::Rng;
 use thiserror::Error;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
 
@@ -61,6 +62,7 @@ pub struct MinecraftConnection {
     state_machine: StateMachine,
     follow_target: Option<String>,
     follow_task: Option<JoinHandle<()>>,
+    roam_task: Option<JoinHandle<()>>,
 }
 
 impl MinecraftConnection {
@@ -101,6 +103,7 @@ impl MinecraftConnection {
             state_machine,
             follow_target: None,
             follow_task: None,
+            roam_task: None,
         })
     }
 
@@ -144,6 +147,7 @@ impl MinecraftConnection {
             return Ok(false);
         }
 
+        self.stop_roaming();
         self.stop_following();
         follow_client.goto_without_mining(RadiusGoal {
             pos: position,
@@ -172,6 +176,56 @@ impl MinecraftConnection {
         self.follow_target = Some(target);
         self.follow_task = Some(task);
         Ok(true)
+    }
+
+    pub fn start_roaming(
+        &mut self,
+        radius: u32,
+        update_interval: Duration,
+    ) -> Result<bool, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        if !(1..=50).contains(&radius)
+            || update_interval < Duration::from_secs(1)
+            || update_interval > Duration::from_secs(60)
+        {
+            return Ok(false);
+        }
+        if self
+            .roam_task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
+            return Ok(false);
+        }
+
+        self.stop_following();
+        self.stop_roaming();
+        let mut roam_client = self.client.clone();
+        let goal = roam_goal(roam_client.position(), radius);
+        roam_client.goto_without_mining(goal);
+
+        self.roam_task = Some(tokio::spawn(async move {
+            loop {
+                sleep(update_interval).await;
+                let goal = roam_goal(roam_client.position(), radius);
+                roam_client.goto_without_mining(goal);
+            }
+        }));
+        Ok(true)
+    }
+
+    pub fn stop_roaming(&mut self) -> bool {
+        let was_active = self.roam_task.take().is_some_and(|task| {
+            let active = !task.is_finished();
+            task.abort();
+            active
+        });
+        if was_active && self.state() == BotState::Connected {
+            self.client.stop_pathfinding();
+        }
+        was_active
     }
 
     pub fn stop_following(&mut self) -> Option<String> {
@@ -233,10 +287,12 @@ impl MinecraftConnection {
                 }
                 Event::Death(_) => {
                     self.stop_following();
+                    self.stop_roaming();
                     Some(MinecraftEvent::Death)
                 }
                 Event::Disconnect(reason) => {
                     self.stop_following();
+                    self.stop_roaming();
                     self.state_machine.transition(BotState::Disconnected)?;
                     Some(MinecraftEvent::Disconnected {
                         reason: reason.map(|message| message.to_string()),
@@ -250,6 +306,7 @@ impl MinecraftConnection {
         }
 
         self.stop_following();
+        self.stop_roaming();
         if self.state() != BotState::Disconnected {
             self.state_machine.transition(BotState::Disconnected)?;
         }
@@ -260,6 +317,9 @@ impl MinecraftConnection {
 impl Drop for MinecraftConnection {
     fn drop(&mut self) {
         if let Some(task) = self.follow_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.roam_task.take() {
             task.abort();
         }
         if self.state() == BotState::Connected {
@@ -281,6 +341,17 @@ fn distance_squared(first: Vec3, second: Vec3) -> f64 {
     let dy = first.y - second.y;
     let dz = first.z - second.z;
     dx * dx + dy * dy + dz * dz
+}
+
+fn roam_goal(position: Vec3, radius: u32) -> RadiusGoal {
+    let mut random = rand::thread_rng();
+    let radius = radius as i32;
+    let x = position.x.floor() as i32 + random.gen_range(-radius..=radius);
+    let z = position.z.floor() as i32 + random.gen_range(-radius..=radius);
+    RadiusGoal {
+        pos: Vec3::new(x as f64, position.y.floor(), z as f64),
+        radius: 1.0,
+    }
 }
 
 pub fn validate_config(config: &BotConfig) -> Result<(), MinecraftTransportError> {
@@ -394,5 +465,17 @@ mod tests {
         assert_eq!(server_address("::1", 25565), "[::1]:25565");
         assert_eq!(server_address("[::1]", 25565), "[::1]:25565");
         assert_eq!(server_address("localhost", 25565), "localhost:25565");
+    }
+
+    #[test]
+    fn roam_goals_stay_within_horizontal_radius_and_preserve_height() {
+        let origin = Vec3::new(0.9, 64.5, -4.4);
+        for _ in 0..100 {
+            let goal = roam_goal(origin, 3);
+            assert!((goal.pos.x as i32).abs() <= 3);
+            assert!((goal.pos.z as i32 + 5).abs() <= 3);
+            assert_eq!(goal.pos.y, 64.0);
+            assert_eq!(goal.radius, 1.0);
+        }
     }
 }

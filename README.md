@@ -172,13 +172,15 @@ protocol versions and authentication modes are rejected explicitly; the Rust tra
 Azalea-compatible `nightly-2024-10-23` toolchain.
 The runtime dispatches parsed incoming chat commands through the Rust registry, applies configured
 permission levels, and sends command replies back to public chat or private messages. It registers
-`!help`, `!ping`, `!follow`, and `!stopfollow` by default; additional commands can be registered
-through the runtime's command registry. Following uses pathfinding without block breaking and stops
-if the target leaves, dies, or moves more than 50 blocks away. Send `$loginadmin <password>` in a
-private message to establish an admin session.
+`!help`, `!ping`, `!follow`, `!stopfollow`, `!roam`, `!stoproam`, and `!stop` by default; additional
+commands can be registered through the runtime's command registry. Following uses pathfinding
+without block breaking and stops if the target leaves, dies, or moves more than 50 blocks away.
+Admin users can start roaming with `!roam [radius] [interval-ms]` (defaults: 3 blocks and 7000 ms;
+valid ranges: 1–50 blocks and 1000–60000 ms); roaming uses no block breaking. Send
+`$loginadmin <password>` in a private message to establish an admin session.
 Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions,
 chat formats, command dispatch, typed argument validation, registry execution, permission checks,
-cooldowns, legacy migration, fact updates, persistence, and transport configuration.
+cooldowns, legacy migration, fact updates, persistence, transport configuration, and roaming bounds.
 The Rust bot can be started with `cargo run --manifest-path rust/Cargo.toml`; it reads the existing
 environment configuration, processes commands, and exits cleanly on Ctrl+C. The `Rust core` GitHub
 Actions workflow checks formatting, all targets, and tests on Windows.

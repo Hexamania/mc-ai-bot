@@ -13,7 +13,10 @@ use crate::{
     command_registry::{
         CommandContext, CommandDefinition, CommandRegistry, CommandRegistryError, CommandResult,
     },
-    commands::{ChatParser, ChatParserConfig, MessageType, PermissionConfig, PermissionManager},
+    commands::{
+        ChatParser, ChatParserConfig, MessageType, PermissionConfig, PermissionLevel,
+        PermissionManager,
+    },
     config::{AppConfig, BotConfig},
 };
 
@@ -81,7 +84,8 @@ impl MinecraftRuntime {
         let fatal_error = command_registry
             .register_help_command(chat_config.public_prefix.clone())
             .and_then(|_| command_registry.register_ping_command())
-            .and_then(|_| register_follow_commands(&command_registry, action_sender))
+            .and_then(|_| register_follow_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_roam_commands(&command_registry, action_sender))
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
 
@@ -370,6 +374,35 @@ impl MinecraftRuntime {
                         context.reply("Not following a player.");
                     }
                 }
+                RuntimeCommandAction::StartRoaming {
+                    radius,
+                    update_interval,
+                } => {
+                    if connection.start_roaming(radius, update_interval)? {
+                        context.reply(&format!(
+                            "🚶 Roaming started (radius {radius}, update every {} ms).",
+                            update_interval.as_millis()
+                        ));
+                    } else {
+                        let error =
+                            "Roaming is already active or the requested settings are invalid.";
+                        context.error(error);
+                        result.success = false;
+                        result.error = Some(error.to_owned());
+                    }
+                }
+                RuntimeCommandAction::StopRoaming => {
+                    if connection.stop_roaming() {
+                        context.reply("Stopped roaming.");
+                    } else {
+                        context.reply("Roaming is not active.");
+                    }
+                }
+                RuntimeCommandAction::StopAll => {
+                    connection.stop_following();
+                    connection.stop_roaming();
+                    context.reply("⛔ All movement operations halted.");
+                }
             }
         }
         Ok(())
@@ -412,8 +445,17 @@ impl MinecraftRuntime {
 
 #[derive(Clone, Debug, PartialEq)]
 enum RuntimeCommandAction {
-    Follow { target: String, range: f64 },
+    Follow {
+        target: String,
+        range: f64,
+    },
     StopFollowing,
+    StartRoaming {
+        radius: u32,
+        update_interval: Duration,
+    },
+    StopRoaming,
+    StopAll,
 }
 
 fn register_follow_commands(
@@ -483,6 +525,118 @@ fn register_follow_commands(
     stop_following.category = Some("Movement".to_owned());
     stop_following.permission = Some(PermissionConfig::default());
     registry.register(stop_following)?;
+    Ok(())
+}
+
+fn register_roam_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    let roam_sender = action_sender.clone();
+    let mut roam = CommandDefinition::new(
+        "roam",
+        "Start random roaming",
+        std::sync::Arc::new(move |context, _| {
+            let sender = roam_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 2 {
+                    return Err("Usage: roam [radius] [interval-ms]".to_owned());
+                }
+                let radius = match context.args.args.first() {
+                    Some(ArgumentValue::Number(radius))
+                        if radius.is_finite()
+                            && radius.fract() == 0.0
+                            && (1.0..=50.0).contains(radius) =>
+                    {
+                        *radius as u32
+                    }
+                    _ => return Err("Roam radius must be a whole number from 1 to 50.".to_owned()),
+                };
+                let interval = match context.args.args.get(1) {
+                    Some(ArgumentValue::Number(interval))
+                        if interval.is_finite()
+                            && interval.fract() == 0.0
+                            && (1_000.0..=60_000.0).contains(interval) =>
+                    {
+                        Duration::from_millis(*interval as u64)
+                    }
+                    _ => {
+                        return Err(
+                            "Roam interval must be a whole number from 1000 to 60000 ms."
+                                .to_owned(),
+                        )
+                    }
+                };
+                sender
+                    .send(RuntimeCommandAction::StartRoaming {
+                        radius,
+                        update_interval: interval,
+                    })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    roam.aliases = vec!["startroam".to_owned()];
+    roam.usage = Some("[radius] [interval-ms]".to_owned());
+    roam.category = Some("Movement".to_owned());
+    roam.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    roam.arguments = vec![
+        ArgumentDefinition::new("radius", ArgumentType::Number, false)
+            .with_default(ArgumentValue::Number(3.0))
+            .with_constraint(ArgumentConstraint::Integer)
+            .with_constraint(ArgumentConstraint::Minimum(1.0))
+            .with_constraint(ArgumentConstraint::Maximum(50.0)),
+        ArgumentDefinition::new("interval-ms", ArgumentType::Number, false)
+            .with_default(ArgumentValue::Number(7_000.0))
+            .with_constraint(ArgumentConstraint::Integer)
+            .with_constraint(ArgumentConstraint::Minimum(1_000.0))
+            .with_constraint(ArgumentConstraint::Maximum(60_000.0)),
+    ];
+    registry.register(roam)?;
+
+    let stop_roaming_sender = action_sender.clone();
+    let mut stop_roaming = CommandDefinition::new(
+        "stoproam",
+        "Stop roaming",
+        std::sync::Arc::new(move |context, _| {
+            let sender = stop_roaming_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stoproam".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopRoaming)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stop_roaming.aliases = vec!["unroam".to_owned()];
+    stop_roaming.category = Some("Movement".to_owned());
+    stop_roaming.permission = Some(PermissionConfig::default());
+    registry.register(stop_roaming)?;
+
+    let mut stop_all = CommandDefinition::new(
+        "stop",
+        "Stop all movement operations",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stop".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopAll)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stop_all.aliases = vec!["stopall".to_owned()];
+    stop_all.category = Some("Movement".to_owned());
+    stop_all.permission = Some(PermissionConfig::default());
+    registry.register(stop_all)?;
     Ok(())
 }
 
@@ -698,6 +852,99 @@ mod tests {
             receiver.try_recv().unwrap(),
             RuntimeCommandAction::StopFollowing
         );
+    }
+
+    #[test]
+    fn roam_commands_require_admin_and_schedule_valid_settings() {
+        let registry = CommandRegistry::default();
+        let (sender, receiver) = mpsc::channel();
+        register_roam_commands(&registry, sender).unwrap();
+        let mut guest_context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let denied_result = run(registry.execute("roam", &mut guest_context)).unwrap();
+        assert!(!denied_result.success);
+        assert!(receiver.try_recv().is_err());
+
+        let mut admin_context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let default_result = run(registry.execute("roam", &mut admin_context)).unwrap();
+        assert!(default_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::StartRoaming {
+                radius: 3,
+                update_interval: Duration::from_millis(7_000),
+            }
+        );
+
+        let mut custom_context = CommandContext::new(
+            "Alex",
+            vec!["12".to_owned(), "1500".to_owned()],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let custom_result = run(registry.execute("startroam", &mut custom_context)).unwrap();
+        assert!(custom_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::StartRoaming {
+                radius: 12,
+                update_interval: Duration::from_millis(1_500),
+            }
+        );
+
+        let mut invalid_context = CommandContext::new(
+            "Alex",
+            vec!["12".to_owned(), "999".to_owned()],
+            PermissionLevel::Admin,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let invalid_result = run(registry.execute("roam", &mut invalid_context)).unwrap();
+        assert!(!invalid_result.success);
+        assert!(receiver.try_recv().is_err());
+
+        let mut stop_context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let stop_result = run(registry.execute("unroam", &mut stop_context)).unwrap();
+        assert!(stop_result.success);
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::StopRoaming
+        );
+
+        let mut stop_all_context = CommandContext::new(
+            "Alex",
+            Vec::new(),
+            PermissionLevel::Guest,
+            false,
+            |_| {},
+            |_| {},
+        );
+        let stop_all_result = run(registry.execute("stopall", &mut stop_all_context)).unwrap();
+        assert!(stop_all_result.success);
+        assert_eq!(receiver.try_recv().unwrap(), RuntimeCommandAction::StopAll);
     }
 
     #[test]

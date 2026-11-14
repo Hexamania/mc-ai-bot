@@ -130,7 +130,7 @@ impl MinecraftConnection {
     pub fn position(&mut self) -> Option<Vec3> {
         let entity = self.client.entity;
         let position: Position = self.client.get_entity_component(entity)?;
-        Some(position.into())
+        Some(Vec3::from(&position))
     }
 
     pub fn inventory_snapshot(&self) -> Result<InventorySnapshot, MinecraftTransportError> {

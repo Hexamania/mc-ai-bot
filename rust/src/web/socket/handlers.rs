@@ -89,9 +89,11 @@ pub fn setup_main_namespace(
             }
 
             // Handle disconnection
-            socket.on_disconnect(move |_socket: SocketRef, _reason: socketioxide::socket::DisconnectReason| {
-                info!("[SOCKET] Dashboard disconnected");
-            });
+            socket.on_disconnect(
+                move |_socket: SocketRef, _reason: socketioxide::socket::DisconnectReason| {
+                    info!("[SOCKET] Dashboard disconnected");
+                },
+            );
         });
     });
 

@@ -1,3 +1,4 @@
+// Socket.io event handlers for web dashboard
 use axum::extract::State;
 use socketioxide::{
     SocketIo,

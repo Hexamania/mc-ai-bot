@@ -2,7 +2,6 @@
  * Authentication module for web server
  * JWT-based authentication with role-based access control
  */
-
 use axum::{
     extract::{FromRequestParts, Request, State},
     http::{header, HeaderMap, StatusCode},
@@ -77,7 +76,9 @@ pub enum AuthError {
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let (status, code, message) = match self {
-            AuthError::MissingToken => (StatusCode::UNAUTHORIZED, "AUTH_REQUIRED", self.to_string()),
+            AuthError::MissingToken => {
+                (StatusCode::UNAUTHORIZED, "AUTH_REQUIRED", self.to_string())
+            }
             AuthError::InvalidToken => (StatusCode::UNAUTHORIZED, "AUTH_INVALID", self.to_string()),
             AuthError::InsufficientPermissions => {
                 (StatusCode::FORBIDDEN, "AUTH_FORBIDDEN", self.to_string())
@@ -179,14 +180,11 @@ pub async fn auth_middleware(
         .get(header::COOKIE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    let query_token = request
-        .uri()
-        .query()
-        .and_then(|q| {
-            q.split('&')
-                .find(|p| p.starts_with("token="))
-                .map(|p| &p[6..])
-        });
+    let query_token = request.uri().query().and_then(|q| {
+        q.split('&')
+            .find(|p| p.starts_with("token="))
+            .map(|p| &p[6..])
+    });
 
     let token = extract_token(&headers, cookies, query_token).ok_or(AuthError::MissingToken)?;
     let claims = verify_token(&config, &token)?;
@@ -208,14 +206,11 @@ pub async fn optional_auth_middleware(
         .get(header::COOKIE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    let query_token = request
-        .uri()
-        .query()
-        .and_then(|q| {
-            q.split('&')
-                .find(|p| p.starts_with("token="))
-                .map(|p| &p[6..])
-        });
+    let query_token = request.uri().query().and_then(|q| {
+        q.split('&')
+            .find(|p| p.starts_with("token="))
+            .map(|p| &p[6..])
+    });
 
     if let Some(token) = extract_token(&headers, cookies, query_token) {
         if let Ok(claims) = verify_token(&config, &token) {
@@ -228,21 +223,23 @@ pub async fn optional_auth_middleware(
 
 /// Role-based authorization middleware
 pub fn require_role(allowed_roles: Vec<UserRole>) -> axum::middleware::Middleware<axum::Router> {
-    axum::middleware::from_fn(move |State(config): State<Arc<AppConfig>>, mut request: Request, next: Next| {
-        let allowed = allowed_roles.clone();
-        async move {
-            let claims = request
-                .extensions()
-                .get::<Claims>()
-                .ok_or(AuthError::MissingToken)?;
+    axum::middleware::from_fn(
+        move |State(config): State<Arc<AppConfig>>, mut request: Request, next: Next| {
+            let allowed = allowed_roles.clone();
+            async move {
+                let claims = request
+                    .extensions()
+                    .get::<Claims>()
+                    .ok_or(AuthError::MissingToken)?;
 
-            if !allowed.contains(&claims.role) {
-                return Err(AuthError::InsufficientPermissions);
+                if !allowed.contains(&claims.role) {
+                    return Err(AuthError::InsufficientPermissions);
+                }
+
+                Ok(next.run(request).await)
             }
-
-            Ok(next.run(request).await)
-        }
-    })
+        },
+    )
 }
 
 /// Admin only middleware
@@ -342,7 +339,10 @@ pub async fn me_handler(request: Request) -> Result<Json<MeResponse>, AuthError>
 }
 
 /// Socket.io authentication - extract token from handshake
-pub fn extract_socket_token(auth: Option<&serde_json::Value>, query: Option<&serde_json::Value>) -> Option<String> {
+pub fn extract_socket_token(
+    auth: Option<&serde_json::Value>,
+    query: Option<&serde_json::Value>,
+) -> Option<String> {
     // Check auth object
     if let Some(auth_obj) = auth {
         if let Some(token) = auth_obj.get("token").and_then(|v| v.as_str()) {

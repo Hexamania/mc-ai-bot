@@ -2,7 +2,6 @@
  * Rate limiting middleware for web server
  * Uses in-memory store with sliding window algorithm
  */
-
 use axum::{
     extract::{Request, State},
     http::{header, HeaderMap, StatusCode},
@@ -182,7 +181,9 @@ impl RateLimiter {
                 retry_after: retry_after.as_secs(),
                 limit: self.config.max_requests,
                 remaining: 0,
-                reset_time: (entry.window_start + self.config.window).elapsed().as_secs(),
+                reset_time: (entry.window_start + self.config.window)
+                    .elapsed()
+                    .as_secs(),
             });
         }
 
@@ -191,7 +192,9 @@ impl RateLimiter {
         Ok(RateLimitInfo {
             limit: self.config.max_requests,
             remaining: self.config.max_requests - entry.count,
-            reset_time: (entry.window_start + self.config.window).elapsed().as_secs(),
+            reset_time: (entry.window_start + self.config.window)
+                .elapsed()
+                .as_secs(),
         })
     }
 
@@ -207,7 +210,9 @@ impl RateLimiter {
                 Some(RateLimitInfo {
                     limit: self.config.max_requests,
                     remaining: self.config.max_requests.saturating_sub(entry.count),
-                    reset_time: (entry.window_start + self.config.window).elapsed().as_secs(),
+                    reset_time: (entry.window_start + self.config.window)
+                        .elapsed()
+                        .as_secs(),
                 })
             }
         })
@@ -256,10 +261,7 @@ impl IntoResponse for RateLimitExceeded {
             header::RETRY_AFTER,
             self.retry_after.to_string().parse().unwrap(),
         );
-        headers.insert(
-            "X-RateLimit-Limit",
-            self.limit.to_string().parse().unwrap(),
-        );
+        headers.insert("X-RateLimit-Limit", self.limit.to_string().parse().unwrap());
         headers.insert(
             "X-RateLimit-Remaining",
             self.remaining.to_string().parse().unwrap(),
@@ -293,23 +295,32 @@ pub async fn rate_limit_middleware(
     // Determine which limiter to use based on path
     let path = request.uri().path();
     let key = if path.starts_with("/api/auth/") {
-        limiters.auth.check(&default_key_generator(&request, request.headers())).await
+        limiters
+            .auth
+            .check(&default_key_generator(&request, request.headers()))
+            .await
     } else if path.starts_with("/api/commands/") || path == "/api/commands/execute" {
-        limiters.commands.check(&command_key_generator(&request, request.headers())).await
+        limiters
+            .commands
+            .check(&command_key_generator(&request, request.headers()))
+            .await
     } else if path.starts_with("/api/") {
-        limiters.api.check(&default_key_generator(&request, request.headers())).await
+        limiters
+            .api
+            .check(&default_key_generator(&request, request.headers()))
+            .await
     } else {
-        limiters.static_assets.check(&default_key_generator(&request, request.headers())).await
+        limiters
+            .static_assets
+            .check(&default_key_generator(&request, request.headers()))
+            .await
     };
 
     match key {
         Ok(info) => {
             let mut response = next.run(request).await;
             let headers = response.headers_mut();
-            headers.insert(
-                "X-RateLimit-Limit",
-                info.limit.to_string().parse().unwrap(),
-            );
+            headers.insert("X-RateLimit-Limit", info.limit.to_string().parse().unwrap());
             headers.insert(
                 "X-RateLimit-Remaining",
                 info.remaining.to_string().parse().unwrap(),

@@ -2,7 +2,6 @@
  * REST API routes for web server
  * Provides HTTP endpoints for bot state, memory, commands, and configuration
  */
-
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -21,7 +20,10 @@ use crate::{
     config::AppConfig,
     memory::Memory,
     web::{
-        auth::{auth_middleware, optional_auth_middleware, require_admin, require_trusted, Claims, UserRole},
+        auth::{
+            auth_middleware, optional_auth_middleware, require_admin, require_trusted, Claims,
+            UserRole,
+        },
         rate_limit::{create_rate_limiters, rate_limit_middleware, RateLimiters},
         WebState,
     },
@@ -169,63 +171,264 @@ pub fn create_api_router(state: Arc<WebState>) -> Router {
         // Health check (no auth required)
         .route("/health", get(health_check))
         // Bot status (optional auth)
-        .route("/status", get(bot_status).layer(middleware::from_fn_with_state(state.clone(), optional_auth_middleware)))
+        .route(
+            "/status",
+            get(bot_status).layer(middleware::from_fn_with_state(
+                state.clone(),
+                optional_auth_middleware,
+            )),
+        )
         // Bot state (auth required)
-        .route("/state", get(bot_state).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/state",
+            get(bot_state).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Bot vitals
-        .route("/vitals", get(bot_vitals).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/vitals",
+            get(bot_vitals).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Inventory
-        .route("/inventory", get(bot_inventory).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/inventory",
+            get(bot_inventory).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Equipment
-        .route("/equipment", get(bot_equipment).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/equipment",
+            get(bot_equipment).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Players
-        .route("/players", get(bot_players).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/players",
+            get(bot_players).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Map
-        .route("/map", get(bot_map).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/map",
+            get(bot_map).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Logs
-        .route("/logs", get(bot_logs).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/logs",
+            get(bot_logs).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Settings
         .route(
             "/settings",
             get(get_settings)
-                .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
+                .layer(middleware::from_fn_with_state(
+                    state.clone(),
+                    auth_middleware,
+                ))
                 .patch(update_settings)
-                .layer(middleware::from_fn_with_state(state.clone(), require_trusted()))
+                .layer(middleware::from_fn_with_state(
+                    state.clone(),
+                    require_trusted(),
+                )),
         )
         // Locations
-        .route("/locations", get(get_locations).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/locations", post(save_location).layer(middleware::from_fn_with_state(state.clone(), require_trusted())))
-        .route("/locations/:name", delete(delete_location).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
+        .route(
+            "/locations",
+            get(get_locations).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/locations",
+            post(save_location).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_trusted(),
+            )),
+        )
+        .route(
+            "/locations/:name",
+            delete(delete_location).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
         // Memory
-        .route("/memory", get(get_memory).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/memory/context", get(get_memory_context).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/memory/facts", get(get_memory_facts).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/memory/facts", post(add_memory_fact).layer(middleware::from_fn_with_state(state.clone(), require_trusted())))
-        .route("/memory/facts/:key", delete(delete_memory_fact).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
-        .route("/memory/rules", get(get_memory_rules).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/memory/rules", post(add_memory_rule).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
-        .route("/memory/rules/:rule", delete(delete_memory_rule).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
-        .route("/memory/task", get(get_memory_task).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/memory/players", get(get_memory_players).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/memory/save", post(save_memory).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
-        .route("/memory/clear", post(clear_memory).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
+        .route(
+            "/memory",
+            get(get_memory).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/memory/context",
+            get(get_memory_context).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/memory/facts",
+            get(get_memory_facts).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/memory/facts",
+            post(add_memory_fact).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_trusted(),
+            )),
+        )
+        .route(
+            "/memory/facts/:key",
+            delete(delete_memory_fact).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
+        .route(
+            "/memory/rules",
+            get(get_memory_rules).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/memory/rules",
+            post(add_memory_rule).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
+        .route(
+            "/memory/rules/:rule",
+            delete(delete_memory_rule).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
+        .route(
+            "/memory/task",
+            get(get_memory_task).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/memory/players",
+            get(get_memory_players).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/memory/save",
+            post(save_memory).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
+        .route(
+            "/memory/clear",
+            post(clear_memory).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
         // Commands
-        .route("/commands", get(get_commands).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/commands/execute", post(execute_command).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/commands",
+            get(get_commands).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/commands/execute",
+            post(execute_command).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Config
-        .route("/config", get(get_config).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
+        .route(
+            "/config",
+            get(get_config).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
         // Stats
-        .route("/stats", get(get_stats).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
+        .route(
+            "/stats",
+            get(get_stats).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
         // Chat
-        .route("/chat", get(get_chat).layer(middleware::from_fn_with_state(state.clone(), auth_middleware)))
-        .route("/chat", post(send_chat).layer(middleware::from_fn_with_state(state.clone(), require_trusted())))
+        .route(
+            "/chat",
+            get(get_chat).layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            )),
+        )
+        .route(
+            "/chat",
+            post(send_chat).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_trusted(),
+            )),
+        )
         // Console
-        .route("/console", post(execute_console).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
+        .route(
+            "/console",
+            post(execute_console).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
         // Bot control
-        .route("/bot/restart", post(restart_bot).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
-        .route("/bot/shutdown", post(shutdown_bot).layer(middleware::from_fn_with_state(state.clone(), require_admin())))
+        .route(
+            "/bot/restart",
+            post(restart_bot).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
+        .route(
+            "/bot/shutdown",
+            post(shutdown_bot).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin(),
+            )),
+        )
         // Global rate limiting
-        .layer(middleware::from_fn_with_state(rate_limiters, rate_limit_middleware))
+        .layer(middleware::from_fn_with_state(
+            rate_limiters,
+            rate_limit_middleware,
+        ))
         .with_state(state)
 }
 
@@ -244,7 +447,9 @@ async fn health_check() -> Json<HealthResponse> {
 }
 
 /// Get bot status
-async fn bot_status(State(state): State<Arc<WebState>>) -> Result<Json<StatusResponse>, ErrorResponse> {
+async fn bot_status(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<StatusResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let status = runtime.get_status().await;
@@ -262,7 +467,9 @@ async fn bot_status(State(state): State<Arc<WebState>>) -> Result<Json<StatusRes
 }
 
 /// Get full bot state
-async fn bot_state(State(state): State<Arc<WebState>>) -> Result<Json<StatusResponse>, ErrorResponse> {
+async fn bot_state(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<StatusResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let bot_state = runtime.get_state().await;
@@ -280,7 +487,9 @@ async fn bot_state(State(state): State<Arc<WebState>>) -> Result<Json<StatusResp
 }
 
 /// Get bot vitals
-async fn bot_vitals(State(state): State<Arc<WebState>>) -> Result<Json<VitalsResponse>, ErrorResponse> {
+async fn bot_vitals(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<VitalsResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let vitals = runtime.get_vitals().await;
@@ -298,7 +507,9 @@ async fn bot_vitals(State(state): State<Arc<WebState>>) -> Result<Json<VitalsRes
 }
 
 /// Get bot inventory
-async fn bot_inventory(State(state): State<Arc<WebState>>) -> Result<Json<InventoryResponse>, ErrorResponse> {
+async fn bot_inventory(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<InventoryResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let inventory = runtime.get_inventory().await;
@@ -316,7 +527,9 @@ async fn bot_inventory(State(state): State<Arc<WebState>>) -> Result<Json<Invent
 }
 
 /// Get bot equipment
-async fn bot_equipment(State(state): State<Arc<WebState>>) -> Result<Json<EquipmentResponse>, ErrorResponse> {
+async fn bot_equipment(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<EquipmentResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let equipment = runtime.get_equipment().await;
@@ -334,7 +547,9 @@ async fn bot_equipment(State(state): State<Arc<WebState>>) -> Result<Json<Equipm
 }
 
 /// Get players
-async fn bot_players(State(state): State<Arc<WebState>>) -> Result<Json<PlayersResponse>, ErrorResponse> {
+async fn bot_players(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<PlayersResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let players = runtime.get_players().await;
@@ -364,7 +579,10 @@ async fn bot_map(
 ) -> Result<Json<MapResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
-        let radius = params.get("radius").and_then(|s| s.parse().ok()).unwrap_or(15);
+        let radius = params
+            .get("radius")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(15);
         let map_data = runtime.get_map(radius).await;
         Ok(Json(MapResponse {
             success: true,
@@ -386,7 +604,10 @@ async fn bot_logs(
 ) -> Result<Json<LogsResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
-        let limit = params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100);
+        let limit = params
+            .get("limit")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(100);
         let logs = runtime.get_logs(limit).await;
         Ok(Json(LogsResponse {
             success: true,
@@ -405,7 +626,9 @@ async fn bot_logs(
 }
 
 /// Get settings
-async fn get_settings(State(state): State<Arc<WebState>>) -> Result<Json<SettingsResponse>, ErrorResponse> {
+async fn get_settings(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<SettingsResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let settings = runtime.get_settings().await;
@@ -444,8 +667,12 @@ async fn update_settings(
 }
 
 /// Get locations
-async fn get_locations(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn get_locations(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.locations,
@@ -465,22 +692,37 @@ async fn save_location(
         });
     }
 
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let pos = payload.position.unwrap_or_else(|| {
         if let Some(runtime_arc) = state.runtime.as_ref() {
             let runtime = runtime_arc.read().await;
             runtime.get_position_blocking()
         } else {
-            crate::web::socket::events::BotPosition { x: 0.0, y: 0.0, z: 0.0 }
+            crate::web::socket::events::BotPosition {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            }
         }
     });
 
-    memory.save_location(&payload.name, pos, payload.location_type.unwrap_or_else(|| "waypoint".to_string()));
-    memory.save(&state.config.memory.file_path).await.map_err(|e| ErrorResponse {
-        success: false,
-        error: e.to_string(),
-        code: "INTERNAL_ERROR".to_string(),
-    })?;
+    memory.save_location(
+        &payload.name,
+        pos,
+        payload
+            .location_type
+            .unwrap_or_else(|| "waypoint".to_string()),
+    );
+    memory
+        .save(&state.config.memory.file_path)
+        .await
+        .map_err(|e| ErrorResponse {
+            success: false,
+            error: e.to_string(),
+            code: "INTERNAL_ERROR".to_string(),
+        })?;
 
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
@@ -498,15 +740,20 @@ async fn delete_location(
     State(state): State<Arc<WebState>>,
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
 
     if memory.locations.contains_key(&name) {
         memory.locations.remove(&name);
-        memory.save(&state.config.memory.file_path).await.map_err(|e| ErrorResponse {
-            success: false,
-            error: e.to_string(),
-            code: "INTERNAL_ERROR".to_string(),
-        })?;
+        memory
+            .save(&state.config.memory.file_path)
+            .await
+            .map_err(|e| ErrorResponse {
+                success: false,
+                error: e.to_string(),
+                code: "INTERNAL_ERROR".to_string(),
+            })?;
 
         Ok(Json(json!({
             "success": true,
@@ -522,8 +769,12 @@ async fn delete_location(
 }
 
 /// Get all memory
-async fn get_memory(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn get_memory(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory,
@@ -531,8 +782,12 @@ async fn get_memory(State(state): State<Arc<WebState>>) -> Result<Json<serde_jso
 }
 
 /// Get memory context for AI
-async fn get_memory_context(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn get_memory_context(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let context = memory.get_context();
     Ok(Json(json!({
         "success": true,
@@ -541,8 +796,12 @@ async fn get_memory_context(State(state): State<Arc<WebState>>) -> Result<Json<s
 }
 
 /// Get memory facts
-async fn get_memory_facts(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn get_memory_facts(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.learned_facts,
@@ -562,13 +821,18 @@ async fn add_memory_fact(
         });
     }
 
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let success = memory.remember_fact(&payload.key, &payload.fact);
-    memory.save(&state.config.memory.file_path).await.map_err(|e| ErrorResponse {
-        success: false,
-        error: e.to_string(),
-        code: "INTERNAL_ERROR".to_string(),
-    })?;
+    memory
+        .save(&state.config.memory.file_path)
+        .await
+        .map_err(|e| ErrorResponse {
+            success: false,
+            error: e.to_string(),
+            code: "INTERNAL_ERROR".to_string(),
+        })?;
 
     Ok(Json(json!({
         "success": success,
@@ -581,13 +845,18 @@ async fn delete_memory_fact(
     State(state): State<Arc<WebState>>,
     axum::extract::Path(key): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let success = memory.forget_fact(&key);
-    memory.save(&state.config.memory.file_path).await.map_err(|e| ErrorResponse {
-        success: false,
-        error: e.to_string(),
-        code: "INTERNAL_ERROR".to_string(),
-    })?;
+    memory
+        .save(&state.config.memory.file_path)
+        .await
+        .map_err(|e| ErrorResponse {
+            success: false,
+            error: e.to_string(),
+            code: "INTERNAL_ERROR".to_string(),
+        })?;
 
     Ok(Json(json!({
         "success": success,
@@ -596,8 +865,12 @@ async fn delete_memory_fact(
 }
 
 /// Get memory rules
-async fn get_memory_rules(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn get_memory_rules(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.rules,
@@ -617,13 +890,18 @@ async fn add_memory_rule(
         });
     }
 
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let success = memory.add_rule(&payload.rule);
-    memory.save(&state.config.memory.file_path).await.map_err(|e| ErrorResponse {
-        success: false,
-        error: e.to_string(),
-        code: "INTERNAL_ERROR".to_string(),
-    })?;
+    memory
+        .save(&state.config.memory.file_path)
+        .await
+        .map_err(|e| ErrorResponse {
+            success: false,
+            error: e.to_string(),
+            code: "INTERNAL_ERROR".to_string(),
+        })?;
 
     Ok(Json(json!({
         "success": success,
@@ -636,13 +914,18 @@ async fn delete_memory_rule(
     State(state): State<Arc<WebState>>,
     axum::extract::Path(rule): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let success = memory.remove_rule(&rule);
-    memory.save(&state.config.memory.file_path).await.map_err(|e| ErrorResponse {
-        success: false,
-        error: e.to_string(),
-        code: "INTERNAL_ERROR".to_string(),
-    })?;
+    memory
+        .save(&state.config.memory.file_path)
+        .await
+        .map_err(|e| ErrorResponse {
+            success: false,
+            error: e.to_string(),
+            code: "INTERNAL_ERROR".to_string(),
+        })?;
 
     Ok(Json(json!({
         "success": success,
@@ -651,8 +934,12 @@ async fn delete_memory_rule(
 }
 
 /// Get memory current task
-async fn get_memory_task(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn get_memory_task(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.current_task,
@@ -660,8 +947,12 @@ async fn get_memory_task(State(state): State<Arc<WebState>>) -> Result<Json<serd
 }
 
 /// Get memory players
-async fn get_memory_players(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn get_memory_players(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.players,
@@ -669,8 +960,12 @@ async fn get_memory_players(State(state): State<Arc<WebState>>) -> Result<Json<s
 }
 
 /// Save memory
-async fn save_memory(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn save_memory(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let success = memory.save(&state.config.memory.file_path).await.is_ok();
     Ok(Json(json!({
         "success": success,
@@ -679,8 +974,12 @@ async fn save_memory(State(state): State<Arc<WebState>>) -> Result<Json<serde_js
 }
 
 /// Clear memory
-async fn clear_memory(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path).await.unwrap_or_default();
+async fn clear_memory(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
+    let mut memory = Memory::load(&state.config.memory.file_path)
+        .await
+        .unwrap_or_default();
     let success = memory.clear().is_ok();
     Ok(Json(json!({
         "success": success,
@@ -689,7 +988,9 @@ async fn clear_memory(State(state): State<Arc<WebState>>) -> Result<Json<serde_j
 }
 
 /// Get commands list
-async fn get_commands(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
+async fn get_commands(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let commands = runtime.get_command_definitions().await;
@@ -732,7 +1033,10 @@ async fn execute_command(
         let runtime = runtime_arc.read().await;
         let args: Vec<String> = match &payload.args {
             Some(serde_json::Value::String(s)) => vec![s.clone()],
-            Some(serde_json::Value::Array(arr)) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
+            Some(serde_json::Value::Array(arr)) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect(),
             _ => vec![],
         };
 
@@ -764,7 +1068,9 @@ async fn execute_command(
 }
 
 /// Get config (safe version)
-async fn get_config(State(state): State<Arc<WebState>>) -> Result<Json<ConfigResponse>, ErrorResponse> {
+async fn get_config(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<ConfigResponse>, ErrorResponse> {
     let config = &state.config;
     let safe_config = json!({
         "bot": {
@@ -792,7 +1098,9 @@ async fn get_config(State(state): State<Arc<WebState>>) -> Result<Json<ConfigRes
 }
 
 /// Get stats
-async fn get_stats(State(state): State<Arc<WebState>>) -> Result<Json<StatsResponse>, ErrorResponse> {
+async fn get_stats(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<StatsResponse>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let bot_state = runtime.get_state().await;
@@ -837,7 +1145,9 @@ async fn get_stats(State(state): State<Arc<WebState>>) -> Result<Json<StatsRespo
 }
 
 /// Get chat history
-async fn get_chat(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
+async fn get_chat(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         let limit = 50;
@@ -870,11 +1180,14 @@ async fn send_chat(
 
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
-        runtime.send_chat(&payload.message).await.map_err(|e| ErrorResponse {
-            success: false,
-            error: e.to_string(),
-            code: "INTERNAL_ERROR".to_string(),
-        })?;
+        runtime
+            .send_chat(&payload.message)
+            .await
+            .map_err(|e| ErrorResponse {
+                success: false,
+                error: e.to_string(),
+                code: "INTERNAL_ERROR".to_string(),
+            })?;
         Ok(Json(json!({
             "success": true,
             "message": "Chat message sent",
@@ -903,11 +1216,14 @@ async fn execute_console(
 
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
-        runtime.execute_command(&format!("/{}", payload.command)).await.map_err(|e| ErrorResponse {
-            success: false,
-            error: e.to_string(),
-            code: "INTERNAL_ERROR".to_string(),
-        })?;
+        runtime
+            .execute_command(&format!("/{}", payload.command))
+            .await
+            .map_err(|e| ErrorResponse {
+                success: false,
+                error: e.to_string(),
+                code: "INTERNAL_ERROR".to_string(),
+            })?;
         Ok(Json(json!({
             "success": true,
             "message": format!("Executed: /{}", payload.command),
@@ -922,7 +1238,9 @@ async fn execute_console(
 }
 
 /// Restart bot
-async fn restart_bot(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
+async fn restart_bot(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime.restart().await;
@@ -940,7 +1258,9 @@ async fn restart_bot(State(state): State<Arc<WebState>>) -> Result<Json<serde_js
 }
 
 /// Shutdown bot
-async fn shutdown_bot(State(state): State<Arc<WebState>>) -> Result<Json<serde_json::Value>, ErrorResponse> {
+async fn shutdown_bot(
+    State(state): State<Arc<WebState>>,
+) -> Result<Json<serde_json::Value>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.as_ref() {
         let runtime = runtime_arc.read().await;
         runtime.shutdown().await;

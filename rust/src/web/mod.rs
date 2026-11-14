@@ -2,7 +2,6 @@
  * Web server module for mc-ai-bot
  * Axum server with Socket.io for real-time dashboard
  */
-
 pub mod auth;
 pub mod rate_limit;
 pub mod routes;
@@ -48,5 +47,5 @@ impl WebState {
 }
 
 pub use auth::{generate_token, verify_token, Claims, TokenPayload};
-pub use rate_limit::{RateLimiter, RateLimitConfig, RateLimitKey};
+pub use rate_limit::{RateLimitConfig, RateLimitKey, RateLimiter};
 pub use server::WebServer;

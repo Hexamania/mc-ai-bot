@@ -22,8 +22,11 @@ pub trait Feature: Send + Sync + Debug {
     fn dependencies(&self) -> &[String];
     fn enabled(&self) -> bool;
 
-    async fn initialize(&self, bot: &mut MinecraftConnection, runtime: &mut MinecraftRuntime)
-    -> Result<(), String>;
+    async fn initialize(
+        &self,
+        bot: &mut MinecraftConnection,
+        runtime: &mut MinecraftRuntime,
+    ) -> Result<(), String>;
     async fn shutdown(&self) -> Result<(), String>;
 
     fn enable(&mut self) -> Result<(), String> {
@@ -63,7 +66,11 @@ impl FeatureRegistry {
     pub fn register(&mut self, feature: Arc<dyn Feature>) -> Result<(), String> {
         let name = feature.name().to_lowercase();
 
-        if !feature.name().chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+        if !feature
+            .name()
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
             return Err("Feature name must be alphanumeric with underscores or hyphens".to_owned());
         }
 
@@ -231,7 +238,13 @@ impl FeatureRegistry {
         }
 
         for name in self.features.keys() {
-            visit(name, &self.features, &mut visited, &mut visiting, &mut result)?;
+            visit(
+                name,
+                &self.features,
+                &mut visited,
+                &mut visiting,
+                &mut result,
+            )?;
         }
 
         Ok(result)
@@ -649,7 +662,9 @@ mod tests {
     async fn test_feature_registry_dependencies() {
         let mut registry = FeatureRegistry::new();
         registry.register(Arc::new(CoreFeature::default())).unwrap();
-        registry.register(Arc::new(MovementFeature::default())).unwrap();
+        registry
+            .register(Arc::new(MovementFeature::default()))
+            .unwrap();
 
         let deps = registry.get_dependencies("movement");
         assert!(deps.contains(&"core".to_owned()));
@@ -659,8 +674,12 @@ mod tests {
     async fn test_topological_sort() {
         let mut registry = FeatureRegistry::new();
         registry.register(Arc::new(CoreFeature::default())).unwrap();
-        registry.register(Arc::new(MovementFeature::default())).unwrap();
-        registry.register(Arc::new(CombatFeature::default())).unwrap();
+        registry
+            .register(Arc::new(MovementFeature::default()))
+            .unwrap();
+        registry
+            .register(Arc::new(CombatFeature::default()))
+            .unwrap();
 
         let sorted = registry.topological_sort().unwrap();
         // core should come before movement, movement before combat

@@ -1,7 +1,4 @@
-use std::{
-    sync::mpsc,
-    time::Duration,
-};
+use std::{sync::mpsc, time::Duration};
 
 use thiserror::Error;
 use tokio::time::sleep;
@@ -24,8 +21,8 @@ use crate::{
         PermissionManager,
     },
     config::{AppConfig, BotConfig},
-    features::{FeatureRegistry, register_builtin_features},
-    memory::{default_memory, load_memory, remember_fact, forget_fact, save_memory, MemoryError},
+    features::{register_builtin_features, FeatureRegistry},
+    memory::{default_memory, forget_fact, load_memory, remember_fact, save_memory, MemoryError},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -100,7 +97,9 @@ impl MinecraftRuntime {
             .and_then(|_| register_inventory_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_mining_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_base_commands(&command_registry, action_sender.clone()))
-            .and_then(|_| register_mining_feature_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| {
+                register_mining_feature_commands(&command_registry, action_sender.clone())
+            })
             .and_then(|_| register_building_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_combat_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_utility_commands(&command_registry, action_sender.clone()))
@@ -345,7 +344,12 @@ impl MinecraftRuntime {
     }
 
     /// Save location
-    pub fn save_location(&mut self, name: &str, pos: crate::web::socket::events::BotPosition, location_type: &str) {
+    pub fn save_location(
+        &mut self,
+        name: &str,
+        pos: crate::web::socket::events::BotPosition,
+        location_type: &str,
+    ) {
         if let Some(connection) = self.connection.as_mut() {
             connection.save_location(name, pos, location_type);
         }
@@ -879,20 +883,31 @@ impl MinecraftRuntime {
                         result.success = false;
                         result.error = Some(e);
                     } else {
-                        context.reply(&format!("⛏️ Starting {length} block tunnel to the {direction}..."));
+                        context.reply(&format!(
+                            "⛏️ Starting {length} block tunnel to the {direction}..."
+                        ));
                     }
                 }
                 RuntimeCommandAction::StopMiner => {
                     connection.stop_miner();
                     context.reply("⛏️ Miner stopped.");
                 }
-                RuntimeCommandAction::StartMineArea { x1, y1, z1, x2, y2, z2 } => {
+                RuntimeCommandAction::StartMineArea {
+                    x1,
+                    y1,
+                    z1,
+                    x2,
+                    y2,
+                    z2,
+                } => {
                     if let Err(e) = connection.start_mine_area(x1, y1, z1, x2, y2, z2) {
                         context.error(&e);
                         result.success = false;
                         result.error = Some(e);
                     } else {
-                        context.reply(&format!("⛏️ Mining area from ({x1},{y1},{z1}) to ({x2},{y2},{z2})."));
+                        context.reply(&format!(
+                            "⛏️ Mining area from ({x1},{y1},{z1}) to ({x2},{y2},{z2})."
+                        ));
                     }
                 }
                 RuntimeCommandAction::StopMineArea => {
@@ -971,28 +986,27 @@ impl MinecraftRuntime {
                 RuntimeCommandAction::Remember { key, fact } => {
                     let memory_path = "./memory.json";
                     match load_memory(memory_path) {
-                        Ok(mut memory) => {
-                            match remember_fact(&mut memory, &key, &fact) {
-                                Ok(true) => {
-                                    if let Err(e) = save_memory(memory_path, &memory) {
-                                        context.error(&format!("Failed to save memory: {e}"));
-                                        result.success = false;
-                                        result.error = Some(e.to_string());
-                                    } else {
-                                        context.private_reply(&format!("🧠 Remembered: {key}"));
-                                    }
-                                }
-                                Ok(false) => {
-                                    context.private_reply("Memory is disabled or the key/fact is empty.");
-                                    result.success = false;
-                                }
-                                Err(e) => {
-                                    context.error(&format!("Failed to remember: {e}"));
+                        Ok(mut memory) => match remember_fact(&mut memory, &key, &fact) {
+                            Ok(true) => {
+                                if let Err(e) = save_memory(memory_path, &memory) {
+                                    context.error(&format!("Failed to save memory: {e}"));
                                     result.success = false;
                                     result.error = Some(e.to_string());
+                                } else {
+                                    context.private_reply(&format!("🧠 Remembered: {key}"));
                                 }
                             }
-                        }
+                            Ok(false) => {
+                                context
+                                    .private_reply("Memory is disabled or the key/fact is empty.");
+                                result.success = false;
+                            }
+                            Err(e) => {
+                                context.error(&format!("Failed to remember: {e}"));
+                                result.success = false;
+                                result.error = Some(e.to_string());
+                            }
+                        },
                         Err(e) => {
                             context.error(&format!("Failed to load memory: {e}"));
                             result.success = false;
@@ -1003,28 +1017,28 @@ impl MinecraftRuntime {
                 RuntimeCommandAction::Forget { key } => {
                     let memory_path = "./memory.json";
                     match load_memory(memory_path) {
-                        Ok(mut memory) => {
-                            match forget_fact(&mut memory, &key) {
-                                Ok(true) => {
-                                    if let Err(e) = save_memory(memory_path, &memory) {
-                                        context.error(&format!("Failed to save memory: {e}"));
-                                        result.success = false;
-                                        result.error = Some(e.to_string());
-                                    } else {
-                                        context.private_reply(&format!("🧠 Forgot: {key}"));
-                                    }
-                                }
-                                Ok(false) => {
-                                    context.private_reply("Memory is disabled or that fact was not found.");
-                                    result.success = false;
-                                }
-                                Err(e) => {
-                                    context.error(&format!("Failed to forget: {e}"));
+                        Ok(mut memory) => match forget_fact(&mut memory, &key) {
+                            Ok(true) => {
+                                if let Err(e) = save_memory(memory_path, &memory) {
+                                    context.error(&format!("Failed to save memory: {e}"));
                                     result.success = false;
                                     result.error = Some(e.to_string());
+                                } else {
+                                    context.private_reply(&format!("🧠 Forgot: {key}"));
                                 }
                             }
-                        }
+                            Ok(false) => {
+                                context.private_reply(
+                                    "Memory is disabled or that fact was not found.",
+                                );
+                                result.success = false;
+                            }
+                            Err(e) => {
+                                context.error(&format!("Failed to forget: {e}"));
+                                result.success = false;
+                                result.error = Some(e.to_string());
+                            }
+                        },
                         Err(e) => {
                             context.error(&format!("Failed to load memory: {e}"));
                             result.success = false;
@@ -1035,7 +1049,9 @@ impl MinecraftRuntime {
                 // Chat/OpenAI
                 RuntimeCommandAction::Chat { message } => {
                     // This would need OpenAI integration - for now just acknowledge
-                    context.private_reply(&format!("💬 Chat received: {message} (OpenAI integration pending)"));
+                    context.private_reply(&format!(
+                        "💬 Chat received: {message} (OpenAI integration pending)"
+                    ));
                 }
                 // Server command
                 RuntimeCommandAction::ServerCommand { command } => {
@@ -1082,10 +1098,16 @@ impl MinecraftRuntime {
                     let commands = connection.command_registry().get_all().unwrap_or_default();
                     let cmd_list = commands
                         .iter()
-                        .map(|c| format!("  {} - {}", c.name, c.description.as_deref().unwrap_or("")))
+                        .map(|c| {
+                            format!("  {} - {}", c.name, c.description.as_deref().unwrap_or(""))
+                        })
                         .collect::<Vec<_>>()
                         .join("\n");
-                    context.private_reply(&format!("📋 **Available Commands** ({}):\n{}", commands.len(), cmd_list));
+                    context.private_reply(&format!(
+                        "📋 **Available Commands** ({}):\n{}",
+                        commands.len(),
+                        cmd_list
+                    ));
                 }
                 // Rescue/Survival commands
                 RuntimeCommandAction::Rescue { target } => {
@@ -1143,7 +1165,9 @@ impl MinecraftRuntime {
         }
 
         // Shutdown features
-        if let Err(e) = tokio::runtime::Handle::current().block_on(self.feature_registry.shutdown_all()) {
+        if let Err(e) =
+            tokio::runtime::Handle::current().block_on(self.feature_registry.shutdown_all())
+        {
             log::error!("[FEATURES] Error during feature shutdown: {}", e);
         }
 
@@ -1847,13 +1871,25 @@ fn register_mining_feature_commands(
                     return Err("Usage: miner <north|south|east|west> [length]".to_owned());
                 }
                 let direction = match context.args.args.first() {
-                    Some(ArgumentValue::String(d)) if ["north", "south", "east", "west"].contains(&d.as_str()) => d.clone(),
-                    Some(_) => return Err("Direction must be north, south, east, or west.".to_owned()),
+                    Some(ArgumentValue::String(d))
+                        if ["north", "south", "east", "west"].contains(&d.as_str()) =>
+                    {
+                        d.clone()
+                    }
+                    Some(_) => {
+                        return Err("Direction must be north, south, east, or west.".to_owned())
+                    }
                     None => return Err("A direction is required.".to_owned()),
                 };
                 let length = match context.args.args.get(1) {
-                    Some(ArgumentValue::Number(l)) if l.is_finite() && l.fract() == 0.0 && (1.0..=1000.0).contains(l) => *l as u32,
-                    Some(_) => return Err("Length must be a whole number from 1 to 1000.".to_owned()),
+                    Some(ArgumentValue::Number(l))
+                        if l.is_finite() && l.fract() == 0.0 && (1.0..=1000.0).contains(l) =>
+                    {
+                        *l as u32
+                    }
+                    Some(_) => {
+                        return Err("Length must be a whole number from 1 to 1000.".to_owned())
+                    }
                     None => 10,
                 };
                 sender
@@ -1911,14 +1947,17 @@ fn register_mining_feature_commands(
                 if context.raw_args.len() != 6 {
                     return Err("Usage: minearea <x1> <y1> <z1> <x2> <y2> <z2>".to_owned());
                 }
-                let coords: Result<Vec<i32>, _> = context.raw_args.iter()
-                    .map(|s| s.parse::<i32>())
-                    .collect();
+                let coords: Result<Vec<i32>, _> =
+                    context.raw_args.iter().map(|s| s.parse::<i32>()).collect();
                 let coords = coords.map_err(|_| "All coordinates must be integers.".to_owned())?;
                 sender
                     .send(RuntimeCommandAction::StartMineArea {
-                        x1: coords[0], y1: coords[1], z1: coords[2],
-                        x2: coords[3], y2: coords[4], z2: coords[5],
+                        x1: coords[0],
+                        y1: coords[1],
+                        z1: coords[2],
+                        x2: coords[3],
+                        y2: coords[4],
+                        z2: coords[5],
                     })
                     .map_err(|error| error.to_string())
             })
@@ -1931,12 +1970,18 @@ fn register_mining_feature_commands(
         ..PermissionConfig::default()
     });
     mine_area.arguments = vec![
-        ArgumentDefinition::new("x1", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
-        ArgumentDefinition::new("y1", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
-        ArgumentDefinition::new("z1", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
-        ArgumentDefinition::new("x2", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
-        ArgumentDefinition::new("y2", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
-        ArgumentDefinition::new("z2", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("x1", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("y1", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("z1", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("x2", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("y2", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("z2", ArgumentType::Number, true)
+            .with_constraint(ArgumentConstraint::Integer),
     ];
     registry.register(mine_area)?;
 
@@ -1994,7 +2039,11 @@ fn register_mining_feature_commands(
                     return Err("Usage: lumberjack [radius]".to_owned());
                 }
                 let radius = match context.args.args.first() {
-                    Some(ArgumentValue::Number(r)) if r.is_finite() && r.fract() == 0.0 && (1.0..=50.0).contains(r) => *r as u32,
+                    Some(ArgumentValue::Number(r))
+                        if r.is_finite() && r.fract() == 0.0 && (1.0..=50.0).contains(r) =>
+                    {
+                        *r as u32
+                    }
                     Some(_) => return Err("Radius must be a whole number from 1 to 50.".to_owned()),
                     None => 5,
                 };
@@ -2034,7 +2083,11 @@ fn register_building_commands(
                     return Err("Usage: roof [radius]".to_owned());
                 }
                 let radius = match context.args.args.first() {
-                    Some(ArgumentValue::Number(r)) if r.is_finite() && r.fract() == 0.0 && (1.0..=50.0).contains(r) => *r as u32,
+                    Some(ArgumentValue::Number(r))
+                        if r.is_finite() && r.fract() == 0.0 && (1.0..=50.0).contains(r) =>
+                    {
+                        *r as u32
+                    }
                     Some(_) => return Err("Radius must be a whole number from 1 to 50.".to_owned()),
                     None => 5,
                 };
@@ -2126,7 +2179,9 @@ fn register_combat_commands(
                     return Err("A player name is required.".to_owned());
                 };
                 sender
-                    .send(RuntimeCommandAction::StartPvp { target: target.clone() })
+                    .send(RuntimeCommandAction::StartPvp {
+                        target: target.clone(),
+                    })
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2137,7 +2192,11 @@ fn register_combat_commands(
         level: PermissionLevel::Admin,
         ..PermissionConfig::default()
     });
-    pvp.arguments = vec![ArgumentDefinition::new("player", ArgumentType::String, true)];
+    pvp.arguments = vec![ArgumentDefinition::new(
+        "player",
+        ArgumentType::String,
+        true,
+    )];
     registry.register(pvp)?;
 
     // stoppvp - Stop PVP
@@ -2259,7 +2318,7 @@ fn register_memory_commands(
                 let content = context.raw_args.join(" ");
                 let separator = content.find('=').ok_or("Usage: remember <key>=<fact>")?;
                 let key = content[..separator].trim().to_owned();
-                let fact = content[separator+1..].trim().to_owned();
+                let fact = content[separator + 1..].trim().to_owned();
                 if key.is_empty() || fact.is_empty() {
                     return Err("Key and fact cannot be empty.".to_owned());
                 }
@@ -2484,7 +2543,9 @@ fn register_general_commands(
                     return Err("A player name is required.".to_owned());
                 };
                 sender
-                    .send(RuntimeCommandAction::Rescue { target: target.clone() })
+                    .send(RuntimeCommandAction::Rescue {
+                        target: target.clone(),
+                    })
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2492,7 +2553,11 @@ fn register_general_commands(
     rescue.usage = Some("<player>".to_owned());
     rescue.category = Some("Survival".to_owned());
     rescue.permission = Some(PermissionConfig::default());
-    rescue.arguments = vec![ArgumentDefinition::new("player", ArgumentType::Player, true)];
+    rescue.arguments = vec![ArgumentDefinition::new(
+        "player",
+        ArgumentType::Player,
+        true,
+    )];
     registry.register(rescue)?;
 
     // medic - Medic mode for a player
@@ -2509,7 +2574,9 @@ fn register_general_commands(
                     return Err("A player name is required.".to_owned());
                 };
                 sender
-                    .send(RuntimeCommandAction::Medic { target: target.clone() })
+                    .send(RuntimeCommandAction::Medic {
+                        target: target.clone(),
+                    })
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2517,7 +2584,11 @@ fn register_general_commands(
     medic.usage = Some("<player>".to_owned());
     medic.category = Some("Survival".to_owned());
     medic.permission = Some(PermissionConfig::default());
-    medic.arguments = vec![ArgumentDefinition::new("player", ArgumentType::Player, true)];
+    medic.arguments = vec![ArgumentDefinition::new(
+        "player",
+        ArgumentType::Player,
+        true,
+    )];
     registry.register(medic)?;
 
     Ok(())

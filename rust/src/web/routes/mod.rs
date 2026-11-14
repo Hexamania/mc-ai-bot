@@ -1,7 +1,6 @@
 /**
  * Routes module for web server
  */
-
 pub mod api;
 
 use crate::web::WebState;

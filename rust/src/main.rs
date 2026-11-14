@@ -23,7 +23,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await?;
 
     // Wrap runtime in Arc<RwLock> for sharing with web server
-    let runtime = Arc::new(RwLock::new(MinecraftRuntime::from_app_config(app_config.as_ref().clone())));
+    let runtime = Arc::new(RwLock::new(MinecraftRuntime::from_app_config(
+        app_config.as_ref().clone(),
+    )));
 
     // Set runtime on web server
     web_server.set_runtime(runtime.clone()).await;

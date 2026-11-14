@@ -2,7 +2,6 @@
  * Main web server for mc-ai-bot
  * Axum HTTP server with Socket.io for real-time dashboard
  */
-
 use axum::{
     extract::DefaultBodyLimit,
     http::{header, Method},
@@ -17,8 +16,8 @@ use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
-    trace::TraceLayer,
     services::ServeDir,
+    trace::TraceLayer,
 };
 use tracing::{info, warn};
 
@@ -28,9 +27,7 @@ use crate::{
     web::{
         auth::{auth_middleware, optional_auth_middleware},
         rate_limit::RateLimiters,
-        routes,
-        socket,
-        WebState,
+        routes, socket, WebState,
     },
 };
 
@@ -45,7 +42,9 @@ pub struct WebServer {
 
 impl WebServer {
     /// Create a new web server
-    pub async fn new(config: Arc<AppConfig>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn new(
+        config: Arc<AppConfig>,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let state = Arc::new(WebState::new(config.clone()));
 
         // Initialize Socket.io
@@ -81,7 +80,12 @@ impl WebServer {
     /// Start the web server
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let port = self.config.web.port;
-        let host = self.config.web.host.clone().unwrap_or_else(|| "0.0.0.0".to_string());
+        let host = self
+            .config
+            .web
+            .host
+            .clone()
+            .unwrap_or_else(|| "0.0.0.0".to_string());
 
         let listener = tokio::net::TcpListener::bind(format!("{}:{}", host, port)).await?;
         info!("[WEB] Dashboard running at http://{}:{}", host, port);
@@ -89,9 +93,12 @@ impl WebServer {
 
         let app = self.app.clone();
         let handle = tokio::spawn(async move {
-            axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
-                .await
-                .unwrap();
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .await
+            .unwrap();
         });
 
         self.server_handle = Some(handle);
@@ -121,7 +128,14 @@ impl WebServer {
 fn create_router(state: Arc<WebState>, socket_io: Option<SocketIo>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE, Method::OPTIONS])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::COOKIE])
         .allow_credentials(true);
 
@@ -132,7 +146,10 @@ fn create_router(state: Arc<WebState>, socket_io: Option<SocketIo>) -> Router {
         // Health check (no auth, no rate limit)
         .route("/health", get(health_check))
         // Serve static files for dashboard
-        .nest_service("/", ServeDir::new("public").append_index_html_on_directories(true))
+        .nest_service(
+            "/",
+            ServeDir::new("public").append_index_html_on_directories(true),
+        )
         // API routes (with auth and rate limiting)
         .nest("/api", routes::create_routes(state.clone()));
 

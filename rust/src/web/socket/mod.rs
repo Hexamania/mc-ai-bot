@@ -1,7 +1,6 @@
 /**
  * Socket.io module for web server
  */
-
 pub mod events;
 pub mod handlers;
 

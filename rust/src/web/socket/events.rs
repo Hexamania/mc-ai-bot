@@ -2,7 +2,6 @@
  * Socket.io event type definitions
  * Defines all events for real-time communication between bot and dashboard
  */
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

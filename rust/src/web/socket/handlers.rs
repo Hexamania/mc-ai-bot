@@ -34,9 +34,11 @@ pub fn setup_main_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::MAIN)
-        .on_connect(move |socket: SocketRef| {
-            let state = state_clone.clone();
+    io.ns(namespaces::MAIN, move |ns: socketioxide::Namespace| {
+        let state = state_clone.clone();
+
+        ns.on_connect(move |socket: SocketRef| {
+            let state = state.clone();
 
             // Authentication - extract token from socket handshake auth
             let auth_value = socket.auth();
@@ -90,6 +92,7 @@ pub fn setup_main_namespace(
                 info!("[SOCKET] Dashboard disconnected: {}", reason);
             });
         });
+    });
 
     Ok(())
 }
@@ -101,9 +104,11 @@ pub fn setup_admin_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::ADMIN)
-        .on_connect(move |socket: SocketRef| {
-            let state = state_clone.clone();
+    io.ns(namespaces::ADMIN, move |ns: socketioxide::Namespace| {
+        let state = state_clone.clone();
+
+        ns.on_connect(move |socket: SocketRef| {
+            let state = state.clone();
 
             // Check if user is admin - get user from socket data
             let is_admin = socket
@@ -155,6 +160,7 @@ pub fn setup_admin_namespace(
                 },
             );
         });
+    });
 
     Ok(())
 }
@@ -166,9 +172,11 @@ pub fn setup_commands_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::COMMANDS)
-        .on_connect(move |socket: SocketRef| {
-            let state = state_clone.clone();
+    io.ns(namespaces::COMMANDS, move |ns: socketioxide::Namespace| {
+        let state = state_clone.clone();
+
+        ns.on_connect(move |socket: SocketRef| {
+            let state = state.clone();
 
             // Authentication
             let auth_value = socket.auth();
@@ -339,6 +347,7 @@ pub fn setup_commands_namespace(
                 },
             );
         });
+    });
 
     Ok(())
 }
@@ -484,7 +493,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.stop_all_movement().await;
 
                     // Broadcast feature toggled
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -498,7 +507,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 
                     // Broadcast bulk update
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -686,7 +695,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.toggle_kill_aura(enabled);
 
                     // Broadcast feature toggled
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -700,7 +709,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 
                     // Broadcast bulk update
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -720,7 +729,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_auto_defense(enabled);
 
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -733,7 +742,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     }
 
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -882,7 +891,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.stop_all_tasks();
 
                     // Broadcast feature toggled
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -956,7 +965,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.update_settings(settings_value).await;
 
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.ns(namespaces::MAIN) {
+                    if let Some(ns) = io.of(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -1189,7 +1198,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 /// Broadcast bot status to all connected dashboards
 pub async fn broadcast_bot_status(state: &WebState, status: serde_json::Value) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.ns(namespaces::MAIN) {
+        if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(server_events::BOT_STATUS, status)
                 .ok();
@@ -1200,7 +1209,7 @@ pub async fn broadcast_bot_status(state: &WebState, status: serde_json::Value) {
 /// Broadcast bot state to all connected dashboards
 pub async fn broadcast_bot_state(state: &WebState, bot_state: serde_json::Value) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.ns(namespaces::MAIN) {
+        if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(server_events::BOT_STATE, bot_state)
                 .ok();
@@ -1211,7 +1220,7 @@ pub async fn broadcast_bot_state(state: &WebState, bot_state: serde_json::Value)
 /// Broadcast log entry to all connected dashboards
 pub async fn broadcast_log(state: &WebState, level: &str, tag: &str, message: &str) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.ns(namespaces::MAIN) {
+        if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::LOGS)
                 .emit(
                     server_events::LOG_ENTRY,
@@ -1235,7 +1244,7 @@ pub async fn broadcast_chat_message(
     message_type: &str,
 ) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.ns(namespaces::MAIN) {
+        if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(
                     server_events::CHAT_MESSAGE,
@@ -1254,7 +1263,7 @@ pub async fn broadcast_chat_message(
 /// Broadcast command output to all connected dashboards
 pub async fn broadcast_command_output(state: &WebState, message: &str, output_type: &str) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.ns(namespaces::MAIN) {
+        if let Some(ns) = io.of(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(
                     server_events::COMMAND_OUTPUT,

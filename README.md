@@ -170,14 +170,18 @@ exponential backoff capped at 60 seconds; polling the Rust runtime surfaces retr
 attempts. Invalid configuration and authentication errors are returned without retrying. Other
 protocol versions and authentication modes are rejected explicitly; the Rust transport uses the
 Azalea-compatible `nightly-2024-10-23` toolchain.
-Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions, chat
-formats, typed argument validation, registry execution, permission checks, cooldowns, legacy
-migration, fact updates, persistence, and transport configuration.
+The runtime dispatches parsed incoming chat commands through the Rust registry, applies configured
+permission levels, and sends command replies back to public chat or private messages. It registers
+`!help` and `!ping` by default; additional commands can be registered through the runtime's command
+registry. Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions,
+chat formats, command dispatch, typed argument validation, registry execution, permission checks,
+cooldowns, legacy migration, fact updates, persistence, and transport configuration.
 The `Rust core` GitHub Actions workflow checks formatting, all targets, and tests on Windows.
 
 This is not yet a replacement application. Bot-specific automation, the HTTP and Socket.IO
-dashboard, and the Electron/Vue desktop app remain unported. The Rust registry still needs to be
-connected to the Minecraft runtime before it can replace the Node.js command path.
+dashboard, and the Electron/Vue desktop app remain unported. Most application-specific commands
+and their feature integrations still need to be ported before Rust can replace the Node.js command
+path.
 
 Check and test the Rust core with:
 

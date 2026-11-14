@@ -1,19 +1,27 @@
-use std::time::Duration;
+use std::{sync::mpsc, time::Duration};
 
 use thiserror::Error;
 use tokio::time::sleep;
 
 use crate::{
+    bot::minecraft::MinecraftEvent::Chat,
     bot::{
         minecraft::{MinecraftConnection, MinecraftEvent, MinecraftTransportError},
         state_machine::{BotState, StateMachine},
     },
+    command_registry::{CommandContext, CommandRegistry, CommandRegistryError, CommandResult},
+    commands::{ChatParser, ChatParserConfig, MessageType, PermissionManager},
     config::BotConfig,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MinecraftRuntimeEvent {
     Minecraft(MinecraftEvent),
+    CommandExecuted {
+        username: String,
+        command: String,
+        result: CommandResult,
+    },
     ReconnectScheduled {
         attempt: u32,
         retry_in_ms: u64,
@@ -25,6 +33,8 @@ pub enum MinecraftRuntimeEvent {
 pub enum MinecraftRuntimeError {
     #[error(transparent)]
     Transport(#[from] MinecraftTransportError),
+    #[error(transparent)]
+    CommandRegistry(#[from] CommandRegistryError),
     #[error("Invalid bot state transition: {0}")]
     StateTransition(#[from] crate::bot::state_machine::InvalidTransition),
 }
@@ -34,17 +44,30 @@ pub struct MinecraftRuntime {
     connection: Option<MinecraftConnection>,
     state_machine: StateMachine,
     reconnect_attempt: u32,
+    command_registry: CommandRegistry,
+    chat_parser: ChatParser,
+    permissions: PermissionManager,
     fatal_error: Option<MinecraftRuntimeError>,
 }
 
 impl MinecraftRuntime {
     pub fn new(config: BotConfig) -> Self {
+        let command_registry = CommandRegistry::default();
+        let fatal_error = command_registry
+            .register_help_command("!")
+            .and_then(|_| command_registry.register_ping_command())
+            .err()
+            .map(MinecraftRuntimeError::CommandRegistry);
+
         Self {
             config,
             connection: None,
             state_machine: StateMachine::default(),
             reconnect_attempt: 0,
-            fatal_error: None,
+            command_registry,
+            chat_parser: ChatParser::default(),
+            permissions: PermissionManager::default(),
+            fatal_error,
         }
     }
 
@@ -54,6 +77,18 @@ impl MinecraftRuntime {
 
     pub fn username(&self) -> Option<&str> {
         self.connection.as_ref().map(MinecraftConnection::username)
+    }
+
+    pub fn command_registry(&self) -> &CommandRegistry {
+        &self.command_registry
+    }
+
+    pub fn configure_chat(&mut self, config: ChatParserConfig) {
+        self.chat_parser.update_config(config);
+    }
+
+    pub fn permission_manager_mut(&mut self) -> &mut PermissionManager {
+        &mut self.permissions
     }
 
     pub fn send_chat(&self, message: &str) -> Result<(), MinecraftRuntimeError> {
@@ -83,6 +118,8 @@ impl MinecraftRuntime {
 
             match MinecraftConnection::connect(&self.config).await {
                 Ok(connection) => {
+                    self.chat_parser
+                        .set_bot_username(Some(connection.username().to_owned()));
                     self.state_machine.transition(BotState::Connected)?;
                     self.connection = Some(connection);
                 }
@@ -127,8 +164,103 @@ impl MinecraftRuntime {
                 self.schedule_reconnect(reason).map(Some)
             }
             None => self.schedule_reconnect(None).map(Some),
+            Some(Chat {
+                username,
+                message,
+                is_whisper,
+            }) => {
+                if let Some(dispatch) = self
+                    .dispatch_chat_command(username.as_deref(), &message, is_whisper)
+                    .await?
+                {
+                    for reply in dispatch.replies {
+                        let message = match reply.destination {
+                            ReplyDestination::Public => reply.message,
+                            ReplyDestination::Private => {
+                                format!("/msg {} {}", dispatch.username, reply.message)
+                            }
+                        };
+                        self.send_chat(&message)?;
+                    }
+                    Ok(Some(dispatch.event))
+                } else {
+                    Ok(Some(MinecraftRuntimeEvent::Minecraft(Chat {
+                        username,
+                        message,
+                        is_whisper,
+                    })))
+                }
+            }
             Some(event) => Ok(Some(MinecraftRuntimeEvent::Minecraft(event))),
         }
+    }
+
+    async fn dispatch_chat_command(
+        &mut self,
+        username: Option<&str>,
+        message: &str,
+        is_whisper: bool,
+    ) -> Result<Option<CommandDispatch>, MinecraftRuntimeError> {
+        let Some(username) = username else {
+            return Ok(None);
+        };
+        let raw_message = if is_whisper {
+            format!("{username} whispers to you: {message}")
+        } else {
+            format!("<{username}> {message}")
+        };
+        let Some(parsed) = self.chat_parser.parse(&raw_message) else {
+            return Ok(None);
+        };
+        let Some(command_name) = parsed.command_name else {
+            return Ok(None);
+        };
+
+        let permission_level = self.permissions.permission_level(&parsed.message.username);
+        let is_private_message = matches!(
+            parsed.message.message_type,
+            MessageType::PrivateMessage | MessageType::Whisper
+        );
+        let (reply_sender, reply_receiver) = mpsc::channel();
+        let public_sender = reply_sender.clone();
+        let mut context = CommandContext::new(
+            parsed.message.username.clone(),
+            parsed.args,
+            permission_level,
+            is_private_message,
+            move |message| {
+                public_sender
+                    .send(CommandReply {
+                        destination: ReplyDestination::Public,
+                        message: message.to_owned(),
+                    })
+                    .expect("command reply receiver remains alive during execution");
+            },
+            move |message| {
+                reply_sender
+                    .send(CommandReply {
+                        destination: ReplyDestination::Private,
+                        message: message.to_owned(),
+                    })
+                    .expect("command reply receiver remains alive during execution");
+            },
+        );
+        context.full_command = parsed.message.content.clone();
+
+        let result = self
+            .command_registry
+            .execute(&command_name, &mut context)
+            .await?;
+        let replies = reply_receiver.try_iter().collect();
+        Ok(Some(CommandDispatch {
+            event: MinecraftRuntimeEvent::CommandExecuted {
+                username: parsed.message.username.clone(),
+                command: command_name,
+                result,
+            },
+            username: parsed.message.username,
+            replies,
+        }))
     }
 
     fn schedule_reconnect(
@@ -166,6 +298,22 @@ impl MinecraftRuntime {
     }
 }
 
+struct CommandDispatch {
+    event: MinecraftRuntimeEvent,
+    username: String,
+    replies: Vec<CommandReply>,
+}
+
+struct CommandReply {
+    destination: ReplyDestination,
+    message: String,
+}
+
+enum ReplyDestination {
+    Public,
+    Private,
+}
+
 fn reconnect_event(attempt: u32, reason: Option<String>) -> MinecraftRuntimeEvent {
     let retry_in_ms = reconnect_delay(attempt.saturating_sub(1)).as_millis() as u64;
     MinecraftRuntimeEvent::ReconnectScheduled {
@@ -182,6 +330,29 @@ fn reconnect_delay(attempt: u32) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        future::Future,
+        sync::Arc,
+        task::{Context, Poll, Wake, Waker},
+    };
+
+    struct NoopWake;
+
+    impl Wake for NoopWake {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    fn run<F: Future>(future: F) -> F::Output {
+        let waker = Waker::from(Arc::new(NoopWake));
+        let mut context = Context::from_waker(&waker);
+        let mut future = Box::pin(future);
+        loop {
+            match future.as_mut().poll(&mut context) {
+                Poll::Ready(value) => return value,
+                Poll::Pending => std::thread::yield_now(),
+            }
+        }
+    }
 
     #[test]
     fn reconnect_delay_doubles_and_stops_at_sixty_seconds() {
@@ -230,5 +401,43 @@ mod tests {
         runtime.shutdown().unwrap();
 
         assert_eq!(runtime.state(), BotState::Shutdown);
+    }
+
+    #[test]
+    fn runtime_dispatches_chat_commands_and_queues_replies() {
+        let config = BotConfig {
+            host: "localhost".to_owned(),
+            port: 25565,
+            username: "Airi".to_owned(),
+            password: None,
+            version: "1.21.1".to_owned(),
+            auth: "offline".to_owned(),
+            check_timeout_interval: 60_000,
+        };
+        let mut runtime = MinecraftRuntime::new(config);
+
+        let dispatch = run(runtime.dispatch_chat_command(Some("Alex"), "!ping", false))
+            .unwrap()
+            .unwrap();
+
+        let MinecraftRuntimeEvent::CommandExecuted {
+            username,
+            command,
+            result,
+        } = dispatch.event
+        else {
+            panic!("expected command execution event");
+        };
+        assert_eq!(username, "Alex");
+        assert_eq!(command, "ping");
+        assert!(result.success);
+        assert!(result.found);
+        assert_eq!(result.error, None);
+        assert_eq!(dispatch.replies.len(), 1);
+        assert!(matches!(
+            dispatch.replies[0].destination,
+            ReplyDestination::Public
+        ));
+        assert_eq!(dispatch.replies[0].message, "🏓 Pong!");
     }
 }

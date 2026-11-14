@@ -8,14 +8,16 @@ use azalea::{
     Account, BotClientExt, Client, Event, GameProfileComponent, Vec3,
     auto_tool::AutoToolClientExt,
     blocks::{Block as BlockTrait, BlockState, BlockStates},
-    ecs::query::With,
-    entity::{
-        AttackEvent, DropItemEvent, Health, Position, SetControlStateEvent, metadata::Player,
+    container::Container,
+    ecs::{
+        event::{AttackEvent, DropItemEvent, SetControlStateEvent},
+        query::With,
     },
+    entity::{metadata::Player, Position, Attributes},
     interact::InteractBlockEvent,
     inventory::{
-        SetSelectedHotbarSlotEvent,
         operations::click::{ClickMode, ClickOperation, ClickType, MouseButton},
+        SetSelectedHotbarSlotEvent,
     },
     mining::StopMiningBlockEvent,
     pathfinder::{
@@ -26,7 +28,7 @@ use azalea::{
     registry::Block as RegistryBlock,
     world::{chunk::ChunkStorage, direction::Direction},
 };
-use azalea_inventory::Inventory;
+use azalea::inventory::Inventory;
 use rand::Rng;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -538,7 +540,7 @@ impl MinecraftConnection {
             // Find chest block near base
             let world = client.world();
             let world = world.read();
-            let chunk_storage = world.chunk_storage.clone();
+            let chunk_storage = world.chunks.clone();
             drop(world);
 
             let mut found_chest = None;
@@ -672,7 +674,7 @@ impl MinecraftConnection {
             // Find chest block near base
             let world = client.world();
             let world = world.read();
-            let chunk_storage = world.chunk_storage.clone();
+            let chunk_storage = world.chunks.clone();
             drop(world);
 
             let mut found_chest = None;
@@ -855,7 +857,7 @@ impl MinecraftConnection {
             // Find chest block near base
             let world = client.world();
             let world = world.read();
-            let chunk_storage = world.chunk_storage.clone();
+            let chunk_storage = world.chunks.clone();
             drop(world);
 
             let mut found_chest = None;
@@ -1495,7 +1497,7 @@ impl MinecraftConnection {
 
             let world = client.world();
             let world = world.read();
-            let chunk_storage = world.chunk_storage.clone();
+            let chunk_storage = world.chunks.clone();
             drop(world);
 
             let mut coal_positions = Vec::new();
@@ -1646,7 +1648,7 @@ impl MinecraftConnection {
             // Search for logs in loaded chunks
             let world = client.world();
             let world = world.read();
-            let chunk_storage = world.chunk_storage.clone();
+            let chunk_storage = world.chunks.clone();
             drop(world);
 
             let mut log_positions = Vec::new();
@@ -2261,8 +2263,8 @@ impl MinecraftConnection {
 
                 // Eat food if low health
                 let health = client
-                    .get_entity_component::<azalea::entity::Health>(client.entity)
-                    .map(|h| h.health)
+                    .get_entity_component::<azalea::entity::Attributes>(client.entity)
+                    .map(|a| a.health)
                     .unwrap_or(20.0);
 
                 if health < 10.0 {
@@ -2527,8 +2529,8 @@ impl MinecraftConnection {
 
             // Check target health and give food if needed
             let health = client
-                .get_entity_component::<azalea::entity::Health>(entity)
-                .map(|h| h.health)
+                .get_entity_component::<azalea::entity::Attributes>(entity)
+                .map(|a| a.health)
                 .unwrap_or(20.0);
 
             if health < 18.0 {
@@ -2660,8 +2662,8 @@ impl MinecraftConnection {
 
                 // Check target health
                 let health = client
-                    .get_entity_component::<azalea::entity::Health>(target_entity)
-                    .map(|h| h.health)
+                    .get_entity_component::<azalea::entity::Attributes>(target_entity)
+                    .map(|a| a.health)
                     .unwrap_or(20.0);
 
                 let bot_pos = client.position();
@@ -2786,11 +2788,11 @@ impl MinecraftConnection {
         }
         let entity = self.client.entity;
         let position: Option<Position> = self.client.get_entity_component(entity);
-        let health: Option<Health> = self.client.get_entity_component(entity);
+        let attributes: Option<Attributes> = self.client.get_entity_component(entity);
         let food = self.client.component::<azalea::hunger::Hunger>();
 
         let pos = position.map(|p| Vec3::from(&p));
-        let health_val = health.map(|h| h.health).unwrap_or(20.0);
+        let health_val = attributes.map(|a| a.health).unwrap_or(20.0);
         let food_level = food.food_level;
         let saturation = food.saturation;
 
@@ -2885,7 +2887,7 @@ impl MinecraftConnection {
 
         for (entity, profile) in self.client.entities_with::<GameProfileComponent>() {
             let position: Option<Position> = self.client.get_entity_component(entity);
-            let health: Option<Health> = self.client.get_entity_component(entity);
+            let attributes: Option<Attributes> = self.client.get_entity_component(entity);
 
             if let (Some(pos), Some(profile)) = (position, profile) {
                 let distance = Vec3::from(&pos).distance(bot_pos);
@@ -2897,7 +2899,7 @@ impl MinecraftConnection {
                         "y": pos.y,
                         "z": pos.z,
                     },
-                    "health": health.map(|h| h.health),
+                    "health": attributes.map(|a| a.health),
                     "gamemode": None, // Not easily accessible
                     "ping": None,
                     "isBot": profile.name == bot_username,
@@ -2916,7 +2918,7 @@ impl MinecraftConnection {
         let bot_pos = self.position().unwrap_or(Vec3::ZERO);
         let world = self.client.world();
         let world = world.read();
-        let chunk_storage = world.chunk_storage.clone();
+        let chunk_storage = world.chunks.clone();
         drop(world);
 
         let mut blocks = Vec::new();
@@ -3253,7 +3255,7 @@ impl MinecraftConnection {
         let block_pos = azalea::BlockPos::new(x, y, z);
         let world = self.client.world();
         let world = world.read();
-        let chunk_storage = world.chunk_storage.clone();
+        let chunk_storage = world.chunks.clone();
         drop(world);
 
         let goal = azalea::pathfinder::goals::ReachBlockPosGoal {
@@ -3294,7 +3296,7 @@ impl MinecraftConnection {
             .send_event(azalea::interact::InteractBlockEvent {
                 entity: self.client.entity,
                 position: block_pos,
-                direction: azalea::world::direction::Direction::Up,
+                direction: Direction::Up,
                 hand: azalea::protocol::packets::game::Hand::MainHand,
                 cursor_position: None,
                 inside_block: false,

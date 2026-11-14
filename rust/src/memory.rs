@@ -8,6 +8,7 @@ use chrono::{SecondsFormat, Utc};
 use serde_json::{Map, Value, json};
 use tempfile::NamedTempFile;
 use thiserror::Error;
+use uuid::Uuid;
 
 const SCHEMA_VERSION: u64 = 2;
 
@@ -326,6 +327,166 @@ fn normalize_metadata(memory: &mut Map<String, Value>, now: &str) -> Result<(), 
 
 fn timestamp() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+/// Memory struct providing a convenient interface for memory operations
+#[derive(Debug, Clone)]
+pub struct Memory {
+    data: Value,
+}
+
+impl Default for Memory {
+    fn default() -> Self {
+        Self {
+            data: default_memory(),
+        }
+    }
+}
+
+impl std::ops::Deref for Memory {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl Memory {
+    /// Load memory from file
+    pub async fn load(path: impl AsRef<Path> + Send) -> Result<Self, MemoryError> {
+        let data = tokio::task::spawn_blocking(move || load_memory(path)).await.unwrap()?;
+        Ok(Self { data })
+    }
+
+    /// Save memory to file
+    pub async fn save(&self, path: impl AsRef<Path> + Send) -> Result<(), MemoryError> {
+        let data = self.data.clone();
+        tokio::task::spawn_blocking(move || save_memory(path, &data)).await.unwrap()
+    }
+
+    /// Save a location
+    pub fn save_location(
+        &mut self,
+        name: &str,
+        pos: crate::web::socket::events::BotPosition,
+        location_type: &str,
+    ) {
+        let locations = self
+            .data
+            .as_object_mut()
+            .unwrap()
+            .entry("locations".to_owned())
+            .or_insert_with(|| json!({}))
+            .as_object_mut()
+            .unwrap();
+        let now = timestamp();
+        locations.insert(
+            name.to_owned(),
+            json!({
+                "x": pos.x,
+                "y": pos.y,
+                "z": pos.z,
+                "dimension": "overworld",
+                "type": location_type,
+                "createdAt": now,
+                "updatedAt": now,
+            }),
+        );
+    }
+
+    /// Get context for AI
+    pub fn get_context(&self) -> String {
+        let mut parts = Vec::new();
+
+        if let Some(locations) = self.data["locations"].as_object() {
+            for (name, loc) in locations {
+                parts.push(format!(
+                    "Location {}: X={} Y={} Z={} (type: {})",
+                    name,
+                    loc["x"].as_f64().unwrap_or(0.0),
+                    loc["y"].as_f64().unwrap_or(0.0),
+                    loc["z"].as_f64().unwrap_or(0.0),
+                    loc["type"].as_str().unwrap_or("waypoint")
+                ));
+            }
+        }
+
+        if let Some(facts) = self.data["learnedFacts"].as_object() {
+            for (key, fact) in facts {
+                parts.push(format!(
+                    "Fact {}: {}",
+                    key,
+                    fact["value"].as_str().unwrap_or("")
+                ));
+            }
+        }
+
+        if let Some(rules) = self.data["rules"].as_array() {
+            for rule in rules {
+                parts.push(format!("Rule: {}", rule["rule"].as_str().unwrap_or("")));
+            }
+        }
+
+        parts.join("\n")
+    }
+
+    /// Remember a fact
+    pub fn remember_fact(&mut self, key: &str, fact: &str) -> bool {
+        remember_fact(&mut self.data, key, fact).unwrap_or(false)
+    }
+
+    /// Forget a fact
+    pub fn forget_fact(&mut self, key: &str) -> bool {
+        forget_fact(&mut self.data, key).unwrap_or(false)
+    }
+
+    /// Add a rule
+    pub fn add_rule(&mut self, rule: &str) -> bool {
+        let rules = self
+            .data
+            .as_object_mut()
+            .unwrap()
+            .entry("rules".to_owned())
+            .or_insert_with(|| json!([]))
+            .as_array_mut()
+            .unwrap();
+        let now = timestamp();
+        let rule_text = rule.trim().chars().take(300).collect::<String>();
+        if rule_text.is_empty() {
+            return false;
+        }
+        // Check if rule already exists
+        for existing in rules.iter() {
+            if existing["rule"].as_str() == Some(&rule_text) {
+                return false;
+            }
+        }
+        rules.push(json!({
+            "id": format!("rule_{}", Uuid::new_v4().simple()),
+            "rule": rule_text,
+            "category": "general",
+            "enabled": true,
+            "createdAt": now,
+            "updatedAt": now,
+            "author": "web",
+        }));
+        true
+    }
+
+    /// Get locations
+    pub fn locations(&self) -> &Value {
+        &self.data["locations"]
+    }
+
+    /// Get learned facts
+    pub fn learned_facts(&self) -> &Value {
+        &self.data["learnedFacts"]
+    }
+
+    /// Get rules
+    pub fn rules(&self) -> &Value {
+        &self.data["rules"]
+    }
 }
 
 #[cfg(test)]

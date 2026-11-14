@@ -22,7 +22,8 @@ use tower_http::{
 use tracing::{info, warn};
 
 use crate::{
-    bot::minecraft::{MinecraftConnection, MinecraftRuntime},
+    bot::minecraft::MinecraftConnection,
+    bot::runtime::MinecraftRuntime,
     config::AppConfig,
     web::{
         WebState,

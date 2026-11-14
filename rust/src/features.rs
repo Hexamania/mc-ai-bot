@@ -9,7 +9,8 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::{
-    bot::minecraft::{MinecraftConnection, MinecraftRuntime},
+    bot::minecraft::MinecraftConnection,
+    bot::runtime::MinecraftRuntime,
     config::AppConfig,
 };
 

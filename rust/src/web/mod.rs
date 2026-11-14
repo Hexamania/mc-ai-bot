@@ -9,7 +9,8 @@ pub mod server;
 pub mod socket;
 
 use crate::{
-    bot::minecraft::{MinecraftConnection, MinecraftRuntime},
+    bot::minecraft::MinecraftConnection,
+    bot::runtime::MinecraftRuntime,
     config::AppConfig,
 };
 use std::sync::Arc;

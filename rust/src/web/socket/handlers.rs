@@ -2,16 +2,16 @@
  * Socket.io event handlers for web server
  * Handles all real-time communication between bot and dashboard
  */
-use socketioxide::{
-    SocketIo,
-    extract::{Data, SocketRef, State},
-};
+use socketioxide::SocketIo;
+use socketioxide::extract::{Data, SocketRef};
+use axum::extract::State;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::{
-    bot::minecraft::{MinecraftConnection, MinecraftRuntime},
+    bot::minecraft::MinecraftConnection,
+    bot::runtime::MinecraftRuntime,
     config::AppConfig,
     web::{
         WebState,

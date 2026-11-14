@@ -16,7 +16,8 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 use crate::{
-    bot::minecraft::{MinecraftConnection, MinecraftRuntime},
+    bot::minecraft::MinecraftConnection,
+    bot::runtime::MinecraftRuntime,
     config::AppConfig,
     memory::Memory,
     web::{
@@ -744,8 +745,12 @@ async fn delete_location(
         .await
         .unwrap_or_default();
 
-    if memory.locations.contains_key(&name) {
-        memory.locations.remove(&name);
+    if memory
+        .locations
+        .as_object()
+        .is_some_and(|o| o.contains_key(&name))
+    {
+        memory.locations.as_object_mut().unwrap().remove(&name);
         memory
             .save(&state.config.memory.file_path)
             .await

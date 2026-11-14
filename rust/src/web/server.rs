@@ -54,6 +54,9 @@ impl WebServer {
         // Initialize Socket.io
         let (socket_io_layer, socket_io) = socket::initialize_socket_io(state.clone())?;
 
+        // Set socket_io on WebState for broadcast functions
+        state.write().await.set_socket_io(socket_io.clone());
+
         // Create the HTTP router
         let app = create_router(state.clone(), socket_io.clone(), socket_io_layer.clone());
 

@@ -4,31 +4,29 @@ use std::{
     time::{Duration, Instant},
 };
 
-use azalea::attack::AttackEvent as AzaleaAttackEvent;
-use azalea::entity::Hand;
-use azalea::inventory::Inventory;
 use azalea::{
-    Account, BotClientExt, Client, Event, GameProfileComponent, Vec3,
+    Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3,
     auto_tool::AutoToolClientExt,
     blocks::{Block as BlockTrait, BlockState, BlockStates},
     ecs::{
-        event::{AttackEvent, DropItemEvent},
+        event::{EntityEvent, Event as EcsEvent},
         query::With,
     },
-    entity::{Attributes, Position, metadata::Player},
+    entity::{Attributes, AttackEvent, DropItemEvent, Hand, Position, metadata::Player, SetControlStateEvent},
+    hunger::Hunger,
     inventory::{
-        SetSelectedHotbarSlotEvent,
+        Inventory, SetSelectedHotbarSlotEvent,
         components::Container,
-        operations::{ClickMode, ClickOperation, ClickType, MouseButton},
+        operations::click::{ClickMode, ClickOperation, ClickType, MouseButton},
     },
-    mining::StopMiningBlockEvent,
+    interact::InteractBlockEvent,
+    mining::{Mining, StopMiningBlockEvent},
     pathfinder::{
         PathfinderClientExt,
         goals::{Goal, RadiusGoal, ReachBlockPosGoal},
     },
-    protocol::packets::game::PlayerAction,
-    registry::Block as RegistryBlock,
-    world::{Direction, chunks::ChunkStorage},
+    registry::{Block as RegistryBlock, BlockTrait},
+    world::{ChunkStorage, Direction},
 };
 use rand::Rng;
 use serde_json::{Value, json};
@@ -181,7 +179,7 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return Err(MinecraftTransportError::NotConnected);
         }
-        let inventory = self.client.component::<azalea::inventory::Inventory>();
+        let inventory = self.client.component::<Inventory>();
         Ok(InventorySnapshot::from_player(
             inventory.inventory_menu.as_player(),
             inventory.selected_hotbar_slot,
@@ -546,12 +544,12 @@ impl MinecraftConnection {
 
             let mut found_chest = None;
             let search_radius = 5;
-            let base_block_pos = azalea::BlockPos::from(base_pos);
+            let base_block_pos = BlockPos::from(base_pos);
 
             for dx in -search_radius..=search_radius {
                 for dy in -2..=2 {
                     for dz in -search_radius..=search_radius {
-                        let check_pos = azalea::BlockPos::new(
+                        let check_pos = BlockPos::new(
                             base_block_pos.x + dx,
                             base_block_pos.y + dy,
                             base_block_pos.z + dz,
@@ -607,7 +605,7 @@ impl MinecraftConnection {
                 let mut ticks = client.get_tick_broadcaster();
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                 loop {
-                    if goal.success(azalea::BlockPos::from(client.position())) {
+                    if goal.success(BlockPos::from(client.position())) {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -625,7 +623,7 @@ impl MinecraftConnection {
                 client
                     .ecs
                     .lock()
-                    .send_event(azalea::interact::InteractBlockEvent {
+                    .send_event(InteractBlockEvent {
                         entity: client.entity,
                         position: chest_pos,
                         direction: Direction::Up,
@@ -680,12 +678,12 @@ impl MinecraftConnection {
 
             let mut found_chest = None;
             let search_radius = 5;
-            let base_block_pos = azalea::BlockPos::from(base_pos);
+            let base_block_pos = BlockPos::from(base_pos);
 
             for dx in -search_radius..=search_radius {
                 for dy in -2..=2 {
                     for dz in -search_radius..=search_radius {
-                        let check_pos = azalea::BlockPos::new(
+                        let check_pos = BlockPos::new(
                             base_block_pos.x + dx,
                             base_block_pos.y + dy,
                             base_block_pos.z + dz,
@@ -741,7 +739,7 @@ impl MinecraftConnection {
                 let mut ticks = client.get_tick_broadcaster();
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                 loop {
-                    if goal.success(azalea::BlockPos::from(client.position())) {
+                    if goal.success(BlockPos::from(client.position())) {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -758,7 +756,7 @@ impl MinecraftConnection {
                 client
                     .ecs
                     .lock()
-                    .send_event(azalea::interact::InteractBlockEvent {
+                    .send_event(InteractBlockEvent {
                         entity: client.entity,
                         position: chest_pos,
                         direction: Direction::Up,
@@ -800,14 +798,14 @@ impl MinecraftConnection {
                                     slot: slot_idx,
                                     click_type: ClickType::Pickup,
                                     button: MouseButton::Left,
-                                    mode: azalea::inventory::operations::click::ClickMode::Normal,
+                                    mode: ClickMode::Normal,
                                 });
                                 client.ecs.lock().send_event(ClickOperation {
                                     entity: client.entity,
                                     slot: target_slot,
                                     click_type: ClickType::Pickup,
                                     button: MouseButton::Left,
-                                    mode: azalea::inventory::operations::click::ClickMode::Normal,
+                                    mode: ClickMode::Normal,
                                 });
                                 target_slot += 1;
                                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -863,12 +861,12 @@ impl MinecraftConnection {
 
             let mut found_chest = None;
             let search_radius = 5;
-            let base_block_pos = azalea::BlockPos::from(base_pos);
+            let base_block_pos = BlockPos::from(base_pos);
 
             for dx in -search_radius..=search_radius {
                 for dy in -2..=2 {
                     for dz in -search_radius..=search_radius {
-                        let check_pos = azalea::BlockPos::new(
+                        let check_pos = BlockPos::new(
                             base_block_pos.x + dx,
                             base_block_pos.y + dy,
                             base_block_pos.z + dz,
@@ -924,7 +922,7 @@ impl MinecraftConnection {
                 let mut ticks = client.get_tick_broadcaster();
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                 loop {
-                    if goal.success(azalea::BlockPos::from(client.position())) {
+                    if goal.success(BlockPos::from(client.position())) {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -941,7 +939,7 @@ impl MinecraftConnection {
                 client
                     .ecs
                     .lock()
-                    .send_event(azalea::interact::InteractBlockEvent {
+                    .send_event(InteractBlockEvent {
                         entity: client.entity,
                         position: chest_pos,
                         direction: Direction::Up,
@@ -1084,7 +1082,7 @@ impl MinecraftConnection {
                                         click_type: ClickType::Pickup,
                                         button: MouseButton::Left,
                                         mode:
-                                            azalea::inventory::operations::click::ClickMode::Normal,
+                                            ClickMode::Normal,
                                     });
 
                                     // Find empty slot in chest (chest slots start after player inventory)
@@ -1097,7 +1095,7 @@ impl MinecraftConnection {
                                                     slot: chest_slot,
                                                     click_type: ClickType::Pickup,
                                                     button: MouseButton::Left,
-                                                    mode: azalea::inventory::operations::click::ClickMode::Normal,
+                                                    mode: ClickMode::Normal,
                                                 });
                                                 break;
                                             }
@@ -1169,7 +1167,7 @@ impl MinecraftConnection {
                 // Dig at foot level (y) and head level (y+1)
                 for dy in 0..2 {
                     let dig_y = start_y + dy;
-                    let block_pos = azalea::BlockPos::new(target_x, dig_y, target_z);
+                    let block_pos = BlockPos::new(target_x, dig_y, target_z);
 
                     // Pathfind to mining position (stand behind the block to mine)
                     let stand_x = target_x as f64 + 0.5;
@@ -1206,7 +1204,7 @@ impl MinecraftConnection {
                             RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
                         ) {
                             // Check if breakable
-                            let destroy_time = Box::<dyn azalea::registry::BlockTrait>::from(state)
+                            let destroy_time = Box::<dyn BlockTrait>::from(state)
                                 .behavior()
                                 .destroy_time;
                             if destroy_time >= 0.0 {
@@ -1216,7 +1214,7 @@ impl MinecraftConnection {
                                 let best_tool = client.best_tool_in_hotbar_for_block(state);
                                 if best_tool.percentage_per_tick > 0.0 {
                                     client.ecs.lock().send_event(
-                                        azalea::inventory::SetSelectedHotbarSlotEvent {
+                                        SetSelectedHotbarSlotEvent {
                                             entity: client.entity,
                                             slot: best_tool.index as u8,
                                         },
@@ -1258,7 +1256,7 @@ impl MinecraftConnection {
                 }
 
                 // Also dig the block above head level for safety (y+2)
-                let block_pos = azalea::BlockPos::new(target_x, start_y + 2, target_z);
+                let block_pos = BlockPos::new(target_x, start_y + 2, target_z);
                 let world = client.world();
                 let world = world.read();
                 if let Some(state) = world.get_block_state(&block_pos) {
@@ -1267,7 +1265,7 @@ impl MinecraftConnection {
                         block,
                         RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
                     ) {
-                        let destroy_time = Box::<dyn azalea::registry::BlockTrait>::from(state)
+                        let destroy_time = Box::<dyn BlockTrait>::from(state)
                             .behavior()
                             .destroy_time;
                         if destroy_time >= 0.0 {
@@ -1298,7 +1296,7 @@ impl MinecraftConnection {
                             let best_tool = client.best_tool_in_hotbar_for_block(state);
                             if best_tool.percentage_per_tick > 0.0 {
                                 client.ecs.lock().send_event(
-                                    azalea::inventory::SetSelectedHotbarSlotEvent {
+                                    SetSelectedHotbarSlotEvent {
                                         entity: client.entity,
                                         slot: best_tool.index as u8,
                                     },
@@ -1383,7 +1381,7 @@ impl MinecraftConnection {
             for y in (min_y..=max_y).rev() {
                 for x in min_x..=max_x {
                     for z in min_z..=max_z {
-                        let block_pos = azalea::BlockPos::new(x, y, z);
+                        let block_pos = BlockPos::new(x, y, z);
 
                         // Check if block exists and is mineable
                         let world = client.world();
@@ -1397,7 +1395,7 @@ impl MinecraftConnection {
                                     | RegistryBlock::VoidAir
                             ) {
                                 let destroy_time =
-                                    Box::<dyn azalea::registry::BlockTrait>::from(state)
+                                    Box::<dyn BlockTrait>::from(state)
                                         .behavior()
                                         .destroy_time;
                                 if destroy_time >= 0.0 {
@@ -1435,7 +1433,7 @@ impl MinecraftConnection {
                                     let best_tool = client.best_tool_in_hotbar_for_block(state);
                                     if best_tool.percentage_per_tick > 0.0 {
                                         client.ecs.lock().send_event(
-                                            azalea::inventory::SetSelectedHotbarSlotEvent {
+                                            SetSelectedHotbarSlotEvent {
                                                 entity: client.entity,
                                                 slot: best_tool.index as u8,
                                             },
@@ -1494,7 +1492,7 @@ impl MinecraftConnection {
             // Search for coal ore in loaded chunks within 32 blocks
             let pos = client.position();
             let search_radius = 32;
-            let player_block_pos = azalea::BlockPos::from(pos);
+            let player_block_pos = BlockPos::from(pos);
 
             let world = client.world();
             let world = world.read();
@@ -1506,7 +1504,7 @@ impl MinecraftConnection {
             for dx in -search_radius..=search_radius {
                 for dy in -16..=16 {
                     for dz in -search_radius..=search_radius {
-                        let check_pos = azalea::BlockPos::new(
+                        let check_pos = BlockPos::new(
                             player_block_pos.x + dx,
                             player_block_pos.y + dy,
                             player_block_pos.z + dz,
@@ -1571,7 +1569,7 @@ impl MinecraftConnection {
                         block,
                         RegistryBlock::CoalOre | RegistryBlock::DeepslateCoalOre
                     ) {
-                        let destroy_time = Box::<dyn azalea::registry::BlockTrait>::from(state)
+                        let destroy_time = Box::<dyn BlockTrait>::from(state)
                             .behavior()
                             .destroy_time;
                         if destroy_time >= 0.0 {
@@ -1581,7 +1579,7 @@ impl MinecraftConnection {
                             let best_tool = client.best_tool_in_hotbar_for_block(state);
                             if best_tool.percentage_per_tick > 0.0 {
                                 client.ecs.lock().send_event(
-                                    azalea::inventory::SetSelectedHotbarSlotEvent {
+                                    SetSelectedHotbarSlotEvent {
                                         entity: client.entity,
                                         slot: best_tool.index as u8,
                                     },
@@ -1643,7 +1641,7 @@ impl MinecraftConnection {
         let pos = self.position().ok_or("Bot not spawned")?;
         let mut client = self.client.clone();
         let search_radius = radius as i32;
-        let player_block_pos = azalea::BlockPos::from(pos);
+        let player_block_pos = BlockPos::from(pos);
 
         tokio::spawn(async move {
             // Search for logs in loaded chunks
@@ -1658,7 +1656,7 @@ impl MinecraftConnection {
                 for dy in -5..=20 {
                     // Trees grow upward
                     for dz in -search_radius..=search_radius {
-                        let check_pos = azalea::BlockPos::new(
+                        let check_pos = BlockPos::new(
                             player_block_pos.x + dx,
                             player_block_pos.y + dy,
                             player_block_pos.z + dz,
@@ -1694,7 +1692,7 @@ impl MinecraftConnection {
                 if let Some(state) = world.get_block_state(&log_pos) {
                     let block = RegistryBlock::from(state);
                     if block.to_string().contains("_log") && !block.to_string().contains("planks") {
-                        let destroy_time = Box::<dyn azalea::registry::BlockTrait>::from(state)
+                        let destroy_time = Box::<dyn BlockTrait>::from(state)
                             .behavior()
                             .destroy_time;
                         if destroy_time >= 0.0 {
@@ -1729,7 +1727,7 @@ impl MinecraftConnection {
                             let best_tool = client.best_tool_in_hotbar_for_block(state);
                             if best_tool.percentage_per_tick > 0.0 {
                                 client.ecs.lock().send_event(
-                                    azalea::inventory::SetSelectedHotbarSlotEvent {
+                                    SetSelectedHotbarSlotEvent {
                                         entity: client.entity,
                                         slot: best_tool.index as u8,
                                     },
@@ -1742,7 +1740,7 @@ impl MinecraftConnection {
                             let mut bottom_log = log_pos;
                             for check_y in (log_pos.y - 10)..=log_pos.y {
                                 let check_pos =
-                                    azalea::BlockPos::new(log_pos.x, check_y, log_pos.z);
+                                    BlockPos::new(log_pos.x, check_y, log_pos.z);
                                 if let Some(check_state) = chunk_storage.get_block_state(&check_pos)
                                 {
                                     let check_block = RegistryBlock::from(check_state);
@@ -1761,7 +1759,7 @@ impl MinecraftConnection {
                             // Mine from bottom to top
                             for mine_y in bottom_log.y..(bottom_log.y + 30) {
                                 let mine_pos =
-                                    azalea::BlockPos::new(bottom_log.x, mine_y, bottom_log.z);
+                                    BlockPos::new(bottom_log.x, mine_y, bottom_log.z);
                                 let world = client.world();
                                 let world = world.read();
                                 if let Some(mine_state) = world.get_block_state(&mine_pos) {
@@ -1822,7 +1820,7 @@ impl MinecraftConnection {
             .base_location
             .ok_or("No base location set. Use sbase first.")?;
         let mut client = self.client.clone();
-        let base_block_pos = azalea::BlockPos::from(base);
+        let base_block_pos = BlockPos::from(base);
         let roof_y = base_block_pos.y + 5; // Build roof 5 blocks above base
 
         tokio::spawn(async move {
@@ -1884,7 +1882,7 @@ impl MinecraftConnection {
             client
                 .ecs
                 .lock()
-                .send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                .send_event(SetSelectedHotbarSlotEvent {
                     entity: client.entity,
                     slot: block_slot as u8,
                 });
@@ -1894,7 +1892,7 @@ impl MinecraftConnection {
             for dx in -radius_i..=radius_i {
                 for dz in -radius_i..=radius_i {
                     let place_pos =
-                        azalea::BlockPos::new(base_block_pos.x + dx, roof_y, base_block_pos.z + dz);
+                        BlockPos::new(base_block_pos.x + dx, roof_y, base_block_pos.z + dz);
 
                     // Check if block already exists
                     let world = client.world();
@@ -1937,7 +1935,7 @@ impl MinecraftConnection {
                         }
 
                         // Place block (right-click on top of block below)
-                        let target_pos = azalea::BlockPos::new(
+                        let target_pos = BlockPos::new(
                             base_block_pos.x + dx,
                             roof_y - 1,
                             base_block_pos.z + dz,
@@ -1949,7 +1947,7 @@ impl MinecraftConnection {
                         client
                             .ecs
                             .lock()
-                            .send_event(azalea::interact::InteractBlockEvent {
+                            .send_event(InteractBlockEvent {
                                 entity: client.entity,
                                 position: target_pos,
                                 direction: Direction::Up,
@@ -2056,7 +2054,7 @@ impl MinecraftConnection {
                     if last_attack.elapsed() >= Duration::from_secs(1) {
                         // Attack the target
                         client.look_at(client.entity_position(target).unwrap_or(Vec3::ZERO));
-                        client.ecs.lock().send_event(azalea::entity::AttackEvent {
+                        client.ecs.lock().send_event(AttackEvent {
                             entity: client.entity,
                             target,
                         });
@@ -2113,7 +2111,7 @@ impl MinecraftConnection {
                     client
                         .ecs
                         .lock()
-                        .send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                        .send_event(SetSelectedHotbarSlotEvent {
                             entity: client.entity,
                             slot: slot as u8,
                         });
@@ -2246,7 +2244,7 @@ impl MinecraftConnection {
                     client
                         .ecs
                         .lock()
-                        .send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                        .send_event(SetSelectedHotbarSlotEvent {
                             entity: client.entity,
                             slot: slot as u8,
                         });
@@ -2255,7 +2253,7 @@ impl MinecraftConnection {
                 // Attack if in range
                 if dist <= 4.0 && last_attack.elapsed() >= Duration::from_millis(500) {
                     client.look_at(target_pos);
-                    client.ecs.lock().send_event(azalea::entity::AttackEvent {
+                    client.ecs.lock().send_event(AttackEvent {
                         entity: client.entity,
                         target: target_entity,
                     });
@@ -2264,7 +2262,7 @@ impl MinecraftConnection {
 
                 // Eat food if low health
                 let health = client
-                    .get_entity_component::<azalea::entity::Attributes>(client.entity)
+                    .get_entity_component::<Attributes>(client.entity)
                     .map(|a| a.health)
                     .unwrap_or(20.0);
 
@@ -2284,7 +2282,7 @@ impl MinecraftConnection {
                                 || name.contains("cake")
                             {
                                 client.ecs.lock().send_event(
-                                    azalea::inventory::SetSelectedHotbarSlotEvent {
+                                    SetSelectedHotbarSlotEvent {
                                         entity: client.entity,
                                         slot: slot as u8,
                                     },
@@ -2355,7 +2353,7 @@ impl MinecraftConnection {
 
             // Once at height, build a small shelter
             let pos = client.position();
-            let block_pos = azalea::BlockPos::new(
+            let block_pos = BlockPos::new(
                 pos.x.floor() as i32,
                 pos.y.floor() as i32,
                 pos.z.floor() as i32,
@@ -2391,7 +2389,7 @@ impl MinecraftConnection {
                 client
                     .ecs
                     .lock()
-                    .send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                    .send_event(SetSelectedHotbarSlotEvent {
                         entity: client.entity,
                         slot: slot as u8,
                     });
@@ -2400,7 +2398,7 @@ impl MinecraftConnection {
                 for dx in -1..=1 {
                     for dz in -1..=1 {
                         for dy in 0..2 {
-                            let place_pos = azalea::BlockPos::new(
+                            let place_pos = BlockPos::new(
                                 block_pos.x + dx,
                                 block_pos.y + dy,
                                 block_pos.z + dz,
@@ -2437,7 +2435,7 @@ impl MinecraftConnection {
 
                             // Place block
                             let target_pos =
-                                azalea::BlockPos::new(place_pos.x, place_pos.y - 1, place_pos.z);
+                                BlockPos::new(place_pos.x, place_pos.y - 1, place_pos.z);
                             client.look_at(Vec3::from(place_pos.center()));
                             let mut ticks = client.get_tick_broadcaster();
                             let _ =
@@ -2446,7 +2444,7 @@ impl MinecraftConnection {
                             client
                                 .ecs
                                 .lock()
-                                .send_event(azalea::interact::InteractBlockEvent {
+                                .send_event(InteractBlockEvent {
                                     entity: client.entity,
                                     position: target_pos,
                                     direction: Direction::Up,
@@ -2472,7 +2470,7 @@ impl MinecraftConnection {
         self.client
             .ecs
             .lock()
-            .send_event(azalea::entity::SetControlStateEvent {
+            .send_event(SetControlStateEvent {
                 entity: self.client.entity,
                 control: "sneak".to_owned(),
                 state: self.stealth_mode,
@@ -2530,7 +2528,7 @@ impl MinecraftConnection {
 
             // Check target health and give food if needed
             let health = client
-                .get_entity_component::<azalea::entity::Attributes>(entity)
+                .get_entity_component::<Attributes>(entity)
                 .map(|a| a.health)
                 .unwrap_or(20.0);
 
@@ -2554,7 +2552,7 @@ impl MinecraftConnection {
                         {
                             // Drop food for target
                             client.ecs.lock().send_event(
-                                azalea::inventory::SetSelectedHotbarSlotEvent {
+                                SetSelectedHotbarSlotEvent {
                                     entity: client.entity,
                                     slot: slot as u8,
                                 },
@@ -2562,7 +2560,7 @@ impl MinecraftConnection {
                             tokio::time::sleep(Duration::from_millis(200)).await;
 
                             // Drop the item (Q key)
-                            client.ecs.lock().send_event(azalea::entity::DropItemEvent {
+                            client.ecs.lock().send_event(DropItemEvent {
                                 entity: client.entity,
                                 slot: slot as u8,
                                 count: 1,
@@ -2597,7 +2595,7 @@ impl MinecraftConnection {
                                 // Attack mob
                                 if last_attack.elapsed() >= Duration::from_secs(1) {
                                     client.look_at(mob_pos);
-                                    client.ecs.lock().send_event(azalea::entity::AttackEvent {
+                                    client.ecs.lock().send_event(AttackEvent {
                                         entity: client.entity,
                                         target: mob_entity,
                                     });
@@ -2663,7 +2661,7 @@ impl MinecraftConnection {
 
                 // Check target health
                 let health = client
-                    .get_entity_component::<azalea::entity::Attributes>(target_entity)
+                    .get_entity_component::<Attributes>(target_entity)
                     .map(|a| a.health)
                     .unwrap_or(20.0);
 
@@ -2726,14 +2724,14 @@ impl MinecraftConnection {
 
                         // Give food to target (drop it)
                         client.ecs.lock().send_event(
-                            azalea::inventory::SetSelectedHotbarSlotEvent {
+                            SetSelectedHotbarSlotEvent {
                                 entity: client.entity,
                                 slot: slot as u8,
                             },
                         );
                         tokio::time::sleep(Duration::from_millis(200)).await;
 
-                        client.ecs.lock().send_event(azalea::entity::DropItemEvent {
+                        client.ecs.lock().send_event(DropItemEvent {
                             entity: client.entity,
                             slot: slot as u8,
                             count: 1,
@@ -2756,7 +2754,7 @@ impl MinecraftConnection {
                         if mob_pos.distance(target_pos) <= 8.0 {
                             // Attack mob threatening target
                             client.look_at(mob_pos);
-                            client.ecs.lock().send_event(azalea::entity::AttackEvent {
+                            client.ecs.lock().send_event(AttackEvent {
                                 entity: client.entity,
                                 target: mob_entity,
                             });
@@ -2795,7 +2793,7 @@ impl MinecraftConnection {
         let entity = self.client.entity;
         let position: Option<Position> = self.client.get_entity_component(entity);
         let attributes: Option<Attributes> = self.client.get_entity_component(entity);
-        let food = self.client.component::<azalea::hunger::Hunger>();
+        let food = self.client.component::<Hunger>();
 
         let pos = position.map(|p| Vec3::from(&p));
         let health_val = attributes.map(|a| a.health).unwrap_or(20.0);
@@ -2870,7 +2868,7 @@ impl MinecraftConnection {
             return Err(MinecraftTransportError::NotConnected);
         }
         let snapshot = self.inventory_snapshot()?;
-        let inventory = self.client.component::<azalea::inventory::Inventory>();
+        let inventory = self.client.component::<Inventory>();
 
         Ok(json!({
             "head": snapshot.helmet().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
@@ -2930,13 +2928,13 @@ impl MinecraftConnection {
         let mut blocks = Vec::new();
         let mut entities = Vec::new();
 
-        let base_block_pos = azalea::BlockPos::from(bot_pos);
+        let base_block_pos = BlockPos::from(bot_pos);
 
         // Scan blocks
         for dx in -radius..=radius {
             for dz in -radius..=radius {
                 for dy in -2..=2 {
-                    let check_pos = azalea::BlockPos::new(
+                    let check_pos = BlockPos::new(
                         base_block_pos.x + dx,
                         base_block_pos.y + dy,
                         base_block_pos.z + dz,
@@ -3055,7 +3053,7 @@ impl MinecraftConnection {
         self.client
             .ecs
             .lock()
-            .send_event(azalea::entity::SetControlStateEvent {
+            .send_event(SetControlStateEvent {
                 entity: self.client.entity,
                 control: "sneak".to_owned(),
                 state: enabled,
@@ -3170,14 +3168,14 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return;
         }
-        let inventory = self.client.component::<azalea::inventory::Inventory>();
+        let inventory = self.client.component::<Inventory>();
         if let Some(item) = inventory.slots.get(slot as usize) {
             if let Some(item_stack) = item.as_present() {
                 let drop_count = count.unwrap_or(item_stack.count).min(item_stack.count);
                 self.client
                     .ecs
                     .lock()
-                    .send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                    .send_event(SetSelectedHotbarSlotEvent {
                         entity: self.client.entity,
                         slot: slot as u8,
                     });
@@ -3186,7 +3184,7 @@ impl MinecraftConnection {
                     self.client
                         .ecs
                         .lock()
-                        .send_event(azalea::entity::DropItemEvent {
+                        .send_event(DropItemEvent {
                             entity: self.client.entity,
                             slot: slot as u8,
                             count: 1,
@@ -3202,7 +3200,7 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return;
         }
-        let inventory = self.client.component::<azalea::inventory::Inventory>();
+        let inventory = self.client.component::<Inventory>();
         let items = inventory.items().collect::<Vec<_>>();
         for item in items {
             let _ = self.toss_stack(&item).await;
@@ -3217,23 +3215,23 @@ impl MinecraftConnection {
         self.client
             .ecs
             .lock()
-            .send_event(azalea::inventory::operations::click::ClickOperation {
+            .send_event(ClickOperation {
                 entity: self.client.entity,
                 slot: from as u8,
-                click_type: azalea::inventory::operations::click::ClickType::Pickup,
-                button: azalea::inventory::operations::click::MouseButton::Left,
-                mode: azalea::inventory::operations::click::ClickMode::Normal,
+                click_type: ClickType::Pickup,
+                button: MouseButton::Left,
+                mode: ClickMode::Normal,
             });
         tokio::time::sleep(Duration::from_millis(100)).await;
         self.client
             .ecs
             .lock()
-            .send_event(azalea::inventory::operations::click::ClickOperation {
+            .send_event(ClickOperation {
                 entity: self.client.entity,
                 slot: to as u8,
-                click_type: azalea::inventory::operations::click::ClickType::Pickup,
-                button: azalea::inventory::operations::click::MouseButton::Left,
-                mode: azalea::inventory::operations::click::ClickMode::Normal,
+                click_type: ClickType::Pickup,
+                button: MouseButton::Left,
+                mode: ClickMode::Normal,
             });
     }
 
@@ -3246,7 +3244,7 @@ impl MinecraftConnection {
             self.client
                 .ecs
                 .lock()
-                .send_event(azalea::inventory::SetSelectedHotbarSlotEvent {
+                .send_event(SetSelectedHotbarSlotEvent {
                     entity: self.client.entity,
                     slot: slot as u8,
                 });
@@ -3258,13 +3256,13 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return;
         }
-        let block_pos = azalea::BlockPos::new(x, y, z);
+        let block_pos = BlockPos::new(x, y, z);
         let world = self.client.world();
         let world = world.read();
         let chunk_storage = world.chunks.clone();
         drop(world);
 
-        let goal = azalea::pathfinder::goals::ReachBlockPosGoal {
+        let goal = ReachBlockPosGoal {
             pos: block_pos,
             chunk_storage: chunk_storage.clone(),
         };
@@ -3274,7 +3272,7 @@ impl MinecraftConnection {
         let mut ticks = self.client.get_tick_broadcaster();
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
         loop {
-            if goal.success(azalea::BlockPos::from(self.client.position())) {
+            if goal.success(BlockPos::from(self.client.position())) {
                 break;
             }
             match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -3291,7 +3289,7 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return;
         }
-        let block_pos = azalea::BlockPos::new(x, y, z);
+        let block_pos = BlockPos::new(x, y, z);
         self.client.look_at(Vec3::from(block_pos.center()));
         let mut ticks = self.client.get_tick_broadcaster();
         let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
@@ -3299,7 +3297,7 @@ impl MinecraftConnection {
         self.client
             .ecs
             .lock()
-            .send_event(azalea::interact::InteractBlockEvent {
+            .send_event(InteractBlockEvent {
                 entity: self.client.entity,
                 position: block_pos,
                 direction: Direction::Up,
@@ -3521,7 +3519,7 @@ pub(crate) fn parse_mineable_block(name: &str) -> Option<RegistryBlock> {
 
 async fn mine_block_task(
     client: &mut Client,
-    target: azalea::BlockPos,
+    target: BlockPos,
     expected_block: RegistryBlock,
     chunk_storage: ChunkStorage,
 ) -> Result<(), &'static str> {
@@ -3537,7 +3535,7 @@ async fn mine_block_task(
     let mut ticks = client.get_tick_broadcaster();
     let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     loop {
-        if goal.success(azalea::BlockPos::from(client.position())) {
+        if goal.success(BlockPos::from(client.position())) {
             break;
         }
         match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -3593,7 +3591,7 @@ async fn mine_block_task(
 
 fn stop_active_mining(client: &Client) {
     let mut ecs = client.ecs.lock();
-    if ecs.get::<azalea::mining::Mining>(client.entity).is_some() {
+    if ecs.get::<Mining>(client.entity).is_some() {
         ecs.send_event(StopMiningBlockEvent {
             entity: client.entity,
         });

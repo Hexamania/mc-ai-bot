@@ -1,4 +1,5 @@
 use axum::extract::State;
+use socketioxide::socket::DisconnectReason;
 /**
  * Socket.io event handlers for web server
  * Handles all real-time communication between bot and dashboard
@@ -34,7 +35,7 @@ pub fn setup_main_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::MAIN, move |ns: socketioxide::Namespace| {
+    io.ns(namespaces::MAIN, move |ns| {
         let state = state_clone.clone();
 
         ns.on_connect(move |socket: SocketRef| {
@@ -90,7 +91,7 @@ pub fn setup_main_namespace(
 
             // Handle disconnection
             socket.on_disconnect(
-                move |_socket: SocketRef, _reason: socketioxide::socket::DisconnectReason| {
+                move |_socket: SocketRef, _reason: DisconnectReason| {
                     info!("[SOCKET] Dashboard disconnected");
                 },
             );
@@ -107,7 +108,7 @@ pub fn setup_admin_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::ADMIN, move |ns: socketioxide::Namespace| {
+    io.ns(namespaces::ADMIN, move |ns| {
         let state = state_clone.clone();
 
         ns.on_connect(move |socket: SocketRef| {
@@ -175,7 +176,7 @@ pub fn setup_commands_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::COMMANDS, move |ns: socketioxide::Namespace| {
+    io.ns(namespaces::COMMANDS, move |ns| {
         let state = state_clone.clone();
 
         ns.on_connect(move |socket: SocketRef| {

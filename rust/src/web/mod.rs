@@ -20,6 +20,7 @@ pub struct WebState {
     pub config: Arc<AppConfig>,
     pub connection: Arc<RwLock<Option<MinecraftConnection>>>,
     pub runtime: Option<Arc<RwLock<MinecraftRuntime>>>,
+    pub socket_io: Option<socketioxide::SocketIo>,
 }
 
 impl WebState {
@@ -28,6 +29,7 @@ impl WebState {
             config,
             connection: Arc::new(RwLock::new(None)),
             runtime: None,
+            socket_io: None,
         }
     }
 
@@ -37,6 +39,16 @@ impl WebState {
 
     pub fn set_runtime(&mut self, runtime: Arc<RwLock<MinecraftRuntime>>) {
         self.runtime = Some(runtime);
+    }
+
+    pub fn set_socket_io(&mut self, socket_io: socketioxide::SocketIo) {
+        self.socket_io = Some(socket_io);
+    }
+
+    pub fn get_socket_io(&self) -> Result<&socketioxide::SocketIo, String> {
+        self.socket_io
+            .as_ref()
+            .ok_or_else(|| "Socket.io not initialized".to_string())
     }
 
     pub async fn clear(&self) {

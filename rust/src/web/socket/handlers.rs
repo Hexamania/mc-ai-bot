@@ -41,8 +41,9 @@ pub fn setup_main_namespace(
             let state = state.clone();
 
             // Authentication - extract token from socket handshake auth
-            let auth_value = socket.auth();
-            let query_value = socket.query();
+            let handshake = socket.handshake();
+            let auth_value = handshake.auth.clone();
+            let query_value = handshake.query.clone();
 
             let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
@@ -55,7 +56,7 @@ pub fn setup_main_namespace(
                     };
 
                     // Store user data in socket
-                    socket.data.insert(user.clone());
+                    socket.data().insert(user.clone());
 
                     // Join default rooms
                     socket.join(rooms::ALL).ok();
@@ -73,7 +74,7 @@ pub fn setup_main_namespace(
                     send_initial_state(&socket, &state);
 
                     // Set up event handlers
-                    setup_socket_event_handlers(socket, state);
+                    setup_socket_event_handlers(socket, state, ns.io().clone());
                 } else {
                     socket
                         .emit(server_events::AUTH_FAILED, "Invalid token")
@@ -88,8 +89,8 @@ pub fn setup_main_namespace(
             }
 
             // Handle disconnection
-            socket.on_disconnect(move |_socket: SocketRef, reason: String| {
-                info!("[SOCKET] Dashboard disconnected: {}", reason);
+            socket.on_disconnect(move |_socket: SocketRef, _reason: socketioxide::socket::DisconnectReason| {
+                info!("[SOCKET] Dashboard disconnected");
             });
         });
     });
@@ -112,7 +113,7 @@ pub fn setup_admin_namespace(
 
             // Check if user is admin - get user from socket data
             let is_admin = socket
-                .data
+                .data()
                 .get::<SocketUser>()
                 .map(|user| matches!(user.role, crate::web::auth::UserRole::Admin))
                 .unwrap_or(false);
@@ -179,15 +180,16 @@ pub fn setup_commands_namespace(
             let state = state.clone();
 
             // Authentication
-            let auth_value = socket.auth();
-            let query_value = socket.query();
+            let handshake = socket.handshake();
+            let auth_value = handshake.auth.clone();
+            let query_value = handshake.query.clone();
 
             let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
             if let Some(token) = token {
                 let config = state.config.clone();
                 if verify_socket_token(&config, &token).is_ok() {
-                    socket.data.insert(SocketUser {
+                    socket.data().insert(SocketUser {
                         username: "dashboard".to_string(),
                         role: crate::web::auth::UserRole::Admin,
                     });

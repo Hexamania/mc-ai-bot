@@ -7,7 +7,7 @@ on:
     branches: [rust-rewrite]
 
 env:
-  RUSTUP_TOOLCHAIN: nightly-2024-11-01
+  RUSTUP_TOOLCHAIN: nightly-2025-01-15
 
 jobs:
   check-and-test:
@@ -22,7 +22,7 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2024-11-01
+          toolchain: nightly-2025-01-15
           components: rustfmt
       - name: Verify toolchain
         run: rustc --version && cargo --version

@@ -4,7 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use serde_json::{json, Value};
+use serde_json::{
+    json,
+    Value,
+};
 use azalea::{
     auto_tool::AutoToolClientExt,
     blocks::{Block as BlockTrait, BlockState, BlockStates},
@@ -12,6 +15,7 @@ use azalea::{
     entity::{metadata::Player, Position, Health, DropItemEvent, AttackEvent, SetControlStateEvent},
     inventory::{SetSelectedHotbarSlotEvent, operations::click::{ClickOperation, ClickType, MouseButton, ClickMode}},
     interact::InteractBlockEvent,
+    mining::StopMiningBlockEvent,
     pathfinder::{
         goals::{Goal, RadiusGoal, ReachBlockPosGoal},
         PathfinderClientExt,
@@ -19,9 +23,13 @@ use azalea::{
     protocol::packets::game::Hand,
     registry::Block as RegistryBlock,
     world::{chunk::ChunkStorage, direction::Direction},
-    GameProfileComponent, Vec3,
+    Account,
+    BotClientExt,
+    Client,
+    Event,
+    GameProfileComponent,
+    Vec3,
 };
-use azalea::{mining::StopMiningBlockEvent, Account, BotClientExt, Client, Event};
 use azalea_inventory::Inventory;
 use rand::Rng;
 use thiserror::Error;

@@ -524,20 +524,20 @@ async fn mine_block_task(
     }
 
     client.stop_pathfinding();
-    let world = client.world();
-    let world = world.read();
-    let Some(state) = world.get_block_state(&target) else {
-        return Err("target is no longer loaded");
+    let best_tool = {
+        let world = client.world();
+        let world = world.read();
+        let Some(state) = world.get_block_state(&target) else {
+            return Err("target is no longer loaded");
+        };
+        if state.is_air()
+            || RegistryBlock::from(state) != expected_block
+            || Box::<dyn BlockTrait>::from(state).behavior().destroy_time < 0.0
+        {
+            return Err("target is no longer breakable");
+        }
+        client.best_tool_in_hotbar_for_block(state)
     };
-    if state.is_air()
-        || RegistryBlock::from(state) != expected_block
-        || Box::<dyn BlockTrait>::from(state).behavior().destroy_time < 0.0
-    {
-        return Err("target is no longer breakable");
-    }
-    drop(world);
-
-    let best_tool = client.best_tool_in_hotbar_for_block(state);
     if best_tool.percentage_per_tick <= 0.0 {
         return Err("no suitable tool is available in the hotbar");
     }

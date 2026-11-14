@@ -6,23 +6,14 @@ pub mod handlers;
 
 use crate::web::WebState;
 use socketioxide::SocketIo;
+use socketioxide::layer::SocketIoLayer;
 use std::sync::Arc;
-use tower::ServiceBuilder;
 
 /// Initialize Socket.io with all namespaces
 pub fn initialize_socket_io(
     state: Arc<WebState>,
-) -> Result<
-    (
-        ServiceBuilder<
-            tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>,
-        >,
-        SocketIo,
-    ),
-    Box<dyn std::error::Error + Send + Sync>,
-> {
+) -> Result<(SocketIoLayer, SocketIo), Box<dyn std::error::Error + Send + Sync>> {
     let (layer, io) = SocketIo::new_layer();
-    let layer = ServiceBuilder::new().layer(layer);
 
     // Initialize all namespaces
     handlers::initialize_all_namespaces(&io, state)?;

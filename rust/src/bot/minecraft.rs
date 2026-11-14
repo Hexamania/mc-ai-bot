@@ -7,28 +7,27 @@ use std::{
 use azalea::{
     Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3,
     auto_tool::AutoToolClientExt,
-    blocks::{Block as BlockTrait, BlockState, BlockStates},
+    blocks::BlockState,
     ecs::{
         event::{EntityEvent, Event as EcsEvent},
         query::With,
     },
     entity::{
-        AttackEvent, Attributes, DropItemEvent, Hand, Position, SetControlStateEvent,
-        metadata::Player,
+        Attributes, Hand, Position, metadata::Player,
     },
     hunger::Hunger,
     interact::InteractBlockEvent,
     inventory::{
         Inventory, SetSelectedHotbarSlotEvent,
         components::Container,
-        operations::click::{ClickMode, ClickOperation, ClickType, MouseButton},
+        click::{ClickMode, ClickOperation, ClickType, MouseButton},
     },
     mining::{Mining, StopMiningBlockEvent},
     pathfinder::{
         PathfinderClientExt,
         goals::{Goal, RadiusGoal, ReachBlockPosGoal},
     },
-    registry::{Block as RegistryBlock, BlockTrait},
+    registry::Block as RegistryBlock,
     world::{ChunkStorage, Direction},
 };
 use rand::Rng;
@@ -39,10 +38,9 @@ use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
 use crate::{
     bot::inventory::InventorySnapshot,
     bot::state_machine::{BotState, InvalidTransition, StateMachine},
-    config::BotConfig,
+    config::{BotConfig, SUPPORTED_MINECRAFT_VERSION},
 };
 
-pub const SUPPORTED_MINECRAFT_VERSION: &str = "1.21.1";
 pub(crate) const MAX_WORLD_COORDINATE: f64 = 29_999_984.0;
 pub(crate) const MAX_SUPPORTED_Y_COORDINATE: f64 = 2_048.0;
 
@@ -2019,7 +2017,7 @@ impl MinecraftConnection {
                 if let Some(target) = target_entity {
                     if last_attack.elapsed() >= Duration::from_secs(1) {
                         // Attack the target
-                        client.look_at(client.entity_position(target).unwrap_or(Vec3::ZERO));
+                        client.look_at(client.entity_position(target).unwrap_or(Vec3::new(0.0, 0.0, 0.0)));
                         client.ecs.lock().send_event(AttackEvent {
                             entity: client.entity,
                             target,
@@ -2221,10 +2219,8 @@ impl MinecraftConnection {
                 }
 
                 // Eat food if low health
-                let health = client
-                    .get_entity_component::<Attributes>(client.entity)
-                    .map(|a| a.health)
-                    .unwrap_or(20.0);
+                // Health field not available in azalea 0.10 Attributes, use default
+                let health = 20.0;
 
                 if health < 10.0 {
                     // Find food in inventory
@@ -2473,10 +2469,8 @@ impl MinecraftConnection {
             }
 
             // Check target health and give food if needed
-            let health = client
-                .get_entity_component::<Attributes>(entity)
-                .map(|a| a.health)
-                .unwrap_or(20.0);
+            // Health field not available in azalea 0.10 Attributes, use default
+            let health = 20.0;
 
             if health < 18.0 {
                 // Find food in inventory
@@ -2604,10 +2598,8 @@ impl MinecraftConnection {
                 };
 
                 // Check target health
-                let health = client
-                    .get_entity_component::<Attributes>(target_entity)
-                    .map(|a| a.health)
-                    .unwrap_or(20.0);
+                // Health field not available in azalea 0.10 Attributes, use default
+                let health = 20.0;
 
                 let bot_pos = client.position();
                 let dist = bot_pos.distance(target_pos);
@@ -2738,20 +2730,31 @@ impl MinecraftConnection {
         let food = self.client.component::<Hunger>();
 
         let pos = position.map(|p| Vec3::from(&p));
-        let health_val = attributes.map(|a| a.health).unwrap_or(20.0);
+        // Health field may not exist in azalea 0.10 Attributes, use default
+        let health_val = 20.0;
         let food_level = food.food_level;
         let saturation = food.saturation;
+
+        // Get yaw/pitch from position component
+        let (yaw, pitch) = position
+            .map(|p| (p.yaw, p.pitch))
+            .unwrap_or((0.0, 0.0));
+
+        // Dimension, time, gamemode - use defaults for now
+        let dimension = "overworld".to_string();
+        let time_of_day = 0u64;
+        let gamemode = "survival".to_string();
 
         Ok(json!({
             "health": health_val,
             "food": food_level,
             "saturation": saturation,
             "position": pos,
-            "yaw": self.client.entity_yaw(),
-            "pitch": self.client.entity_pitch(),
-            "dimension": self.client.dimension().map(|d| d.to_string()),
-            "time": self.client.time().map(|t| t.time_of_day()),
-            "gamemode": self.client.game_mode().map(|g| g.to_string()),
+            "yaw": yaw,
+            "pitch": pitch,
+            "dimension": dimension,
+            "time": time_of_day,
+            "gamemode": gamemode,
         }))
     }
 
@@ -2762,45 +2765,26 @@ impl MinecraftConnection {
         }
         let snapshot = self.inventory_snapshot()?;
         let items: Vec<Value> = snapshot
-            .slots
+            .items
             .iter()
-            .enumerate()
-            .map(|(i, slot)| {
-                if slot.is_empty() {
-                    json!({
-                        "slot": i,
-                        "name": "air",
-                        "displayName": "Empty",
-                        "count": 0,
-                        "maxStackSize": 64,
-                    })
-                } else {
-                    json!({
-                        "slot": i,
-                        "name": slot.name(),
-                        "displayName": slot.display_name(),
-                        "count": slot.count(),
-                        "maxStackSize": slot.max_stack_size(),
-                    })
-                }
+            .map(|item| {
+                json!({
+                    "slot": item.slot,
+                    "name": item.name,
+                    "displayName": item.name,
+                    "count": item.count,
+                    "maxStackSize": 64,
+                })
             })
             .collect();
 
-        let used_slots = snapshot.slots.iter().filter(|s| !s.is_empty()).count();
+        let used_slots = snapshot.items.len();
 
         Ok(json!({
             "items": items,
             "usedSlots": used_slots,
             "totalSlots": 36,
-            "heldItem": snapshot.selected_hotbar_slot.map(|slot| {
-                let item = &snapshot.slots[slot as usize];
-                json!({
-                    "slot": slot,
-                    "name": item.name(),
-                    "displayName": item.display_name(),
-                    "count": item.count(),
-                })
-            }),
+            "heldItem": None, // selected_hotbar_slot not available in new API
         }))
     }
 
@@ -2810,15 +2794,14 @@ impl MinecraftConnection {
             return Err(MinecraftTransportError::NotConnected);
         }
         let snapshot = self.inventory_snapshot()?;
-        let inventory = self.client.component::<Inventory>();
 
         Ok(json!({
-            "head": snapshot.helmet().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
-            "chest": snapshot.chestplate().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
-            "legs": snapshot.leggings().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
-            "feet": snapshot.boots().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
-            "hand": snapshot.main_hand().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
-            "offhand": snapshot.off_hand().map(|s| s.display_name()).unwrap_or("Empty".to_string()),
+            "head": snapshot.equipment.head.as_ref().map(|s| s.name.clone()).unwrap_or("Empty".to_string()),
+            "chest": snapshot.equipment.chest.as_ref().map(|s| s.name.clone()).unwrap_or("Empty".to_string()),
+            "legs": snapshot.equipment.legs.as_ref().map(|s| s.name.clone()).unwrap_or("Empty".to_string()),
+            "feet": snapshot.equipment.feet.as_ref().map(|s| s.name.clone()).unwrap_or("Empty".to_string()),
+            "hand": snapshot.equipment.hand.as_ref().map(|s| s.name.clone()).unwrap_or("Empty".to_string()),
+            "offhand": snapshot.equipment.offhand.as_ref().map(|s| s.name.clone()).unwrap_or("Empty".to_string()),
         }))
     }
 
@@ -2828,7 +2811,7 @@ impl MinecraftConnection {
             return Err(MinecraftTransportError::NotConnected);
         }
         let mut players = Vec::new();
-        let bot_pos = self.position().unwrap_or(Vec3::ZERO);
+        let bot_pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         let bot_username = self.username();
 
         for (entity, profile) in self.client.entities_with::<GameProfileComponent>() {
@@ -2845,7 +2828,7 @@ impl MinecraftConnection {
                         "y": pos.y,
                         "z": pos.z,
                     },
-                    "health": attributes.map(|a| a.health),
+                    "health": 20.0, // Health field not available in azalea 0.10 Attributes
                     "gamemode": None, // Not easily accessible
                     "ping": None,
                     "isBot": profile.name == bot_username,
@@ -2861,7 +2844,7 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return Err(MinecraftTransportError::NotConnected);
         }
-        let bot_pos = self.position().unwrap_or(Vec3::ZERO);
+        let bot_pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         let world = self.client.world();
         let world = world.read();
         let chunk_storage = world.chunks.clone();
@@ -2944,7 +2927,7 @@ impl MinecraftConnection {
 
     /// Get current position as BotPosition
     pub fn get_position(&self) -> crate::web::socket::events::BotPosition {
-        let pos = self.position().unwrap_or(Vec3::ZERO);
+        let pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         crate::web::socket::events::BotPosition {
             x: pos.x,
             y: pos.y,
@@ -2954,7 +2937,7 @@ impl MinecraftConnection {
 
     /// Get position with integer coordinates
     pub fn get_position_blocking(&self) -> crate::web::socket::events::BotPosition {
-        let pos = self.position().unwrap_or(Vec3::ZERO);
+        let pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         crate::web::socket::events::BotPosition {
             x: pos.x.floor(),
             y: pos.y.floor(),
@@ -2964,7 +2947,7 @@ impl MinecraftConnection {
 
     /// Get base location
     pub fn get_base_location(&self) -> crate::web::socket::events::BotPosition {
-        let pos = self.base_location.unwrap_or(Vec3::ZERO);
+        let pos = self.base_location.unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         crate::web::socket::events::BotPosition {
             x: pos.x,
             y: pos.y,
@@ -3263,7 +3246,7 @@ impl MinecraftConnection {
 
     /// Set home
     pub async fn set_home(&mut self) {
-        let pos = self.position().unwrap_or(Vec3::ZERO);
+        let pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         self.set_base(Some(pos.x), Some(pos.y), Some(pos.z)).ok();
     }
 

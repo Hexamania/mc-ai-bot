@@ -6,14 +6,12 @@ use axum::{
     Router,
     extract::DefaultBodyLimit,
     http::{Method, header},
-    middleware,
     routing::get,
 };
 use socketioxide::SocketIo;
+use socketioxide::layer::SocketIoLayer;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tower::ServiceBuilder;
-use tower::layer::Identity;
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
@@ -40,11 +38,7 @@ pub struct WebServer {
     state: Arc<WebState>,
     app: Router,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<
-        ServiceBuilder<
-            tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>,
-        >,
-    >,
+    socket_io_layer: Option<SocketIoLayer>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -140,11 +134,7 @@ impl WebServer {
 fn create_router(
     state: Arc<WebState>,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<
-        ServiceBuilder<
-            tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>,
-        >,
-    >,
+    socket_io_layer: Option<SocketIoLayer>,
 ) -> Router<Arc<WebState>> {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -172,7 +162,7 @@ fn create_router(
 
     // Add Socket.io layer if available
     if let Some(layer) = socket_io_layer {
-        router = router.layer(layer);
+        router = router.layer(ServiceBuilder::new().layer(layer));
     }
 
     // Add global middleware

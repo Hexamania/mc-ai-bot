@@ -2,8 +2,8 @@
 use axum::extract::State;
 use socketioxide::{
     SocketIo,
-    extract::{Data, SocketRef},
-    socket::{DisconnectReason, HandshakeData},
+    extract::{Data, HandshakeData, SocketRef},
+    socket::DisconnectReason,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -53,7 +53,7 @@ pub fn setup_main_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::MAIN, move |ns: socketioxide::Namespace| {
+    io.ns(namespaces::MAIN, move |ns| {
         let state = state_clone.clone();
 
         ns.on_connect(
@@ -154,7 +154,7 @@ pub fn setup_admin_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::ADMIN, move |ns: socketioxide::Namespace| {
+    io.ns(namespaces::ADMIN, move |ns| {
         let state = state_clone.clone();
 
         ns.on_connect(move |socket: SocketRef| {
@@ -222,7 +222,7 @@ pub fn setup_commands_namespace(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_clone = state.clone();
 
-    io.ns(namespaces::COMMANDS, move |ns: socketioxide::Namespace| {
+    io.ns(namespaces::COMMANDS, move |ns| {
         let state = state_clone.clone();
 
         ns.on_connect(

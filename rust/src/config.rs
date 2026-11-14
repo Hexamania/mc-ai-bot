@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
+/// Supported Minecraft version for the bot
+pub const SUPPORTED_MINECRAFT_VERSION: &str = "1.21.1";
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct AppConfig {
     pub bot: BotConfig,

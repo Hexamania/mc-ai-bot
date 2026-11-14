@@ -11,7 +11,7 @@ use crate::{
     },
     command_registry::{CommandContext, CommandRegistry, CommandRegistryError, CommandResult},
     commands::{ChatParser, ChatParserConfig, MessageType, PermissionManager},
-    config::BotConfig,
+    config::{AppConfig, BotConfig},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,12 +52,37 @@ pub struct MinecraftRuntime {
 
 impl MinecraftRuntime {
     pub fn new(config: BotConfig) -> Self {
-        let command_registry = CommandRegistry::default();
+        Self::with_chat_config(config, ChatParserConfig::default(), None)
+    }
+
+    pub fn from_app_config(config: AppConfig) -> Self {
+        let chat_config = ChatParserConfig {
+            public_prefix: config.prefix.public,
+            admin_prefix: config.prefix.admin,
+            ignore_bot_messages: true,
+        };
+        Self::with_chat_config(config.bot, chat_config, Some(config.admin.password))
+    }
+
+    fn with_chat_config(
+        config: BotConfig,
+        chat_config: ChatParserConfig,
+        admin_password: Option<String>,
+    ) -> Self {
+        let command_registry = CommandRegistry::new(
+            chat_config.public_prefix.clone(),
+            chat_config.admin_prefix.clone(),
+        );
         let fatal_error = command_registry
-            .register_help_command("!")
+            .register_help_command(chat_config.public_prefix.clone())
             .and_then(|_| command_registry.register_ping_command())
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
+
+        let mut permissions = PermissionManager::default();
+        if let Some(password) = admin_password {
+            permissions.set_admin_password(password);
+        }
 
         Self {
             config,
@@ -65,8 +90,8 @@ impl MinecraftRuntime {
             state_machine: StateMachine::default(),
             reconnect_attempt: 0,
             command_registry,
-            chat_parser: ChatParser::default(),
-            permissions: PermissionManager::default(),
+            chat_parser: ChatParser::new(chat_config),
+            permissions,
             fatal_error,
         }
     }
@@ -83,8 +108,21 @@ impl MinecraftRuntime {
         &self.command_registry
     }
 
-    pub fn configure_chat(&mut self, config: ChatParserConfig) {
+    pub fn configure_chat(
+        &mut self,
+        config: ChatParserConfig,
+    ) -> Result<(), MinecraftRuntimeError> {
+        let prefix_changed = self.command_registry.get_prefix()? != config.public_prefix;
+        self.command_registry
+            .set_prefix(config.public_prefix.clone())?;
+        self.command_registry
+            .set_admin_prefix(config.admin_prefix.clone())?;
+        if prefix_changed {
+            self.command_registry
+                .register_help_command(config.public_prefix.clone())?;
+        }
         self.chat_parser.update_config(config);
+        Ok(())
     }
 
     pub fn permission_manager_mut(&mut self) -> &mut PermissionManager {
@@ -439,5 +477,29 @@ mod tests {
             ReplyDestination::Public
         ));
         assert_eq!(dispatch.replies[0].message, "🏓 Pong!");
+    }
+
+    #[test]
+    fn runtime_uses_application_prefix_and_admin_password() {
+        let app_config = AppConfig::from_values(&std::collections::HashMap::from([
+            ("PREFIX".to_owned(), ":".to_owned()),
+            ("ADMIN_PASSWORD".to_owned(), "secret".to_owned()),
+        ]))
+        .unwrap();
+        let mut runtime = MinecraftRuntime::from_app_config(app_config);
+
+        assert!(runtime.permissions.try_admin_login("Alex", "secret"));
+        let dispatch = run(runtime.dispatch_chat_command(Some("Alex"), ":ping", false))
+            .unwrap()
+            .unwrap();
+
+        let MinecraftRuntimeEvent::CommandExecuted {
+            command, result, ..
+        } = dispatch.event
+        else {
+            panic!("expected command execution event");
+        };
+        assert_eq!(command, "ping");
+        assert!(result.success);
     }
 }

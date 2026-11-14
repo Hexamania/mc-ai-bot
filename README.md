@@ -176,7 +176,9 @@ permission levels, and sends command replies back to public chat or private mess
 registry. Focused Rust tests cover defaults, invalid ports and memory shapes, lifecycle transitions,
 chat formats, command dispatch, typed argument validation, registry execution, permission checks,
 cooldowns, legacy migration, fact updates, persistence, and transport configuration.
-The `Rust core` GitHub Actions workflow checks formatting, all targets, and tests on Windows.
+The Rust bot can be started with `cargo run --manifest-path rust/Cargo.toml`; it reads the existing
+environment configuration, processes commands, and exits cleanly on Ctrl+C. The `Rust core` GitHub
+Actions workflow checks formatting, all targets, and tests on Windows.
 
 This is not yet a replacement application. Bot-specific automation, the HTTP and Socket.IO
 dashboard, and the Electron/Vue desktop app remain unported. Most application-specific commands
@@ -188,6 +190,7 @@ Check and test the Rust core with:
 ```bash
 cargo check --all-targets --manifest-path rust/Cargo.toml
 cargo test --manifest-path rust/Cargo.toml
+cargo run --manifest-path rust/Cargo.toml
 ```
 
 ## Project Structure

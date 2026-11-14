@@ -149,13 +149,10 @@ mod tests {
         assert_eq!(machine.state(), BotState::Connected);
 
         let error = machine.transition(BotState::Shutdown).unwrap_err();
-        assert_eq!(
-            error,
-            InvalidTransition {
-                from: BotState::Connected,
-                to: BotState::Shutdown
-            }
-        );
+        assert_eq!(error, InvalidTransition {
+            from: BotState::Connected,
+            to: BotState::Shutdown
+        });
         assert_eq!(machine.history().len(), 2);
     }
 

@@ -605,10 +605,10 @@ mod tests {
             split_arguments(r#"say "a \"quoted\" phrase" 'mixed "quotes' tail"#),
             ["say", r#"a "quoted" phrase"#, "mixed \"quotes", "tail"]
         );
-        assert_eq!(
-            split_arguments(r#"say "unfinished phrase"#),
-            ["say", "unfinished phrase"]
-        );
+        assert_eq!(split_arguments(r#"say "unfinished phrase"#), [
+            "say",
+            "unfinished phrase"
+        ]);
     }
 
     #[test]

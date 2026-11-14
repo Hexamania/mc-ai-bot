@@ -698,13 +698,10 @@ mod tests {
         let parsed = parser
             .parse(&raw(&["4", "FLY"]), &definitions, &[])
             .unwrap();
-        assert_eq!(
-            parsed.args,
-            vec![
-                ArgumentValue::Number(4.0),
-                ArgumentValue::String("fly".to_owned())
-            ]
-        );
+        assert_eq!(parsed.args, vec![
+            ArgumentValue::Number(4.0),
+            ArgumentValue::String("fly".to_owned())
+        ]);
         assert_eq!(
             parser.parse(&raw(&["4.5", "walk"]), &definitions, &[]),
             Err(ArgumentParseError("Must be an integer".to_owned()))
@@ -756,13 +753,10 @@ mod tests {
 
         assert_eq!(parsed.options["verbose"], ArgumentValue::Boolean(true));
         assert_eq!(parsed.options["limit"], ArgumentValue::Number(3.0));
-        assert_eq!(
-            parsed.args,
-            vec![
-                ArgumentValue::String("--unknown".to_owned()),
-                ArgumentValue::String("target".to_owned())
-            ]
-        );
+        assert_eq!(parsed.args, vec![
+            ArgumentValue::String("--unknown".to_owned()),
+            ArgumentValue::String("target".to_owned())
+        ]);
         assert_eq!(
             parsed.raw,
             raw(&["-v", "--limit", "3", "--unknown", "target"])
@@ -796,13 +790,10 @@ mod tests {
         let parsed = parser
             .parse(&raw(&["hello", "there"]), &definitions, &[])
             .unwrap();
-        assert_eq!(
-            parsed.args,
-            vec![ArgumentValue::List(vec![
-                ArgumentValue::String("hello".to_owned()),
-                ArgumentValue::String("there".to_owned())
-            ])]
-        );
+        assert_eq!(parsed.args, vec![ArgumentValue::List(vec![
+            ArgumentValue::String("hello".to_owned()),
+            ArgumentValue::String("there".to_owned())
+        ])]);
         assert!(parser.parse(&[], &definitions, &[]).is_err());
     }
 

@@ -269,9 +269,9 @@ impl Drop for MinecraftConnection {
 }
 
 fn player_position(client: &mut Client, username: &str) -> Option<Vec3> {
-    let entity = client.entity_by::<With<Player>, (&GameProfileComponent,)>(|(profile,)| {
-        profile.name.eq_ignore_ascii_case(username)
-    })?;
+    let entity = client.entity_by::<With<Player>, &GameProfileComponent>(
+        |profile: &&GameProfileComponent| profile.name.eq_ignore_ascii_case(username),
+    )?;
     let position: Position = client.get_entity_component(entity)?;
     Some(Vec3::from(&position))
 }

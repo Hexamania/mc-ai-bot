@@ -643,9 +643,7 @@ mod tests {
             |_| {},
         );
 
-        let result = run(registry.execute("follow", &mut context))
-            .unwrap()
-            .unwrap();
+        let result = run(registry.execute("follow", &mut context)).unwrap();
         assert!(result.success);
         assert_eq!(
             receiver.try_recv().unwrap(),
@@ -663,9 +661,7 @@ mod tests {
             |_| {},
             |_| {},
         );
-        let invalid_result = run(registry.execute("follow", &mut invalid_context))
-            .unwrap()
-            .unwrap();
+        let invalid_result = run(registry.execute("follow", &mut invalid_context)).unwrap();
         assert!(!invalid_result.success);
         assert!(receiver.try_recv().is_err());
 
@@ -677,9 +673,8 @@ mod tests {
             |_| {},
             |_| {},
         );
-        let default_range_result = run(registry.execute("follow", &mut default_range_context))
-            .unwrap()
-            .unwrap();
+        let default_range_result =
+            run(registry.execute("follow", &mut default_range_context)).unwrap();
         assert!(default_range_result.success);
         assert_eq!(
             receiver.try_recv().unwrap(),
@@ -697,9 +692,7 @@ mod tests {
             |_| {},
             |_| {},
         );
-        let stop_result = run(registry.execute("unfollow", &mut stop_context))
-            .unwrap()
-            .unwrap();
+        let stop_result = run(registry.execute("unfollow", &mut stop_context)).unwrap();
         assert!(stop_result.success);
         assert_eq!(
             receiver.try_recv().unwrap(),

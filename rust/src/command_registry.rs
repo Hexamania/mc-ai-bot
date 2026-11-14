@@ -724,10 +724,13 @@ impl CommandRegistry {
                 entry.uses = entry.uses.saturating_add(1);
             }
             _ => {
-                state.cooldowns.insert(key, CooldownEntry {
-                    window_start: now,
-                    uses: 1,
-                });
+                state.cooldowns.insert(
+                    key,
+                    CooldownEntry {
+                        window_start: now,
+                        uses: 1,
+                    },
+                );
             }
         }
         Ok(())

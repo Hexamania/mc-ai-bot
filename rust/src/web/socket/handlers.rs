@@ -147,14 +147,17 @@ pub fn setup_admin_namespace(
                                 let runtime = runtime_arc.read().await;
                                 runtime.execute_command(command).await;
                                 socket
-                                    .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                                        request_id: request_id.map(|s| s.to_string()),
-                                        command: format!("console:{}", command),
-                                        success: true,
-                                        output: Some(format!("Executed: /{}", command)),
-                                        error: None,
-                                        execution_time: None,
-                                    })
+                                    .emit(
+                                        server_events::COMMAND_RESULT,
+                                        CommandResultPayload {
+                                            request_id: request_id.map(|s| s.to_string()),
+                                            command: format!("console:{}", command),
+                                            success: true,
+                                            output: Some(format!("Executed: /{}", command)),
+                                            error: None,
+                                            execution_time: None,
+                                        },
+                                    )
                                     .ok();
                             }
                         });
@@ -262,18 +265,21 @@ pub fn setup_commands_namespace(
                                 let runtime = runtime_arc.read().await;
                                 let help = runtime.get_command_help(command, prefix).await;
                                 socket
-                                    .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                                        request_id: None,
-                                        command: command.to_string(),
-                                        success: help.is_some(),
-                                        output: help,
-                                        error: if help.is_none() {
-                                            Some(format!("No help found for \"{}\"", command))
-                                        } else {
-                                            None
+                                    .emit(
+                                        server_events::COMMAND_RESULT,
+                                        CommandResultPayload {
+                                            request_id: None,
+                                            command: command.to_string(),
+                                            success: help.is_some(),
+                                            output: help,
+                                            error: if help.is_none() {
+                                                Some(format!("No help found for \"{}\"", command))
+                                            } else {
+                                                None
+                                            },
+                                            execution_time: None,
                                         },
-                                        execution_time: None,
-                                    })
+                                    )
                                     .ok();
                             }
                         });
@@ -328,33 +334,41 @@ pub fn setup_commands_namespace(
                             let execution_time = start_time.elapsed().as_millis() as u64;
 
                             socket
-                                .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                                    request_id: Some(request_id),
-                                    command: data.command,
-                                    success: result,
-                                    output: if result {
-                                        Some("Command executed".to_string())
-                                    } else {
-                                        None
+                                .emit(
+                                    server_events::COMMAND_RESULT,
+                                    CommandResultPayload {
+                                        request_id: Some(request_id),
+                                        command: data.command,
+                                        success: result,
+                                        output: if result {
+                                            Some("Command executed".to_string())
+                                        } else {
+                                            None
+                                        },
+                                        error: if !result {
+                                            Some("Command failed or not found".to_string())
+                                        } else {
+                                            None
+                                        },
+                                        execution_time: Some(execution_time),
                                     },
-                                    error: if !result {
-                                        Some("Command failed or not found".to_string())
-                                    } else {
-                                        None
-                                    },
-                                    execution_time: Some(execution_time),
-                                })
+                                )
                                 .ok();
                         } else {
                             socket
-                                .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                                    request_id: Some(request_id),
-                                    command: data.command,
-                                    success: false,
-                                    output: None,
-                                    error: Some("Bot not connected".to_string()),
-                                    execution_time: Some(start_time.elapsed().as_millis() as u64),
-                                })
+                                .emit(
+                                    server_events::COMMAND_RESULT,
+                                    CommandResultPayload {
+                                        request_id: Some(request_id),
+                                        command: data.command,
+                                        success: false,
+                                        output: None,
+                                        error: Some("Bot not connected".to_string()),
+                                        execution_time: Some(
+                                            start_time.elapsed().as_millis() as u64
+                                        ),
+                                    },
+                                )
                                 .ok();
                         }
                     });
@@ -493,33 +507,39 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let execution_time = start_time.elapsed().as_millis() as u64;
 
                     socket
-                        .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                            request_id: Some(request_id),
-                            command: data.command,
-                            success: result,
-                            output: if result {
-                                Some("Command executed".to_string())
-                            } else {
-                                None
+                        .emit(
+                            server_events::COMMAND_RESULT,
+                            CommandResultPayload {
+                                request_id: Some(request_id),
+                                command: data.command,
+                                success: result,
+                                output: if result {
+                                    Some("Command executed".to_string())
+                                } else {
+                                    None
+                                },
+                                error: if !result {
+                                    Some("Command failed or not found".to_string())
+                                } else {
+                                    None
+                                },
+                                execution_time: Some(execution_time),
                             },
-                            error: if !result {
-                                Some("Command failed or not found".to_string())
-                            } else {
-                                None
-                            },
-                            execution_time: Some(execution_time),
-                        })
+                        )
                         .ok();
                 } else {
                     socket
-                        .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                            request_id: Some(request_id),
-                            command: data.command,
-                            success: false,
-                            output: None,
-                            error: Some("Bot is offline".to_string()),
-                            execution_time: Some(start_time.elapsed().as_millis() as u64),
-                        })
+                        .emit(
+                            server_events::COMMAND_RESULT,
+                            CommandResultPayload {
+                                request_id: Some(request_id),
+                                command: data.command,
+                                success: false,
+                                output: None,
+                                error: Some("Bot is offline".to_string()),
+                                execution_time: Some(start_time.elapsed().as_millis() as u64),
+                            },
+                        )
                         .ok();
                 }
             });
@@ -557,14 +577,17 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let result = runtime.follow_player(&data.username).await;
                     if !result {
                         socket
-                            .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                                request_id: None,
-                                command: "follow".to_string(),
-                                success: false,
-                                error: Some(format!("Player \"{}\" not found", data.username)),
-                                output: None,
-                                execution_time: None,
-                            })
+                            .emit(
+                                server_events::COMMAND_RESULT,
+                                CommandResultPayload {
+                                    request_id: None,
+                                    command: "follow".to_string(),
+                                    success: false,
+                                    error: Some(format!("Player \"{}\" not found", data.username)),
+                                    output: None,
+                                    execution_time: None,
+                                },
+                            )
                             .ok();
                     }
                 }
@@ -585,10 +608,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     // Broadcast feature toggled
                     io.of(namespaces::MAIN)
                         .to(rooms::ALL)
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "all".to_string(),
-                            enabled: false,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "all".to_string(),
+                                enabled: false,
+                            },
+                        )
                         .ok();
 
                     // Broadcast bulk update
@@ -775,10 +801,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     // Broadcast feature toggled
                     io.of(namespaces::MAIN)
                         .to(rooms::ALL)
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "killAura".to_string(),
-                            enabled,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "killAura".to_string(),
+                                enabled,
+                            },
+                        )
                         .ok();
 
                     // Broadcast bulk update
@@ -804,10 +833,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 
                     io.of(namespaces::MAIN)
                         .to(rooms::ALL)
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "autoDefense".to_string(),
-                            enabled,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "autoDefense".to_string(),
+                                enabled,
+                            },
+                        )
                         .ok();
 
                     let bot_state = runtime.get_state().await;
@@ -841,10 +873,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     }
 
                     socket
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "roaming".to_string(),
-                            enabled,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "roaming".to_string(),
+                                enabled,
+                            },
+                        )
                         .ok();
                 }
             });
@@ -864,10 +899,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                         runtime.stop_farming().await;
                     }
                     socket
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "farming".to_string(),
-                            enabled,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "farming".to_string(),
+                                enabled,
+                            },
+                        )
                         .ok();
                 }
             });
@@ -887,10 +925,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                         runtime.stop_mining().await;
                     }
                     socket
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "mining".to_string(),
-                            enabled,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "mining".to_string(),
+                                enabled,
+                            },
+                        )
                         .ok();
                 }
             });
@@ -910,10 +951,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                         runtime.stop_lumberjack().await;
                     }
                     socket
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "lumberjack".to_string(),
-                            enabled,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "lumberjack".to_string(),
+                                enabled,
+                            },
+                        )
                         .ok();
                 }
             });
@@ -949,10 +993,13 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     // Broadcast feature toggled
                     io.of(namespaces::MAIN)
                         .to(rooms::ALL)
-                        .emit(server_events::FEATURE_TOGGLED, FeatureToggledPayload {
-                            feature: "all".to_string(),
-                            enabled: false,
-                        })
+                        .emit(
+                            server_events::FEATURE_TOGGLED,
+                            FeatureToggledPayload {
+                                feature: "all".to_string(),
+                                enabled: false,
+                            },
+                        )
                         .ok();
 
                     if let Some(conn) = state.connection.read().await.as_ref() {
@@ -1061,22 +1108,25 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let runtime = runtime_arc.read().await;
                     let success = runtime.remember_fact(&data.key, &data.fact).await;
                     socket
-                        .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                            request_id: None,
-                            command: "remember".to_string(),
-                            success,
-                            output: if success {
-                                Some(format!("Remembered: {}", data.key))
-                            } else {
-                                None
+                        .emit(
+                            server_events::COMMAND_RESULT,
+                            CommandResultPayload {
+                                request_id: None,
+                                command: "remember".to_string(),
+                                success,
+                                output: if success {
+                                    Some(format!("Remembered: {}", data.key))
+                                } else {
+                                    None
+                                },
+                                error: if !success {
+                                    Some("Failed to remember fact".to_string())
+                                } else {
+                                    None
+                                },
+                                execution_time: None,
                             },
-                            error: if !success {
-                                Some("Failed to remember fact".to_string())
-                            } else {
-                                None
-                            },
-                            execution_time: None,
-                        })
+                        )
                         .ok();
                 }
             });
@@ -1093,22 +1143,25 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let runtime = runtime_arc.read().await;
                     let success = runtime.forget_fact(key).await;
                     socket
-                        .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                            request_id: None,
-                            command: "forget".to_string(),
-                            success,
-                            output: if success {
-                                Some(format!("Forgot: {}", key))
-                            } else {
-                                None
+                        .emit(
+                            server_events::COMMAND_RESULT,
+                            CommandResultPayload {
+                                request_id: None,
+                                command: "forget".to_string(),
+                                success,
+                                output: if success {
+                                    Some(format!("Forgot: {}", key))
+                                } else {
+                                    None
+                                },
+                                error: if !success {
+                                    Some("Fact not found".to_string())
+                                } else {
+                                    None
+                                },
+                                execution_time: None,
                             },
-                            error: if !success {
-                                Some("Fact not found".to_string())
-                            } else {
-                                None
-                            },
-                            execution_time: None,
-                        })
+                        )
                         .ok();
                 }
             });
@@ -1125,22 +1178,25 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let runtime = runtime_arc.read().await;
                     let success = runtime.add_rule(rule).await;
                     socket
-                        .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                            request_id: None,
-                            command: "add_rule".to_string(),
-                            success,
-                            output: if success {
-                                Some(format!("Added rule: {}", rule))
-                            } else {
-                                None
+                        .emit(
+                            server_events::COMMAND_RESULT,
+                            CommandResultPayload {
+                                request_id: None,
+                                command: "add_rule".to_string(),
+                                success,
+                                output: if success {
+                                    Some(format!("Added rule: {}", rule))
+                                } else {
+                                    None
+                                },
+                                error: if !success {
+                                    Some("Rule already exists or failed".to_string())
+                                } else {
+                                    None
+                                },
+                                execution_time: None,
                             },
-                            error: if !success {
-                                Some("Rule already exists or failed".to_string())
-                            } else {
-                                None
-                            },
-                            execution_time: None,
-                        })
+                        )
                         .ok();
                 }
             });
@@ -1157,22 +1213,25 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let runtime = runtime_arc.read().await;
                     let success = runtime.remove_rule(rule).await;
                     socket
-                        .emit(server_events::COMMAND_RESULT, CommandResultPayload {
-                            request_id: None,
-                            command: "remove_rule".to_string(),
-                            success,
-                            output: if success {
-                                Some(format!("Removed rule: {}", rule))
-                            } else {
-                                None
+                        .emit(
+                            server_events::COMMAND_RESULT,
+                            CommandResultPayload {
+                                request_id: None,
+                                command: "remove_rule".to_string(),
+                                success,
+                                output: if success {
+                                    Some(format!("Removed rule: {}", rule))
+                                } else {
+                                    None
+                                },
+                                error: if !success {
+                                    Some("Rule not found".to_string())
+                                } else {
+                                    None
+                                },
+                                execution_time: None,
                             },
-                            error: if !success {
-                                Some("Rule not found".to_string())
-                            } else {
-                                None
-                            },
-                            execution_time: None,
-                        })
+                        )
                         .ok();
                 }
             });
@@ -1185,11 +1244,14 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
         move |socket: SocketRef, Data(data): Data<PingPayload>| {
             let latency = chrono::Utc::now().timestamp_millis() as u64 - data.timestamp;
             socket
-                .emit(server_events::PONG, PongPayload {
-                    pong: true,
-                    timestamp: chrono::Utc::now().timestamp_millis() as u64,
-                    latency,
-                })
+                .emit(
+                    server_events::PONG,
+                    PongPayload {
+                        pong: true,
+                        timestamp: chrono::Utc::now().timestamp_millis() as u64,
+                        latency,
+                    },
+                )
                 .ok();
         },
     );
@@ -1247,12 +1309,15 @@ pub async fn broadcast_log(state: &WebState, level: &str, tag: &str, message: &s
     if let Ok(io) = state.get_socket_io() {
         io.of(namespaces::MAIN)
             .to(rooms::LOGS)
-            .emit(server_events::LOG_ENTRY, LogEntryPayload {
-                level: level.to_string(),
-                tag: tag.to_string(),
-                message: message.to_string(),
-                timestamp: chrono::Utc::now().to_rfc3339(),
-            })
+            .emit(
+                server_events::LOG_ENTRY,
+                LogEntryPayload {
+                    level: level.to_string(),
+                    tag: tag.to_string(),
+                    message: message.to_string(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+            )
             .ok();
     }
 }
@@ -1267,12 +1332,15 @@ pub async fn broadcast_chat_message(
     if let Ok(io) = state.get_socket_io() {
         io.of(namespaces::MAIN)
             .to(rooms::ALL)
-            .emit(server_events::CHAT_MESSAGE, ChatMessagePayload {
-                username: username.to_string(),
-                message: message.to_string(),
-                message_type: message_type.to_string(),
-                timestamp: chrono::Utc::now().to_rfc3339(),
-            })
+            .emit(
+                server_events::CHAT_MESSAGE,
+                ChatMessagePayload {
+                    username: username.to_string(),
+                    message: message.to_string(),
+                    message_type: message_type.to_string(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+            )
             .ok();
     }
 }
@@ -1282,11 +1350,14 @@ pub async fn broadcast_command_output(state: &WebState, message: &str, output_ty
     if let Ok(io) = state.get_socket_io() {
         io.of(namespaces::MAIN)
             .to(rooms::ALL)
-            .emit(server_events::COMMAND_OUTPUT, CommandOutputPayload {
-                message: message.to_string(),
-                output_type: output_type.to_string(),
-                timestamp: chrono::Utc::now().to_rfc3339(),
-            })
+            .emit(
+                server_events::COMMAND_OUTPUT,
+                CommandOutputPayload {
+                    message: message.to_string(),
+                    output_type: output_type.to_string(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+            )
             .ok();
     }
 }

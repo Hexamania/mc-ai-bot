@@ -251,9 +251,9 @@ mod tests {
         config.bot.host.clear();
         config.bot.username.clear();
 
-        assert_eq!(config.validate(), vec![
-            "MC_HOST is required",
-            "MC_USERNAME is required"
-        ]);
+        assert_eq!(
+            config.validate(),
+            vec!["MC_HOST is required", "MC_USERNAME is required"]
+        );
     }
 }

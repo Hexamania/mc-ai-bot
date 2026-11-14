@@ -2755,10 +2755,13 @@ mod tests {
 
         let result = run(registry.execute("follow", &mut context)).unwrap();
         assert!(result.success);
-        assert_eq!(receiver.try_recv().unwrap(), RuntimeCommandAction::Follow {
-            target: "Jordan".to_owned(),
-            range: 4.0,
-        });
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Follow {
+                target: "Jordan".to_owned(),
+                range: 4.0,
+            }
+        );
 
         let mut invalid_context = CommandContext::new(
             "Alex",
@@ -2783,10 +2786,13 @@ mod tests {
         let default_range_result =
             run(registry.execute("follow", &mut default_range_context)).unwrap();
         assert!(default_range_result.success);
-        assert_eq!(receiver.try_recv().unwrap(), RuntimeCommandAction::Follow {
-            target: "Jordan".to_owned(),
-            range: 2.0,
-        });
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            RuntimeCommandAction::Follow {
+                target: "Jordan".to_owned(),
+                range: 2.0,
+            }
+        );
 
         let mut stop_context = CommandContext::new(
             "Alex",

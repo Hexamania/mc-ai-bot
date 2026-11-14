@@ -40,7 +40,11 @@ pub struct WebServer {
     state: Arc<WebState>,
     app: Router,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<ServiceBuilder<tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>>>,
+    socket_io_layer: Option<
+        ServiceBuilder<
+            tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>,
+        >,
+    >,
     server_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -136,7 +140,11 @@ impl WebServer {
 fn create_router(
     state: Arc<WebState>,
     socket_io: Option<SocketIo>,
-    socket_io_layer: Option<ServiceBuilder<tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>>>,
+    socket_io_layer: Option<
+        ServiceBuilder<
+            tower::layer::util::Stack<socketioxide::layer::SocketIoLayer, tower::layer::Identity>,
+        >,
+    >,
 ) -> Router<Arc<WebState>> {
     let cors = CorsLayer::new()
         .allow_origin(Any)

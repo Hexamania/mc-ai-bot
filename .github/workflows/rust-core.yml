@@ -7,7 +7,7 @@ on:
     branches: [rust-rewrite]
 
 env:
-  RUSTUP_TOOLCHAIN: nightly-2025-11-01
+  RUSTUP_TOOLCHAIN: nightly-2025-11-15
 
 jobs:
   check-and-test:

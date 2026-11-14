@@ -24,6 +24,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          autocrlf: false
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master

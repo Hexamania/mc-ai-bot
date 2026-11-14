@@ -1,11 +1,11 @@
 use axum::extract::State;
-use socketioxide::socket::DisconnectReason;
 /**
  * Socket.io event handlers for web server
  * Handles all real-time communication between bot and dashboard
  */
 use socketioxide::SocketIo;
 use socketioxide::extract::{Data, SocketRef};
+use socketioxide::socket::DisconnectReason;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -90,11 +90,9 @@ pub fn setup_main_namespace(
             }
 
             // Handle disconnection
-            socket.on_disconnect(
-                move |_socket: SocketRef, _reason: DisconnectReason| {
-                    info!("[SOCKET] Dashboard disconnected");
-                },
-            );
+            socket.on_disconnect(move |_socket: SocketRef, _reason: DisconnectReason| {
+                info!("[SOCKET] Dashboard disconnected");
+            });
         });
     });
 

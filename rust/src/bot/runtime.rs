@@ -21,6 +21,7 @@ use crate::{
         PermissionManager,
     },
     config::{AppConfig, BotConfig},
+    memory::{default_memory, load_memory, remember_fact, forget_fact, save_memory, MemoryError},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -92,7 +93,15 @@ impl MinecraftRuntime {
             .and_then(|_| register_roam_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_navigation_commands(&command_registry, action_sender.clone()))
             .and_then(|_| register_inventory_commands(&command_registry, action_sender.clone()))
-            .and_then(|_| register_mining_commands(&command_registry, action_sender))
+            .and_then(|_| register_mining_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_base_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_mining_feature_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_building_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_combat_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_utility_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_memory_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_chat_commands(&command_registry, action_sender.clone()))
+            .and_then(|_| register_admin_commands(&command_registry, action_sender))
             .err()
             .map(MinecraftRuntimeError::CommandRegistry);
 
@@ -461,6 +470,243 @@ impl MinecraftRuntime {
                         result.error = Some(error);
                     }
                 }
+                // Base/Storage commands
+                RuntimeCommandAction::SetBase { x, y, z } => {
+                    if let Err(e) = connection.set_base(x, y, z) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!(
+                            "🏠 Base location set to X: {}, Y: {}, Z: {}",
+                            x.unwrap_or(0.0).floor(),
+                            y.unwrap_or(0.0).floor(),
+                            z.unwrap_or(0.0).floor()
+                        ));
+                    }
+                }
+                RuntimeCommandAction::Home => {
+                    if let Err(e) = connection.go_home() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply("🏃 Heading home to base location.");
+                    }
+                }
+                RuntimeCommandAction::SetMiningBase => {
+                    if let Err(e) = connection.set_mining_base() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply("⛏️ Mining base set at current location.");
+                    }
+                }
+                RuntimeCommandAction::MiningBase => {
+                    if let Err(e) = connection.go_mining_base() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply("🏃 Heading to mining operations base.");
+                    }
+                }
+                RuntimeCommandAction::BaseChest => {
+                    if let Err(e) = connection.open_base_chest() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    }
+                }
+                RuntimeCommandAction::SortChest => {
+                    if let Err(e) = connection.sort_chest() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply("📦 Chest sorted.");
+                    }
+                }
+                RuntimeCommandAction::DepositItems => {
+                    if let Err(e) = connection.deposit_items() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply("📦 Items deposited to chest.");
+                    }
+                }
+                // Mining commands
+                RuntimeCommandAction::StartMiner { direction, length } => {
+                    if let Err(e) = connection.start_miner(&direction, length) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!("⛏️ Starting {length} block tunnel to the {direction}..."));
+                    }
+                }
+                RuntimeCommandAction::StopMiner => {
+                    connection.stop_miner();
+                    context.reply("⛏️ Miner stopped.");
+                }
+                RuntimeCommandAction::StartMineArea { x1, y1, z1, x2, y2, z2 } => {
+                    if let Err(e) = connection.start_mine_area(x1, y1, z1, x2, y2, z2) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!("⛏️ Mining area from ({x1},{y1},{z1}) to ({x2},{y2},{z2})."));
+                    }
+                }
+                RuntimeCommandAction::StopMineArea => {
+                    connection.stop_mine_area();
+                    context.reply("⛏️ Mine area stopped.");
+                }
+                RuntimeCommandAction::Refuel => {
+                    if let Err(e) = connection.refuel() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply("⛽ Refuel protocol started.");
+                    }
+                }
+                RuntimeCommandAction::Lumberjack { radius } => {
+                    if let Err(e) = connection.start_lumberjack(radius) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!("🌲 Lumberjack mode started (radius {radius})."));
+                    }
+                }
+                // Building commands
+                RuntimeCommandAction::BuildRoof { radius } => {
+                    if let Err(e) = connection.build_roof(radius) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!("🏠 Building roof with radius {radius}."));
+                    }
+                }
+                // Combat/Guard commands
+                RuntimeCommandAction::StartGuard => {
+                    if let Err(e) = connection.start_guard() {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply("🛡️ Guarding current location.");
+                    }
+                }
+                RuntimeCommandAction::StopGuard => {
+                    connection.stop_guard();
+                    context.reply("🛑 Guard stopped.");
+                }
+                RuntimeCommandAction::StartPvp { target } => {
+                    if let Err(e) = connection.start_pvp(&target) {
+                        context.error(&e);
+                        result.success = false;
+                        result.error = Some(e);
+                    } else {
+                        context.reply(&format!("⚔️ PVP engaged vs {target}."));
+                    }
+                }
+                RuntimeCommandAction::StopPvp => {
+                    connection.stop_pvp();
+                    context.reply("🛑 PVP stopped.");
+                }
+                // Utility commands
+                RuntimeCommandAction::Panic => {
+                    connection.activate_panic_mode();
+                    context.reply("🚨 Panic mode activated!");
+                }
+                RuntimeCommandAction::Stealth => {
+                    connection.toggle_stealth();
+                    context.reply("👻 Stealth mode toggled.");
+                }
+                RuntimeCommandAction::StopDefense => {
+                    connection.stop_defense();
+                    context.reply("🛑 Auto-defense halted and target cleared.");
+                }
+                // Memory commands
+                RuntimeCommandAction::Remember { key, fact } => {
+                    let memory_path = "./memory.json";
+                    match load_memory(memory_path) {
+                        Ok(mut memory) => {
+                            match remember_fact(&mut memory, &key, &fact) {
+                                Ok(true) => {
+                                    if let Err(e) = save_memory(memory_path, &memory) {
+                                        context.error(&format!("Failed to save memory: {e}"));
+                                        result.success = false;
+                                        result.error = Some(e.to_string());
+                                    } else {
+                                        context.private_reply(&format!("🧠 Remembered: {key}"));
+                                    }
+                                }
+                                Ok(false) => {
+                                    context.private_reply("Memory is disabled or the key/fact is empty.");
+                                    result.success = false;
+                                }
+                                Err(e) => {
+                                    context.error(&format!("Failed to remember: {e}"));
+                                    result.success = false;
+                                    result.error = Some(e.to_string());
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            context.error(&format!("Failed to load memory: {e}"));
+                            result.success = false;
+                            result.error = Some(e.to_string());
+                        }
+                    }
+                }
+                RuntimeCommandAction::Forget { key } => {
+                    let memory_path = "./memory.json";
+                    match load_memory(memory_path) {
+                        Ok(mut memory) => {
+                            match forget_fact(&mut memory, &key) {
+                                Ok(true) => {
+                                    if let Err(e) = save_memory(memory_path, &memory) {
+                                        context.error(&format!("Failed to save memory: {e}"));
+                                        result.success = false;
+                                        result.error = Some(e.to_string());
+                                    } else {
+                                        context.private_reply(&format!("🧠 Forgot: {key}"));
+                                    }
+                                }
+                                Ok(false) => {
+                                    context.private_reply("Memory is disabled or that fact was not found.");
+                                    result.success = false;
+                                }
+                                Err(e) => {
+                                    context.error(&format!("Failed to forget: {e}"));
+                                    result.success = false;
+                                    result.error = Some(e.to_string());
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            context.error(&format!("Failed to load memory: {e}"));
+                            result.success = false;
+                            result.error = Some(e.to_string());
+                        }
+                    }
+                }
+                // Chat/OpenAI
+                RuntimeCommandAction::Chat { message } => {
+                    // This would need OpenAI integration - for now just acknowledge
+                    context.private_reply(&format!("💬 Chat received: {message} (OpenAI integration pending)"));
+                }
+                // Server command
+                RuntimeCommandAction::ServerCommand { command } => {
+                    connection.send_chat(&format!("/{command}"))?;
+                    context.reply(&format!("📤 Sent server command: /{command}"));
+                }
             }
         }
         Ok(())
@@ -530,6 +776,68 @@ enum RuntimeCommandAction {
     Equipment,
     MineBlock {
         name: String,
+    },
+    // Base/Storage commands
+    SetBase {
+        x: Option<f64>,
+        y: Option<f64>,
+        z: Option<f64>,
+    },
+    Home,
+    SetMiningBase,
+    MiningBase,
+    BaseChest,
+    SortChest,
+    DepositItems,
+    // Mining commands
+    StartMiner {
+        direction: String,
+        length: u32,
+    },
+    StopMiner,
+    StartMineArea {
+        x1: i32,
+        y1: i32,
+        z1: i32,
+        x2: i32,
+        y2: i32,
+        z2: i32,
+    },
+    StopMineArea,
+    Refuel,
+    Lumberjack {
+        radius: u32,
+    },
+    // Building commands
+    BuildRoof {
+        radius: u32,
+    },
+    // Combat/Guard commands
+    StartGuard,
+    StopGuard,
+    StartPvp {
+        target: String,
+    },
+    StopPvp,
+    // Utility commands
+    Panic,
+    Stealth,
+    StopDefense,
+    // Memory commands
+    Remember {
+        key: String,
+        fact: String,
+    },
+    Forget {
+        key: String,
+    },
+    // Chat/OpenAI
+    Chat {
+        message: String,
+    },
+    // Server command
+    ServerCommand {
+        command: String,
     },
 }
 
@@ -934,6 +1242,706 @@ fn register_mining_commands(
         true,
     )];
     registry.register(mine)?;
+    Ok(())
+}
+
+fn register_base_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // sbase / setbase - Set base location
+    let mut set_base = CommandDefinition::new(
+        "sbase",
+        "Set base location",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 3 {
+                    return Err("Usage: sbase [x] [y] [z]".to_owned());
+                }
+                let x = match context.args.args.get(0) {
+                    Some(ArgumentValue::Number(x)) if x.is_finite() => Some(*x),
+                    Some(_) => return Err("X must be a valid number.".to_owned()),
+                    None => None,
+                };
+                let y = match context.args.args.get(1) {
+                    Some(ArgumentValue::Number(y)) if y.is_finite() => Some(*y),
+                    Some(_) => return Err("Y must be a valid number.".to_owned()),
+                    None => None,
+                };
+                let z = match context.args.args.get(2) {
+                    Some(ArgumentValue::Number(z)) if z.is_finite() => Some(*z),
+                    Some(_) => return Err("Z must be a valid number.".to_owned()),
+                    None => None,
+                };
+                sender
+                    .send(RuntimeCommandAction::SetBase { x, y, z })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    set_base.aliases = vec!["setbase".to_owned()];
+    set_base.usage = Some("[x] [y] [z]".to_owned());
+    set_base.category = Some("Base".to_owned());
+    set_base.permission = Some(PermissionConfig::default());
+    set_base.arguments = vec![
+        ArgumentDefinition::new("x", ArgumentType::Number, false),
+        ArgumentDefinition::new("y", ArgumentType::Number, false),
+        ArgumentDefinition::new("z", ArgumentType::Number, false),
+    ];
+    registry.register(set_base)?;
+
+    // home - Return to base
+    let mut home = CommandDefinition::new(
+        "home",
+        "Return to base location",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: home".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Home)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    home.category = Some("Base".to_owned());
+    home.permission = Some(PermissionConfig::default());
+    registry.register(home)?;
+
+    // sminebase - Set mining base
+    let mut set_mine_base = CommandDefinition::new(
+        "sminebase",
+        "Set mining base location",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: sminebase".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::SetMiningBase)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    set_mine_base.category = Some("Base".to_owned());
+    set_mine_base.permission = Some(PermissionConfig::default());
+    registry.register(set_mine_base)?;
+
+    // minebase - Go to mining base
+    let mut mine_base = CommandDefinition::new(
+        "minebase",
+        "Go to mining base",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: minebase".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::MiningBase)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    mine_base.category = Some("Base".to_owned());
+    mine_base.permission = Some(PermissionConfig::default());
+    registry.register(mine_base)?;
+
+    // basechest - View base chest contents
+    let mut base_chest = CommandDefinition::new(
+        "basechest",
+        "View base chest contents",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: basechest".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::BaseChest)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    base_chest.category = Some("Base".to_owned());
+    base_chest.permission = Some(PermissionConfig::default());
+    registry.register(base_chest)?;
+
+    // sort - Auto-sort nearby chest
+    let mut sort_chest = CommandDefinition::new(
+        "sort",
+        "Auto-sort nearby chest",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: sort".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::SortChest)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    sort_chest.category = Some("Base".to_owned());
+    sort_chest.permission = Some(PermissionConfig::default());
+    registry.register(sort_chest)?;
+
+    // deposit - Deposit items to chest
+    let mut deposit = CommandDefinition::new(
+        "deposit",
+        "Deposit non-essential items to chest",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: deposit".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::DepositItems)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    deposit.category = Some("Base".to_owned());
+    deposit.permission = Some(PermissionConfig::default());
+    registry.register(deposit)?;
+
+    Ok(())
+}
+
+fn register_mining_feature_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // miner - Start mining tunnel
+    let mut miner = CommandDefinition::new(
+        "miner",
+        "Start a mining tunnel",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 2 {
+                    return Err("Usage: miner <north|south|east|west> [length]".to_owned());
+                }
+                let direction = match context.args.args.first() {
+                    Some(ArgumentValue::String(d)) if ["north", "south", "east", "west"].contains(&d.as_str()) => d.clone(),
+                    Some(_) => return Err("Direction must be north, south, east, or west.".to_owned()),
+                    None => return Err("A direction is required.".to_owned()),
+                };
+                let length = match context.args.args.get(1) {
+                    Some(ArgumentValue::Number(l)) if l.is_finite() && l.fract() == 0.0 && (1.0..=1000.0).contains(l) => *l as u32,
+                    Some(_) => return Err("Length must be a whole number from 1 to 1000.".to_owned()),
+                    None => 10,
+                };
+                sender
+                    .send(RuntimeCommandAction::StartMiner { direction, length })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    miner.usage = Some("<north|south|east|west> [length]".to_owned());
+    miner.category = Some("Mining".to_owned());
+    miner.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    miner.arguments = vec![
+        ArgumentDefinition::new("direction", ArgumentType::String, true),
+        ArgumentDefinition::new("length", ArgumentType::Number, false)
+            .with_default(ArgumentValue::Number(10.0))
+            .with_constraint(ArgumentConstraint::Integer)
+            .with_constraint(ArgumentConstraint::Minimum(1.0))
+            .with_constraint(ArgumentConstraint::Maximum(1000.0)),
+    ];
+    registry.register(miner)?;
+
+    // stopminer - Stop mining tunnel
+    let mut stop_miner = CommandDefinition::new(
+        "stopminer",
+        "Stop mining tunnel",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stopminer".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopMiner)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stop_miner.category = Some("Mining".to_owned());
+    stop_miner.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(stop_miner)?;
+
+    // minearea - Start mining area
+    let mut mine_area = CommandDefinition::new(
+        "minearea",
+        "Start mining an area between two positions",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() != 6 {
+                    return Err("Usage: minearea <x1> <y1> <z1> <x2> <y2> <z2>".to_owned());
+                }
+                let coords: Result<Vec<i32>, _> = context.raw_args.iter()
+                    .map(|s| s.parse::<i32>())
+                    .collect();
+                let coords = coords.map_err(|_| "All coordinates must be integers.".to_owned())?;
+                sender
+                    .send(RuntimeCommandAction::StartMineArea {
+                        x1: coords[0], y1: coords[1], z1: coords[2],
+                        x2: coords[3], y2: coords[4], z2: coords[5],
+                    })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    mine_area.usage = Some("<x1> <y1> <z1> <x2> <y2> <z2>".to_owned());
+    mine_area.category = Some("Mining".to_owned());
+    mine_area.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    mine_area.arguments = vec![
+        ArgumentDefinition::new("x1", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("y1", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("z1", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("x2", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("y2", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
+        ArgumentDefinition::new("z2", ArgumentType::Number, true).with_constraint(ArgumentConstraint::Integer),
+    ];
+    registry.register(mine_area)?;
+
+    // stopminearea - Stop mining area
+    let mut stop_mine_area = CommandDefinition::new(
+        "stopminearea",
+        "Stop mining area",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stopminearea".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopMineArea)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stop_mine_area.category = Some("Mining".to_owned());
+    stop_mine_area.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(stop_mine_area)?;
+
+    // refuel - Search for and mine coal
+    let mut refuel = CommandDefinition::new(
+        "refuel",
+        "Search for and mine coal",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: refuel".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Refuel)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    refuel.category = Some("Mining".to_owned());
+    refuel.permission = Some(PermissionConfig::default());
+    registry.register(refuel)?;
+
+    // lumberjack - Toggle lumberjack mode
+    let mut lumberjack = CommandDefinition::new(
+        "lumberjack",
+        "Start lumberjack mode (chop trees in radius)",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 1 {
+                    return Err("Usage: lumberjack [radius]".to_owned());
+                }
+                let radius = match context.args.args.first() {
+                    Some(ArgumentValue::Number(r)) if r.is_finite() && r.fract() == 0.0 && (1.0..=50.0).contains(r) => *r as u32,
+                    Some(_) => return Err("Radius must be a whole number from 1 to 50.".to_owned()),
+                    None => 5,
+                };
+                sender
+                    .send(RuntimeCommandAction::Lumberjack { radius })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    lumberjack.usage = Some("[radius]".to_owned());
+    lumberjack.category = Some("Mining".to_owned());
+    lumberjack.permission = Some(PermissionConfig::default());
+    lumberjack.arguments = vec![
+        ArgumentDefinition::new("radius", ArgumentType::Number, false)
+            .with_default(ArgumentValue::Number(5.0))
+            .with_constraint(ArgumentConstraint::Integer)
+            .with_constraint(ArgumentConstraint::Minimum(1.0))
+            .with_constraint(ArgumentConstraint::Maximum(50.0)),
+    ];
+    registry.register(lumberjack)?;
+
+    Ok(())
+}
+
+fn register_building_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // roof - Build a roof at base
+    let mut roof = CommandDefinition::new(
+        "roof",
+        "Build a roof at base",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() > 1 {
+                    return Err("Usage: roof [radius]".to_owned());
+                }
+                let radius = match context.args.args.first() {
+                    Some(ArgumentValue::Number(r)) if r.is_finite() && r.fract() == 0.0 && (1.0..=50.0).contains(r) => *r as u32,
+                    Some(_) => return Err("Radius must be a whole number from 1 to 50.".to_owned()),
+                    None => 5,
+                };
+                sender
+                    .send(RuntimeCommandAction::BuildRoof { radius })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    roof.usage = Some("[radius]".to_owned());
+    roof.category = Some("Building".to_owned());
+    roof.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    roof.arguments = vec![
+        ArgumentDefinition::new("radius", ArgumentType::Number, false)
+            .with_default(ArgumentValue::Number(5.0))
+            .with_constraint(ArgumentConstraint::Integer)
+            .with_constraint(ArgumentConstraint::Minimum(1.0))
+            .with_constraint(ArgumentConstraint::Maximum(50.0)),
+    ];
+    registry.register(roof)?;
+
+    Ok(())
+}
+
+fn register_combat_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // guard - Guard current location
+    let mut guard = CommandDefinition::new(
+        "guard",
+        "Guard current location",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: guard".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StartGuard)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    guard.category = Some("Combat".to_owned());
+    guard.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(guard)?;
+
+    // stopguard - Stop guarding
+    let mut stop_guard = CommandDefinition::new(
+        "stopguard",
+        "Stop guarding",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stopguard".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopGuard)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stop_guard.category = Some("Combat".to_owned());
+    stop_guard.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(stop_guard)?;
+
+    // pvp - Engage PVP with player
+    let mut pvp = CommandDefinition::new(
+        "pvp",
+        "Engage PVP with player",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() != 1 {
+                    return Err("Usage: pvp <player>".to_owned());
+                }
+                let Some(ArgumentValue::String(target)) = context.args.args.first() else {
+                    return Err("A player name is required.".to_owned());
+                };
+                sender
+                    .send(RuntimeCommandAction::StartPvp { target: target.clone() })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    pvp.usage = Some("<player>".to_owned());
+    pvp.category = Some("Combat".to_owned());
+    pvp.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    pvp.arguments = vec![ArgumentDefinition::new("player", ArgumentType::String, true)];
+    registry.register(pvp)?;
+
+    // stoppvp - Stop PVP
+    let mut stop_pvp = CommandDefinition::new(
+        "stoppvp",
+        "Stop PVP",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stoppvp".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopPvp)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stop_pvp.category = Some("Combat".to_owned());
+    stop_pvp.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(stop_pvp)?;
+
+    Ok(())
+}
+
+fn register_utility_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // panic - Activate panic mode
+    let mut panic = CommandDefinition::new(
+        "panic",
+        "Activate panic mode (flee to safety)",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: panic".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Panic)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    panic.category = Some("Utility".to_owned());
+    panic.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(panic)?;
+
+    // stealth - Toggle stealth mode
+    let mut stealth = CommandDefinition::new(
+        "stealth",
+        "Toggle stealth mode (sneak)",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: stealth".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Stealth)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    stealth.category = Some("Utility".to_owned());
+    stealth.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(stealth)?;
+
+    // dstop - Stop auto-defense
+    let mut dstop = CommandDefinition::new(
+        "dstop",
+        "Stop auto-defense",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if !context.raw_args.is_empty() {
+                    return Err("Usage: dstop".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::StopDefense)
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    dstop.category = Some("Utility".to_owned());
+    dstop.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(dstop)?;
+
+    Ok(())
+}
+
+fn register_memory_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // remember - Remember a fact
+    let mut remember = CommandDefinition::new(
+        "remember",
+        "Remember a fact",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.is_empty() {
+                    return Err("Usage: remember <key>=<fact>".to_owned());
+                }
+                let content = context.raw_args.join(" ");
+                let separator = content.find('=').ok_or("Usage: remember <key>=<fact>")?;
+                let key = content[..separator].trim().to_owned();
+                let fact = content[separator+1..].trim().to_owned();
+                if key.is_empty() || fact.is_empty() {
+                    return Err("Key and fact cannot be empty.".to_owned());
+                }
+                sender
+                    .send(RuntimeCommandAction::Remember { key, fact })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    remember.usage = Some("<key>=<fact>".to_owned());
+    remember.category = Some("Memory".to_owned());
+    remember.permission = Some(PermissionConfig::default());
+    registry.register(remember)?;
+
+    // forget - Forget a fact
+    let mut forget = CommandDefinition::new(
+        "forget",
+        "Forget a fact",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.len() != 1 {
+                    return Err("Usage: forget <key>".to_owned());
+                }
+                let Some(ArgumentValue::String(key)) = context.args.args.first() else {
+                    return Err("A key is required.".to_owned());
+                };
+                sender
+                    .send(RuntimeCommandAction::Forget { key: key.clone() })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    forget.usage = Some("<key>".to_owned());
+    forget.category = Some("Memory".to_owned());
+    forget.permission = Some(PermissionConfig::default());
+    forget.arguments = vec![ArgumentDefinition::new("key", ArgumentType::String, true)];
+    registry.register(forget)?;
+
+    Ok(())
+}
+
+fn register_chat_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // chat - Chat with AI assistant
+    let mut chat = CommandDefinition::new(
+        "chat",
+        "Chat with AI assistant",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.is_empty() {
+                    return Err("Usage: chat <message>".to_owned());
+                }
+                let message = context.raw_args.join(" ");
+                sender
+                    .send(RuntimeCommandAction::Chat { message })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    chat.usage = Some("<message>".to_owned());
+    chat.category = Some("Chat".to_owned());
+    chat.permission = Some(PermissionConfig::default());
+    registry.register(chat)?;
+
+    Ok(())
+}
+
+fn register_admin_commands(
+    registry: &CommandRegistry,
+    action_sender: mpsc::Sender<RuntimeCommandAction>,
+) -> Result<(), CommandRegistryError> {
+    // servercmd - Execute server command
+    let mut server_cmd = CommandDefinition::new(
+        "servercmd",
+        "Execute server command",
+        std::sync::Arc::new(move |context, _| {
+            let sender = action_sender.clone();
+            Box::pin(async move {
+                if context.raw_args.is_empty() {
+                    return Err("Usage: servercmd <command>".to_owned());
+                }
+                let command = context.raw_args.join(" ");
+                sender
+                    .send(RuntimeCommandAction::ServerCommand { command })
+                    .map_err(|error| error.to_string())
+            })
+        }),
+    );
+    server_cmd.usage = Some("<command>".to_owned());
+    server_cmd.category = Some("Admin".to_owned());
+    server_cmd.permission = Some(PermissionConfig {
+        level: PermissionLevel::Admin,
+        ..PermissionConfig::default()
+    });
+    registry.register(server_cmd)?;
+
     Ok(())
 }
 

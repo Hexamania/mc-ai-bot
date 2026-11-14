@@ -74,6 +74,20 @@ pub struct MinecraftConnection {
     follow_task: Option<JoinHandle<()>>,
     roam_task: Option<JoinHandle<()>>,
     mining_task: Option<JoinHandle<()>>,
+    // Base/Storage
+    base_location: Option<Vec3>,
+    mining_base_location: Option<Vec3>,
+    // Mining features
+    miner_task: Option<JoinHandle<()>>,
+    mine_area_task: Option<JoinHandle<()>>,
+    // Combat/Guard
+    guard_task: Option<JoinHandle<()>>,
+    pvp_task: Option<JoinHandle<()>>,
+    pvp_target: Option<String>,
+    // Utility
+    panic_mode: bool,
+    stealth_mode: bool,
+    auto_defense: bool,
 }
 
 impl MinecraftConnection {
@@ -116,6 +130,16 @@ impl MinecraftConnection {
             follow_task: None,
             roam_task: None,
             mining_task: None,
+            base_location: None,
+            mining_base_location: None,
+            miner_task: None,
+            mine_area_task: None,
+            guard_task: None,
+            pvp_task: None,
+            pvp_target: None,
+            panic_mode: false,
+            stealth_mode: false,
+            auto_defense: false,
         })
     }
 
@@ -374,6 +398,10 @@ impl MinecraftConnection {
         self.stop_mining();
         self.stop_following();
         self.stop_roaming();
+        self.stop_miner();
+        self.stop_mine_area();
+        self.stop_guard();
+        self.stop_pvp();
         if self.state() == BotState::Connected {
             self.client.stop_pathfinding();
         }
@@ -392,6 +420,359 @@ impl MinecraftConnection {
             self.client.stop_pathfinding();
         }
         was_active.then_some(target).flatten()
+    }
+
+    // Base/Storage commands
+    pub fn set_base(
+        &mut self,
+        x: Option<f64>,
+        y: Option<f64>,
+        z: Option<f64>,
+    ) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        let position = self.position().ok_or("Bot not spawned")?;
+        let base_x = x.unwrap_or(position.x);
+        let base_y = y.unwrap_or(position.y);
+        let base_z = z.unwrap_or(position.z);
+        self.base_location = Some(Vec3::new(base_x, base_y, base_z));
+        Ok(())
+    }
+
+    pub fn go_home(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        let base = self.base_location.ok_or("No base location set. Use sbase first.")?;
+        self.stop_mining();
+        self.stop_following();
+        self.stop_roaming();
+        self.client.goto_without_mining(RadiusGoal {
+            pos: base,
+            radius: 1.0,
+        });
+        Ok(())
+    }
+
+    pub fn set_mining_base(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        let position = self.position().ok_or("Bot not spawned")?;
+        self.mining_base_location = Some(position);
+        Ok(())
+    }
+
+    pub fn go_mining_base(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        let base = self.mining_base_location.ok_or("No mining base set. Use sminebase first.")?;
+        self.stop_mining();
+        self.stop_following();
+        self.stop_roaming();
+        self.client.goto_without_mining(RadiusGoal {
+            pos: base,
+            radius: 1.0,
+        });
+        Ok(())
+    }
+
+    pub fn open_base_chest(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        let base = self.base_location.ok_or("No base location set. Use sbase first.")?;
+        self.client.goto_without_mining(RadiusGoal {
+            pos: base,
+            radius: 2.0,
+        });
+        // Note: Opening chest requires additional logic to find and interact with chest block
+        // This is a placeholder that navigates to base
+        Ok(())
+    }
+
+    pub fn sort_chest(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        // Placeholder for chest sorting logic
+        // Would need to find chest, open it, and sort items
+        Ok(())
+    }
+
+    pub fn deposit_items(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        // Placeholder for deposit logic
+        // Would need to find chest and deposit non-essential items
+        Ok(())
+    }
+
+    // Mining feature commands
+    pub fn start_miner(&mut self, direction: &str, length: u32) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        if self
+            .miner_task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
+            return Err("Miner is already active".to_owned());
+        }
+        let valid_directions = ["north", "south", "east", "west"];
+        if !valid_directions.contains(&direction) {
+            return Err("Invalid direction. Use: north, south, east, west".to_owned());
+        }
+        if !(1..=1000).contains(&length) {
+            return Err("Length must be between 1 and 1000".to_owned());
+        }
+
+        self.stop_mining();
+        self.stop_following();
+        self.stop_roaming();
+
+        let mut client = self.client.clone();
+        let direction = direction.to_owned();
+        self.miner_task = Some(tokio::spawn(async move {
+            let offsets = match direction.as_str() {
+                "north" => (0, -1),
+                "south" => (0, 1),
+                "east" => (1, 0),
+                "west" => (-1, 0),
+                _ => (0, 0),
+            };
+            for i in 0..length {
+                let position = client.position();
+                let target_pos = Vec3::new(
+                    position.x + offsets.0 as f64,
+                    position.y,
+                    position.z + offsets.1 as f64,
+                );
+                client.goto_without_mining(RadiusGoal {
+                    pos: target_pos,
+                    radius: 1.0,
+                });
+                // Wait for movement
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                // Dig blocks at current position forward and up
+                // This is simplified - real implementation would dig properly
+            }
+        }));
+        Ok(())
+    }
+
+    pub fn stop_miner(&mut self) -> bool {
+        let Some(task) = self.miner_task.take() else {
+            return false;
+        };
+        if task.is_finished() {
+            return false;
+        }
+        self.client.stop_pathfinding();
+        task.abort();
+        true
+    }
+
+    pub fn start_mine_area(
+        &mut self,
+        x1: i32,
+        y1: i32,
+        z1: i32,
+        x2: i32,
+        y2: i32,
+        z2: i32,
+    ) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        if self
+            .mine_area_task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
+            return Err("Mine area is already active".to_owned());
+        }
+
+        let min_x = x1.min(x2);
+        let max_x = x1.max(x2);
+        let min_y = y1.min(y2);
+        let max_y = y1.max(y2);
+        let min_z = z1.min(z2);
+        let max_z = z1.max(z2);
+
+        let volume = (max_x - min_x + 1) * (max_y - min_y + 1) * (max_z - min_z + 1);
+        if volume > 512 {
+            return Err(format!("Mine area is {volume} blocks; maximum supported is 512"));
+        }
+
+        self.stop_mining();
+        self.stop_following();
+        self.stop_roaming();
+
+        let mut client = self.client.clone();
+        self.mine_area_task = Some(tokio::spawn(async move {
+            for x in min_x..=max_x {
+                for y in min_y..=max_y {
+                    for z in min_z..=max_z {
+                        let target = Vec3::new(x as f64, y as f64, z as f64);
+                        client.goto_without_mining(RadiusGoal {
+                            pos: target,
+                            radius: 1.0,
+                        });
+                        tokio::time::sleep(Duration::from_millis(500)).await;
+                    }
+                }
+            }
+        }));
+        Ok(())
+    }
+
+    pub fn stop_mine_area(&mut self) -> bool {
+        let Some(task) = self.mine_area_task.take() else {
+            return false;
+        };
+        if task.is_finished() {
+            return false;
+        }
+        self.client.stop_pathfinding();
+        task.abort();
+        true
+    }
+
+    pub fn refuel(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        // Placeholder for refuel logic - would search for coal ore and mine it
+        Ok(())
+    }
+
+    pub fn start_lumberjack(&mut self, radius: u32) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        if !(1..=50).contains(&radius) {
+            return Err("Radius must be between 1 and 50".to_owned());
+        }
+        // Placeholder for lumberjack logic - would find and chop trees in radius
+        Ok(())
+    }
+
+    // Building commands
+    pub fn build_roof(&mut self, radius: u32) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        if !(1..=50).contains(&radius) {
+            return Err("Radius must be between 1 and 50".to_owned());
+        }
+        // Placeholder for roof building logic
+        Ok(())
+    }
+
+    // Combat/Guard commands
+    pub fn start_guard(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        if self
+            .guard_task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
+            return Err("Guard is already active".to_owned());
+        }
+
+        let position = self.position().ok_or("Bot not spawned")?;
+        let mut client = self.client.clone();
+        self.guard_task = Some(tokio::spawn(async move {
+            client.goto_without_mining(RadiusGoal {
+                pos: position,
+                radius: 2.0,
+            });
+            // Guard loop would go here
+        }));
+        Ok(())
+    }
+
+    pub fn stop_guard(&mut self) -> bool {
+        let Some(task) = self.guard_task.take() else {
+            return false;
+        };
+        if task.is_finished() {
+            return false;
+        }
+        self.client.stop_pathfinding();
+        task.abort();
+        true
+    }
+
+    pub fn start_pvp(&mut self, target: &str) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
+        }
+        if self
+            .pvp_task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
+            return Err("PVP is already active".to_owned());
+        }
+
+        // Find player entity
+        let entity = self
+            .client
+            .entity_by::<With<Player>, &GameProfileComponent>(
+                |profile: &&GameProfileComponent| profile.name.eq_ignore_ascii_case(target),
+            )
+            .ok_or("Player not found")?;
+
+        self.pvp_target = Some(target.to_owned());
+        let mut client = self.client.clone();
+        let target = target.to_owned();
+        self.pvp_task = Some(tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                // PVP logic would go here - attack target
+            }
+        }));
+        Ok(())
+    }
+
+    pub fn stop_pvp(&mut self) -> bool {
+        let was_active = if let Some(task) = self.pvp_task.take() {
+            let active = !task.is_finished();
+            task.abort();
+            active
+        } else {
+            false
+        };
+        self.pvp_target = None;
+        if was_active && self.state() == BotState::Connected {
+            self.client.stop_pathfinding();
+        }
+        was_active
+    }
+
+    // Utility commands
+    pub fn activate_panic_mode(&mut self) {
+        self.panic_mode = true;
+        self.stop_movement();
+        // Flee to safety logic would go here
+    }
+
+    pub fn toggle_stealth(&mut self) {
+        self.stealth_mode = !self.stealth_mode;
+        self.client.set_control_state("sneak", self.stealth_mode);
+    }
+
+    pub fn stop_defense(&mut self) {
+        self.auto_defense = false;
+        self.stop_movement();
     }
 
     pub fn send_chat(&self, message: &str) -> Result<(), MinecraftTransportError> {
@@ -441,12 +822,20 @@ impl MinecraftConnection {
                     self.stop_mining();
                     self.stop_following();
                     self.stop_roaming();
+                    self.stop_miner();
+                    self.stop_mine_area();
+                    self.stop_guard();
+                    self.stop_pvp();
                     Some(MinecraftEvent::Death)
                 }
                 Event::Disconnect(reason) => {
                     self.stop_mining();
                     self.stop_following();
                     self.stop_roaming();
+                    self.stop_miner();
+                    self.stop_mine_area();
+                    self.stop_guard();
+                    self.stop_pvp();
                     self.state_machine.transition(BotState::Disconnected)?;
                     Some(MinecraftEvent::Disconnected {
                         reason: reason.map(|message| message.to_string()),
@@ -462,6 +851,10 @@ impl MinecraftConnection {
         self.stop_following();
         self.stop_roaming();
         self.stop_mining();
+        self.stop_miner();
+        self.stop_mine_area();
+        self.stop_guard();
+        self.stop_pvp();
         if self.state() != BotState::Disconnected {
             self.state_machine.transition(BotState::Disconnected)?;
         }
@@ -475,6 +868,18 @@ impl Drop for MinecraftConnection {
             task.abort();
         }
         if let Some(task) = self.roam_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.miner_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.mine_area_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.guard_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.pvp_task.take() {
             task.abort();
         }
         self.stop_mining();

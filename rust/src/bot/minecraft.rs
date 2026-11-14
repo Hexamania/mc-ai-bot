@@ -4,6 +4,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use azalea::attack::AttackEvent as AzaleaAttackEvent;
+use azalea::entity::Hand;
 use azalea::inventory::Inventory;
 use azalea::{
     Account, BotClientExt, Client, Event, GameProfileComponent, Vec3,
@@ -15,8 +17,8 @@ use azalea::{
     },
     entity::{Attributes, Position, metadata::Player},
     inventory::{
-        components::Container,
         SetSelectedHotbarSlotEvent,
+        components::Container,
         operations::{ClickMode, ClickOperation, ClickType, MouseButton},
     },
     mining::StopMiningBlockEvent,
@@ -26,10 +28,8 @@ use azalea::{
     },
     protocol::packets::game::PlayerAction,
     registry::Block as RegistryBlock,
-    world::{chunks::ChunkStorage, Direction},
+    world::{Direction, chunks::ChunkStorage},
 };
-use azalea::attack::AttackEvent as AzaleaAttackEvent;
-use azalea::entity::Hand;
 use rand::Rng;
 use serde_json::{Value, json};
 use thiserror::Error;

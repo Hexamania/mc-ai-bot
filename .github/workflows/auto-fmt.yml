@@ -22,7 +22,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2024-10-23
+          toolchain: nightly-2025-10-01
           components: rustfmt
 
       - name: Run cargo fmt

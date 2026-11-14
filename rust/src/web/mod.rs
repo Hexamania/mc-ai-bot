@@ -46,6 +46,6 @@ impl WebState {
     }
 }
 
-pub use auth::{generate_token, verify_token, Claims, TokenPayload};
+pub use auth::{Claims, TokenPayload, generate_token, verify_token};
 pub use rate_limit::{RateLimitConfig, RateLimitKey, RateLimiter};
 pub use server::WebServer;

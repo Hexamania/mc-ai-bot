@@ -709,9 +709,11 @@ mod tests {
             parser.parse(&raw(&["4.5", "walk"]), &definitions, &[]),
             Err(ArgumentParseError("Must be an integer".to_owned()))
         );
-        assert!(parser
-            .parse(&raw(&["9", "walk"]), &definitions, &[])
-            .is_err());
+        assert!(
+            parser
+                .parse(&raw(&["9", "walk"]), &definitions, &[])
+                .is_err()
+        );
     }
 
     #[test]
@@ -765,9 +767,11 @@ mod tests {
             parsed.raw,
             raw(&["-v", "--limit", "3", "--unknown", "target"])
         );
-        assert!(parser
-            .parse(&raw(&["--limit", "bad"]), &[], &definitions)
-            .is_err());
+        assert!(
+            parser
+                .parse(&raw(&["--limit", "bad"]), &[], &definitions)
+                .is_err()
+        );
     }
 
     #[test]
@@ -830,20 +834,24 @@ mod tests {
                 .unwrap(),
             ArgumentValue::Item("diamond_sword".to_owned())
         );
-        assert!(parser
-            .parse_value(
-                "diamond",
-                &ArgumentDefinition::new("item", ArgumentType::Item, true)
-            )
-            .unwrap_err()
-            .0
-            .starts_with("Ambiguous item"));
-        assert!(ArgumentParser::default()
-            .parse_value(
-                "Alex",
-                &ArgumentDefinition::new("player", ArgumentType::Player, true)
-            )
-            .is_ok());
+        assert!(
+            parser
+                .parse_value(
+                    "diamond",
+                    &ArgumentDefinition::new("item", ArgumentType::Item, true)
+                )
+                .unwrap_err()
+                .0
+                .starts_with("Ambiguous item")
+        );
+        assert!(
+            ArgumentParser::default()
+                .parse_value(
+                    "Alex",
+                    &ArgumentDefinition::new("player", ArgumentType::Player, true)
+                )
+                .is_ok()
+        );
     }
 
     #[test]
@@ -874,9 +882,11 @@ mod tests {
             })
         );
         assert!(parser.parse_value("~ ~ ~", &definition).is_ok());
-        assert!(ArgumentParser::default()
-            .parse_value("~ ~ ~", &definition)
-            .is_err());
+        assert!(
+            ArgumentParser::default()
+                .parse_value("~ ~ ~", &definition)
+                .is_err()
+        );
         assert!(parser.parse_value("1 2 nope", &definition).is_err());
     }
 

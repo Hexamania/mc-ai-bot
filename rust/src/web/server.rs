@@ -3,11 +3,11 @@
  * Axum HTTP server with Socket.io for real-time dashboard
  */
 use axum::{
+    Router,
     extract::DefaultBodyLimit,
-    http::{header, Method},
+    http::{Method, header},
     middleware,
     routing::get,
-    Router,
 };
 use socketioxide::SocketIo;
 use std::sync::Arc;
@@ -25,9 +25,10 @@ use crate::{
     bot::minecraft::{MinecraftConnection, MinecraftRuntime},
     config::AppConfig,
     web::{
+        WebState,
         auth::{auth_middleware, optional_auth_middleware},
         rate_limit::RateLimiters,
-        routes, socket, WebState,
+        routes, socket,
     },
 };
 

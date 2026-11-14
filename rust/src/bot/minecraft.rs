@@ -5,30 +5,30 @@ use std::{
 };
 
 use azalea::{
+    Account, BotClientExt, Client, Event, GameProfileComponent, Vec3,
     auto_tool::AutoToolClientExt,
     blocks::{Block as BlockTrait, BlockState, BlockStates},
     ecs::query::With,
     entity::{
-        metadata::Player, AttackEvent, DropItemEvent, Health, Position, SetControlStateEvent,
+        AttackEvent, DropItemEvent, Health, Position, SetControlStateEvent, metadata::Player,
     },
     interact::InteractBlockEvent,
     inventory::{
-        operations::click::{ClickMode, ClickOperation, ClickType, MouseButton},
         SetSelectedHotbarSlotEvent,
+        operations::click::{ClickMode, ClickOperation, ClickType, MouseButton},
     },
     mining::StopMiningBlockEvent,
     pathfinder::{
-        goals::{Goal, RadiusGoal, ReachBlockPosGoal},
         PathfinderClientExt,
+        goals::{Goal, RadiusGoal, ReachBlockPosGoal},
     },
     protocol::packets::game::Hand,
     registry::Block as RegistryBlock,
     world::{chunk::ChunkStorage, direction::Direction},
-    Account, BotClientExt, Client, Event, GameProfileComponent, Vec3,
 };
 use azalea_inventory::Inventory;
 use rand::Rng;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use thiserror::Error;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
 

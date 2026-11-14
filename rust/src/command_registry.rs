@@ -1086,11 +1086,13 @@ mod tests {
         let full_help = registry.get_full_help("!", PermissionLevel::Guest).unwrap();
         assert!(full_help.contains("!ping"));
         assert!(full_help.contains("!help"));
-        assert!(registry
-            .get_help("ping", "!")
-            .unwrap()
-            .unwrap()
-            .contains("Check bot responsiveness"));
+        assert!(
+            registry
+                .get_help("ping", "!")
+                .unwrap()
+                .unwrap()
+                .contains("Check bot responsiveness")
+        );
 
         let replies = Arc::new(Mutex::new(Vec::new()));
         let mut context = context("Alex", PermissionLevel::Guest, false, &[], replies.clone());

@@ -3,11 +3,11 @@
  * Uses in-memory store with sliding window algorithm
  */
 use axum::{
+    Json,
     extract::{Request, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json,
 };
 use std::collections::HashMap;
 use std::net::SocketAddr;

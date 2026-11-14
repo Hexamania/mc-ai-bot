@@ -3,12 +3,12 @@
  * Provides HTTP endpoints for bot state, memory, commands, and configuration
  */
 use axum::{
+    Router,
     extract::{Query, State},
     http::StatusCode,
     middleware,
     response::{IntoResponse, Json, Response},
     routing::{delete, get, patch, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -20,12 +20,12 @@ use crate::{
     config::AppConfig,
     memory::Memory,
     web::{
-        auth::{
-            auth_middleware, optional_auth_middleware, require_admin, require_trusted, Claims,
-            UserRole,
-        },
-        rate_limit::{create_rate_limiters, rate_limit_middleware, RateLimiters},
         WebState,
+        auth::{
+            Claims, UserRole, auth_middleware, optional_auth_middleware, require_admin,
+            require_trusted,
+        },
+        rate_limit::{RateLimiters, create_rate_limiters, rate_limit_middleware},
     },
 };
 

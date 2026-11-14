@@ -8,8 +8,8 @@ use crate::{
     bot::minecraft::MinecraftEvent::Chat,
     bot::{
         minecraft::{
-            parse_mineable_block, MinecraftConnection, MinecraftEvent, MinecraftTransportError,
-            MAX_SUPPORTED_Y_COORDINATE, MAX_WORLD_COORDINATE,
+            MAX_SUPPORTED_Y_COORDINATE, MAX_WORLD_COORDINATE, MinecraftConnection, MinecraftEvent,
+            MinecraftTransportError, parse_mineable_block,
         },
         state_machine::{BotState, StateMachine},
     },
@@ -21,8 +21,8 @@ use crate::{
         PermissionManager,
     },
     config::{AppConfig, BotConfig},
-    features::{register_builtin_features, FeatureRegistry},
-    memory::{default_memory, forget_fact, load_memory, remember_fact, save_memory, MemoryError},
+    features::{FeatureRegistry, register_builtin_features},
+    memory::{MemoryError, default_memory, forget_fact, load_memory, remember_fact, save_memory},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1419,7 +1419,7 @@ fn register_roam_commands(
                         return Err(
                             "Roam interval must be a whole number from 1000 to 60000 ms."
                                 .to_owned(),
-                        )
+                        );
                     }
                 };
                 sender
@@ -1587,10 +1587,12 @@ fn register_inventory_commands(
     inventory.usage = Some("[slot 0-35]".to_owned());
     inventory.category = Some("Inventory".to_owned());
     inventory.permission = Some(PermissionConfig::default());
-    inventory.arguments = vec![ArgumentDefinition::new("slot", ArgumentType::Number, false)
-        .with_constraint(ArgumentConstraint::Integer)
-        .with_constraint(ArgumentConstraint::Minimum(0.0))
-        .with_constraint(ArgumentConstraint::Maximum(35.0))];
+    inventory.arguments = vec![
+        ArgumentDefinition::new("slot", ArgumentType::Number, false)
+            .with_constraint(ArgumentConstraint::Integer)
+            .with_constraint(ArgumentConstraint::Minimum(0.0))
+            .with_constraint(ArgumentConstraint::Maximum(35.0)),
+    ];
     registry.register(inventory)?;
 
     let item_count_sender = action_sender.clone();
@@ -1877,7 +1879,7 @@ fn register_mining_feature_commands(
                         d.clone()
                     }
                     Some(_) => {
-                        return Err("Direction must be north, south, east, or west.".to_owned())
+                        return Err("Direction must be north, south, east, or west.".to_owned());
                     }
                     None => return Err("A direction is required.".to_owned()),
                 };
@@ -1888,7 +1890,7 @@ fn register_mining_feature_commands(
                         *l as u32
                     }
                     Some(_) => {
-                        return Err("Length must be a whole number from 1 to 1000.".to_owned())
+                        return Err("Length must be a whole number from 1 to 1000.".to_owned());
                     }
                     None => 10,
                 };

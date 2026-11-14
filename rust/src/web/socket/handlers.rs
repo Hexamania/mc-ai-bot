@@ -3,8 +3,8 @@
  * Handles all real-time communication between bot and dashboard
  */
 use socketioxide::{
-    extract::{Data, SocketRef, State},
     SocketIo,
+    extract::{Data, SocketRef, State},
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -14,9 +14,9 @@ use crate::{
     bot::minecraft::{MinecraftConnection, MinecraftRuntime},
     config::AppConfig,
     web::{
-        auth::{extract_socket_token, verify_socket_token, Claims},
-        socket::events::*,
         WebState,
+        auth::{Claims, extract_socket_token, verify_socket_token},
+        socket::events::*,
     },
 };
 

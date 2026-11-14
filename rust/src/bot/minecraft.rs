@@ -12,14 +12,17 @@ use azalea::{
         event::{EntityEvent, Event as EcsEvent},
         query::With,
     },
-    entity::{Attributes, AttackEvent, DropItemEvent, Hand, Position, metadata::Player, SetControlStateEvent},
+    entity::{
+        AttackEvent, Attributes, DropItemEvent, Hand, Position, SetControlStateEvent,
+        metadata::Player,
+    },
     hunger::Hunger,
+    interact::InteractBlockEvent,
     inventory::{
         Inventory, SetSelectedHotbarSlotEvent,
         components::Container,
         operations::click::{ClickMode, ClickOperation, ClickType, MouseButton},
     },
-    interact::InteractBlockEvent,
     mining::{Mining, StopMiningBlockEvent},
     pathfinder::{
         PathfinderClientExt,
@@ -620,18 +623,15 @@ impl MinecraftConnection {
                 let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
                 // Send use block packet to open chest
-                client
-                    .ecs
-                    .lock()
-                    .send_event(InteractBlockEvent {
-                        entity: client.entity,
-                        position: chest_pos,
-                        direction: Direction::Up,
-                        hand: Hand::MainHand,
-                        cursor_position: None,
-                        inside_block: false,
-                        sequence: 0,
-                    });
+                client.ecs.lock().send_event(InteractBlockEvent {
+                    entity: client.entity,
+                    position: chest_pos,
+                    direction: Direction::Up,
+                    hand: Hand::MainHand,
+                    cursor_position: None,
+                    inside_block: false,
+                    sequence: 0,
+                });
             }
         });
 
@@ -753,18 +753,15 @@ impl MinecraftConnection {
                 let mut ticks = client.get_tick_broadcaster();
                 let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                client
-                    .ecs
-                    .lock()
-                    .send_event(InteractBlockEvent {
-                        entity: client.entity,
-                        position: chest_pos,
-                        direction: Direction::Up,
-                        hand: Hand::MainHand,
-                        cursor_position: None,
-                        inside_block: false,
-                        sequence: 0,
-                    });
+                client.ecs.lock().send_event(InteractBlockEvent {
+                    entity: client.entity,
+                    position: chest_pos,
+                    direction: Direction::Up,
+                    hand: Hand::MainHand,
+                    cursor_position: None,
+                    inside_block: false,
+                    sequence: 0,
+                });
 
                 // Wait for container to open
                 tokio::time::sleep(Duration::from_millis(500)).await;
@@ -936,18 +933,15 @@ impl MinecraftConnection {
                 let mut ticks = client.get_tick_broadcaster();
                 let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                client
-                    .ecs
-                    .lock()
-                    .send_event(InteractBlockEvent {
-                        entity: client.entity,
-                        position: chest_pos,
-                        direction: Direction::Up,
-                        hand: Hand::MainHand,
-                        cursor_position: None,
-                        inside_block: false,
-                        sequence: 0,
-                    });
+                client.ecs.lock().send_event(InteractBlockEvent {
+                    entity: client.entity,
+                    position: chest_pos,
+                    direction: Direction::Up,
+                    hand: Hand::MainHand,
+                    cursor_position: None,
+                    inside_block: false,
+                    sequence: 0,
+                });
 
                 // Wait for container to open
                 tokio::time::sleep(Duration::from_millis(500)).await;
@@ -1081,8 +1075,7 @@ impl MinecraftConnection {
                                         slot: slot_idx,
                                         click_type: ClickType::Pickup,
                                         button: MouseButton::Left,
-                                        mode:
-                                            ClickMode::Normal,
+                                        mode: ClickMode::Normal,
                                     });
 
                                     // Find empty slot in chest (chest slots start after player inventory)
@@ -1204,21 +1197,18 @@ impl MinecraftConnection {
                             RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
                         ) {
                             // Check if breakable
-                            let destroy_time = Box::<dyn BlockTrait>::from(state)
-                                .behavior()
-                                .destroy_time;
+                            let destroy_time =
+                                Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
                             if destroy_time >= 0.0 {
                                 drop(world);
 
                                 // Select best tool
                                 let best_tool = client.best_tool_in_hotbar_for_block(state);
                                 if best_tool.percentage_per_tick > 0.0 {
-                                    client.ecs.lock().send_event(
-                                        SetSelectedHotbarSlotEvent {
-                                            entity: client.entity,
-                                            slot: best_tool.index as u8,
-                                        },
-                                    );
+                                    client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                        entity: client.entity,
+                                        slot: best_tool.index as u8,
+                                    });
 
                                     // Look at block and mine
                                     client.look_at(Vec3::from(block_pos.center()));
@@ -1265,9 +1255,8 @@ impl MinecraftConnection {
                         block,
                         RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
                     ) {
-                        let destroy_time = Box::<dyn BlockTrait>::from(state)
-                            .behavior()
-                            .destroy_time;
+                        let destroy_time =
+                            Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
                         if destroy_time >= 0.0 {
                             drop(world);
 
@@ -1295,12 +1284,10 @@ impl MinecraftConnection {
 
                             let best_tool = client.best_tool_in_hotbar_for_block(state);
                             if best_tool.percentage_per_tick > 0.0 {
-                                client.ecs.lock().send_event(
-                                    SetSelectedHotbarSlotEvent {
-                                        entity: client.entity,
-                                        slot: best_tool.index as u8,
-                                    },
-                                );
+                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                    entity: client.entity,
+                                    slot: best_tool.index as u8,
+                                });
                             }
                             client.look_at(Vec3::from(block_pos.center()));
                             let mut ticks = client.get_tick_broadcaster();
@@ -1395,9 +1382,7 @@ impl MinecraftConnection {
                                     | RegistryBlock::VoidAir
                             ) {
                                 let destroy_time =
-                                    Box::<dyn BlockTrait>::from(state)
-                                        .behavior()
-                                        .destroy_time;
+                                    Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
                                 if destroy_time >= 0.0 {
                                     drop(world);
 
@@ -1432,12 +1417,10 @@ impl MinecraftConnection {
                                     // Select best tool
                                     let best_tool = client.best_tool_in_hotbar_for_block(state);
                                     if best_tool.percentage_per_tick > 0.0 {
-                                        client.ecs.lock().send_event(
-                                            SetSelectedHotbarSlotEvent {
-                                                entity: client.entity,
-                                                slot: best_tool.index as u8,
-                                            },
-                                        );
+                                        client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                            entity: client.entity,
+                                            slot: best_tool.index as u8,
+                                        });
                                     }
 
                                     // Look at block and mine
@@ -1569,21 +1552,18 @@ impl MinecraftConnection {
                         block,
                         RegistryBlock::CoalOre | RegistryBlock::DeepslateCoalOre
                     ) {
-                        let destroy_time = Box::<dyn BlockTrait>::from(state)
-                            .behavior()
-                            .destroy_time;
+                        let destroy_time =
+                            Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
                         if destroy_time >= 0.0 {
                             drop(world);
 
                             // Select best tool (pickaxe)
                             let best_tool = client.best_tool_in_hotbar_for_block(state);
                             if best_tool.percentage_per_tick > 0.0 {
-                                client.ecs.lock().send_event(
-                                    SetSelectedHotbarSlotEvent {
-                                        entity: client.entity,
-                                        slot: best_tool.index as u8,
-                                    },
-                                );
+                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                    entity: client.entity,
+                                    slot: best_tool.index as u8,
+                                });
                             }
 
                             // Look at block and mine
@@ -1692,9 +1672,8 @@ impl MinecraftConnection {
                 if let Some(state) = world.get_block_state(&log_pos) {
                     let block = RegistryBlock::from(state);
                     if block.to_string().contains("_log") && !block.to_string().contains("planks") {
-                        let destroy_time = Box::<dyn BlockTrait>::from(state)
-                            .behavior()
-                            .destroy_time;
+                        let destroy_time =
+                            Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
                         if destroy_time >= 0.0 {
                             drop(world);
 
@@ -1726,12 +1705,10 @@ impl MinecraftConnection {
                             // Select best tool (axe)
                             let best_tool = client.best_tool_in_hotbar_for_block(state);
                             if best_tool.percentage_per_tick > 0.0 {
-                                client.ecs.lock().send_event(
-                                    SetSelectedHotbarSlotEvent {
-                                        entity: client.entity,
-                                        slot: best_tool.index as u8,
-                                    },
-                                );
+                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                    entity: client.entity,
+                                    slot: best_tool.index as u8,
+                                });
                             }
 
                             // Mine the log - mine from bottom up
@@ -1739,8 +1716,7 @@ impl MinecraftConnection {
                             let mut current_y = log_pos.y;
                             let mut bottom_log = log_pos;
                             for check_y in (log_pos.y - 10)..=log_pos.y {
-                                let check_pos =
-                                    BlockPos::new(log_pos.x, check_y, log_pos.z);
+                                let check_pos = BlockPos::new(log_pos.x, check_y, log_pos.z);
                                 if let Some(check_state) = chunk_storage.get_block_state(&check_pos)
                                 {
                                     let check_block = RegistryBlock::from(check_state);
@@ -1758,8 +1734,7 @@ impl MinecraftConnection {
 
                             // Mine from bottom to top
                             for mine_y in bottom_log.y..(bottom_log.y + 30) {
-                                let mine_pos =
-                                    BlockPos::new(bottom_log.x, mine_y, bottom_log.z);
+                                let mine_pos = BlockPos::new(bottom_log.x, mine_y, bottom_log.z);
                                 let world = client.world();
                                 let world = world.read();
                                 if let Some(mine_state) = world.get_block_state(&mine_pos) {
@@ -1879,13 +1854,10 @@ impl MinecraftConnection {
             };
 
             // Select the building block
-            client
-                .ecs
-                .lock()
-                .send_event(SetSelectedHotbarSlotEvent {
-                    entity: client.entity,
-                    slot: block_slot as u8,
-                });
+            client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                entity: client.entity,
+                slot: block_slot as u8,
+            });
 
             // Build flat roof: place blocks in a square pattern at roof_y
             let radius_i = radius as i32;
@@ -1935,27 +1907,21 @@ impl MinecraftConnection {
                         }
 
                         // Place block (right-click on top of block below)
-                        let target_pos = BlockPos::new(
-                            base_block_pos.x + dx,
-                            roof_y - 1,
-                            base_block_pos.z + dz,
-                        );
+                        let target_pos =
+                            BlockPos::new(base_block_pos.x + dx, roof_y - 1, base_block_pos.z + dz);
                         client.look_at(Vec3::from(place_pos.center()));
                         let mut ticks = client.get_tick_broadcaster();
                         let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                        client
-                            .ecs
-                            .lock()
-                            .send_event(InteractBlockEvent {
-                                entity: client.entity,
-                                position: target_pos,
-                                direction: Direction::Up,
-                                hand: Hand::MainHand,
-                                cursor_position: None,
-                                inside_block: false,
-                                sequence: 0,
-                            });
+                        client.ecs.lock().send_event(InteractBlockEvent {
+                            entity: client.entity,
+                            position: target_pos,
+                            direction: Direction::Up,
+                            hand: Hand::MainHand,
+                            cursor_position: None,
+                            inside_block: false,
+                            sequence: 0,
+                        });
 
                         tokio::time::sleep(Duration::from_millis(300)).await;
                     }
@@ -2108,13 +2074,10 @@ impl MinecraftConnection {
                 }
 
                 if let Some(slot) = best_weapon_slot {
-                    client
-                        .ecs
-                        .lock()
-                        .send_event(SetSelectedHotbarSlotEvent {
-                            entity: client.entity,
-                            slot: slot as u8,
-                        });
+                    client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                        entity: client.entity,
+                        slot: slot as u8,
+                    });
                 }
             }
         }));
@@ -2241,13 +2204,10 @@ impl MinecraftConnection {
                 }
 
                 if let Some(slot) = best_weapon_slot {
-                    client
-                        .ecs
-                        .lock()
-                        .send_event(SetSelectedHotbarSlotEvent {
-                            entity: client.entity,
-                            slot: slot as u8,
-                        });
+                    client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                        entity: client.entity,
+                        slot: slot as u8,
+                    });
                 }
 
                 // Attack if in range
@@ -2281,12 +2241,10 @@ impl MinecraftConnection {
                                 || name.contains("cookie")
                                 || name.contains("cake")
                             {
-                                client.ecs.lock().send_event(
-                                    SetSelectedHotbarSlotEvent {
-                                        entity: client.entity,
-                                        slot: slot as u8,
-                                    },
-                                );
+                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                    entity: client.entity,
+                                    slot: slot as u8,
+                                });
                                 // Use item (right-click hold)
                                 tokio::time::sleep(Duration::from_secs(2)).await;
                                 break;
@@ -2386,23 +2344,17 @@ impl MinecraftConnection {
             }
 
             if let Some((slot, _name)) = building_block_slot {
-                client
-                    .ecs
-                    .lock()
-                    .send_event(SetSelectedHotbarSlotEvent {
-                        entity: client.entity,
-                        slot: slot as u8,
-                    });
+                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                    entity: client.entity,
+                    slot: slot as u8,
+                });
 
                 // Build a 3x3x2 shelter around bot
                 for dx in -1..=1 {
                     for dz in -1..=1 {
                         for dy in 0..2 {
-                            let place_pos = BlockPos::new(
-                                block_pos.x + dx,
-                                block_pos.y + dy,
-                                block_pos.z + dz,
-                            );
+                            let place_pos =
+                                BlockPos::new(block_pos.x + dx, block_pos.y + dy, block_pos.z + dz);
 
                             // Don't place where bot is
                             if dx == 0 && dz == 0 && dy <= 1 {
@@ -2441,18 +2393,15 @@ impl MinecraftConnection {
                             let _ =
                                 tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                            client
-                                .ecs
-                                .lock()
-                                .send_event(InteractBlockEvent {
-                                    entity: client.entity,
-                                    position: target_pos,
-                                    direction: Direction::Up,
-                                    hand: Hand::MainHand,
-                                    cursor_position: None,
-                                    inside_block: false,
-                                    sequence: 0,
-                                });
+                            client.ecs.lock().send_event(InteractBlockEvent {
+                                entity: client.entity,
+                                position: target_pos,
+                                direction: Direction::Up,
+                                hand: Hand::MainHand,
+                                cursor_position: None,
+                                inside_block: false,
+                                sequence: 0,
+                            });
 
                             tokio::time::sleep(Duration::from_millis(300)).await;
                         }
@@ -2468,10 +2417,10 @@ impl MinecraftConnection {
         self.stealth_mode = !self.stealth_mode;
         // Send sneak state to server
         self.client.ecs.lock().send_event(SetControlStateEvent {
-                entity: self.client.entity,
-                control: "sneak".to_owned(),
-                state: self.stealth_mode,
-            });
+            entity: self.client.entity,
+            control: "sneak".to_owned(),
+            state: self.stealth_mode,
+        });
     }
 
     pub fn stop_defense(&mut self) {
@@ -2548,12 +2497,10 @@ impl MinecraftConnection {
                             || name.contains("soup")
                         {
                             // Drop food for target
-                            client.ecs.lock().send_event(
-                                SetSelectedHotbarSlotEvent {
-                                    entity: client.entity,
-                                    slot: slot as u8,
-                                },
-                            );
+                            client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                entity: client.entity,
+                                slot: slot as u8,
+                            });
                             tokio::time::sleep(Duration::from_millis(200)).await;
 
                             // Drop the item (Q key)
@@ -2720,12 +2667,10 @@ impl MinecraftConnection {
                         }
 
                         // Give food to target (drop it)
-                        client.ecs.lock().send_event(
-                            SetSelectedHotbarSlotEvent {
-                                entity: client.entity,
-                                slot: slot as u8,
-                            },
-                        );
+                        client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                            entity: client.entity,
+                            slot: slot as u8,
+                        });
                         tokio::time::sleep(Duration::from_millis(200)).await;
 
                         client.ecs.lock().send_event(DropItemEvent {
@@ -3048,10 +2993,10 @@ impl MinecraftConnection {
     pub fn toggle_stealth(&mut self, enabled: bool) {
         self.stealth_mode = enabled;
         self.client.ecs.lock().send_event(SetControlStateEvent {
-                entity: self.client.entity,
-                control: "sneak".to_owned(),
-                state: enabled,
-            });
+            entity: self.client.entity,
+            control: "sneak".to_owned(),
+            state: enabled,
+        });
     }
 
     /// Toggle auto armor
@@ -3175,14 +3120,11 @@ impl MinecraftConnection {
                     });
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 for _ in 0..drop_count {
-                    self.client
-                        .ecs
-                        .lock()
-                        .send_event(DropItemEvent {
-                            entity: self.client.entity,
-                            slot: slot as u8,
-                            count: 1,
-                        });
+                    self.client.ecs.lock().send_event(DropItemEvent {
+                        entity: self.client.entity,
+                        slot: slot as u8,
+                        count: 1,
+                    });
                     tokio::time::sleep(Duration::from_millis(50)).await;
                 }
             }
@@ -3207,20 +3149,20 @@ impl MinecraftConnection {
             return;
         }
         self.client.ecs.lock().send_event(ClickOperation {
-                entity: self.client.entity,
-                slot: from as u8,
-                click_type: ClickType::Pickup,
-                button: MouseButton::Left,
-                mode: ClickMode::Normal,
-            });
+            entity: self.client.entity,
+            slot: from as u8,
+            click_type: ClickType::Pickup,
+            button: MouseButton::Left,
+            mode: ClickMode::Normal,
+        });
         tokio::time::sleep(Duration::from_millis(100)).await;
         self.client.ecs.lock().send_event(ClickOperation {
-                entity: self.client.entity,
-                slot: to as u8,
-                click_type: ClickType::Pickup,
-                button: MouseButton::Left,
-                mode: ClickMode::Normal,
-            });
+            entity: self.client.entity,
+            slot: to as u8,
+            click_type: ClickType::Pickup,
+            button: MouseButton::Left,
+            mode: ClickMode::Normal,
+        });
     }
 
     /// Set hotbar slot
@@ -3283,14 +3225,14 @@ impl MinecraftConnection {
         let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
         self.client.ecs.lock().send_event(InteractBlockEvent {
-                entity: self.client.entity,
-                position: block_pos,
-                direction: Direction::Up,
-                hand: Hand::MainHand,
-                cursor_position: None,
-                inside_block: false,
-                sequence: 0,
-            });
+            entity: self.client.entity,
+            position: block_pos,
+            direction: Direction::Up,
+            hand: Hand::MainHand,
+            cursor_position: None,
+            inside_block: false,
+            sequence: 0,
+        });
     }
 
     /// Move to position

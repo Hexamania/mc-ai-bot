@@ -7,11 +7,11 @@ publish = false
 
 # Patch simd_cesu8 to fix array_chunks issue on Rust 1.85+
 # The fix changes `remainder.array_chunks()` to `remainder.into_iter().array_chunks()`
-# Patch simdnbt to remove obsolete array_chunks feature gate (fixed in simdnbt 0.7+)
+# Patch simdnbt 0.6.1 to remove obsolete array_chunks feature gate (stabilized in Rust 1.97, gate removed in 1.93+)
 [patch.crates-io]
 simd_cesu8 = { git = "https://github.com/seancroach/simd_cesu8", rev = "v1.2.0" }
-simdnbt = { path = "../vendor/simdnbt" }
-simdnbt-derive = { path = "../vendor/simdnbt-derive" }
+simdnbt = { path = "../vendor/simdnbt/simdnbt" }
+simdnbt-derive = { path = "../vendor/simdnbt/simdnbt-derive" }
 
 [dependencies]
 azalea = "=0.10.3+mc1.21.1"

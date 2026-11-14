@@ -26,6 +26,7 @@ jobs:
       - name: Configure git credentials for private dependencies
         run: |
           git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global credential.helper manager
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:

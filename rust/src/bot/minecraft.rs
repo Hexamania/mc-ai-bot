@@ -12,9 +12,7 @@ use azalea::{
         event::{EntityEvent, Event as EcsEvent},
         query::With,
     },
-    entity::{
-        Attributes, Hand, Position, metadata::Player,
-    },
+    entity::{Attributes, Hand, Position, metadata::Player},
     hunger::Hunger,
     interact::InteractBlockEvent,
     inventory::{
@@ -2017,7 +2015,11 @@ impl MinecraftConnection {
                 if let Some(target) = target_entity {
                     if last_attack.elapsed() >= Duration::from_secs(1) {
                         // Attack the target
-                        client.look_at(client.entity_position(target).unwrap_or(Vec3::new(0.0, 0.0, 0.0)));
+                        client.look_at(
+                            client
+                                .entity_position(target)
+                                .unwrap_or(Vec3::new(0.0, 0.0, 0.0)),
+                        );
                         client.ecs.lock().send_event(AttackEvent {
                             entity: client.entity,
                             target,
@@ -2736,9 +2738,7 @@ impl MinecraftConnection {
         let saturation = food.saturation;
 
         // Get yaw/pitch from position component
-        let (yaw, pitch) = position
-            .map(|p| (p.yaw, p.pitch))
-            .unwrap_or((0.0, 0.0));
+        let (yaw, pitch) = position.map(|p| (p.yaw, p.pitch)).unwrap_or((0.0, 0.0));
 
         // Dimension, time, gamemode - use defaults for now
         let dimension = "overworld".to_string();

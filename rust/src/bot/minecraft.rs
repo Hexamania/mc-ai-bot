@@ -4,10 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use serde_json::{
-    json,
-    Value,
-};
+use serde_json::{json, Value};
 use azalea::{
     auto_tool::AutoToolClientExt,
     blocks::{Block as BlockTrait, BlockState, BlockStates},

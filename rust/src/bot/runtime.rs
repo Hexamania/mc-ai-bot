@@ -228,10 +228,16 @@ impl MinecraftRuntime {
         });
         let health = vitals.get("health").and_then(|h| h.as_f64()).unwrap_or(0.0) as f32;
         let food = vitals.get("food").and_then(|f| f.as_i64()).unwrap_or(0) as i32;
-        let saturation = vitals.get("saturation").and_then(|s| s.as_f64()).unwrap_or(0.0) as f32;
+        let saturation = vitals
+            .get("saturation")
+            .and_then(|s| s.as_f64())
+            .unwrap_or(0.0) as f32;
 
         // Get inventory
-        let inventory = self.get_inventory().await.unwrap_or(serde_json::Value::Null);
+        let inventory = self
+            .get_inventory()
+            .await
+            .unwrap_or(serde_json::Value::Null);
         let inventory_items: Vec<crate::web::socket::events::InventoryItemPayload> = inventory
             .as_array()
             .map(|arr| {
@@ -250,14 +256,41 @@ impl MinecraftRuntime {
             .unwrap_or_default();
 
         // Get equipment
-        let equipment = self.get_equipment().await.unwrap_or(serde_json::Value::Null);
+        let equipment = self
+            .get_equipment()
+            .await
+            .unwrap_or(serde_json::Value::Null);
         let equipment_payload = crate::web::socket::events::EquipmentPayload {
-            head: equipment.get("head").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            chest: equipment.get("chest").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            legs: equipment.get("legs").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            feet: equipment.get("feet").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            hand: equipment.get("hand").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            offhand: equipment.get("offhand").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            head: equipment
+                .get("head")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            chest: equipment
+                .get("chest")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            legs: equipment
+                .get("legs")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            feet: equipment
+                .get("feet")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            hand: equipment
+                .get("hand")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            offhand: equipment
+                .get("offhand")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
         };
 
         // Get players
@@ -276,7 +309,10 @@ impl MinecraftRuntime {
                         })
                     }),
                     health: p.get("health").and_then(|h| h.as_f64()).map(|h| h as f32),
-                    gamemode: p.get("gamemode").and_then(|g| g.as_str()).map(|s| s.to_owned()),
+                    gamemode: p
+                        .get("gamemode")
+                        .and_then(|g| g.as_str())
+                        .map(|s| s.to_owned()),
                     ping: p.get("ping").and_then(|p| p.as_i64()).map(|p| p as i32),
                 })
             })

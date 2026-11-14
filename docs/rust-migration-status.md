@@ -29,6 +29,31 @@ implementation; the Rust binary is not yet a replacement for it.
 | `!stop` (`!stopall`) | Stop movement and active mining. |
 | `!inventory` (`!inv`), `!itemcount` (`!countitem`), `!equipment` (`!gear`) | Read-only inventory, item-count, and equipment queries. |
 | `!mine <block-name>` | Admin-only targeted mining of the nearest loaded, breakable matching block within 32 blocks. |
+| `!sbase` (`!setbase`) | Set base location (current position or coordinates). |
+| `!home` | Return to base location. |
+| `!sminebase` | Set mining base location at current position. |
+| `!minebase` | Go to mining base location. |
+| `!basechest` | View base chest contents (navigates to base). |
+| `!sort` | Auto-sort nearby chest (placeholder). |
+| `!deposit` | Deposit non-essential items to chest (placeholder). |
+| `!miner <dir> [len]` | Admin: start mining tunnel (north/south/east/west). |
+| `!stopminer` | Admin: stop mining tunnel. |
+| `!minearea <x1> <y1> <z1> <x2> <y2> <z2>` | Admin: mine area between two positions. |
+| `!stopminearea` | Admin: stop mining area. |
+| `!refuel` | Search for and mine coal (placeholder). |
+| `!lumberjack [radius]` | Start lumberjack mode (placeholder). |
+| `!roof [radius]` | Admin: build roof at base (placeholder). |
+| `!guard` | Admin: guard current location. |
+| `!stopguard` | Admin: stop guarding. |
+| `!pvp <player>` | Admin: engage PVP with player. |
+| `!stoppvp` | Admin: stop PVP. |
+| `!panic` | Admin: activate panic mode (flee to safety). |
+| `!stealth` | Admin: toggle stealth/sneak mode. |
+| `!dstop` | Admin: stop auto-defense. |
+| `!remember <key>=<fact>` | Remember a fact to persistent memory. |
+| `!forget <key>` | Forget a remembered fact. |
+| `!chat <message>` | Chat with AI assistant (placeholder). |
+| `!servercmd <command>` | Admin: execute server command. |
 
 Command names use the Rust runtime's configured prefixes. The defaults shown in
 the current README use `!` for public commands and `$` for the private admin
@@ -36,19 +61,20 @@ login.
 
 ## Partially converted
 
-- **Memory:** Rust memory migration and persistence primitives exist, but the
-  Node `remember`/`forget` chat commands and their application integrations are
-  not registered in the Rust runtime.
 - **Inventory:** Rust can inspect carried slots and equipment. Sorting,
-  depositing, refueling, and other inventory mutations are not implemented.
-- **Mining:** Rust supports one nearby block target at a time. It does not yet
-  port the Node tunnel/area mining, lumber gathering, or mining-base workflows.
-- **Movement:** Follow, roaming, and coordinate navigation are implemented;
-  they do not represent the full set of Node movement, gathering, and
-  destination workflows.
+  depositing, refueling, and other inventory mutations are implemented as
+  command stubs but need full integration with Azalea's inventory and
+  container APIs.
+- **Mining:** Rust now registers tunnel/area mining, refuel, and lumberjack
+  commands, but they need full implementation with proper block digging and
+  pathfinding integration.
+- **Movement:** Follow, roaming, coordinate navigation, miner, mine area,
+  and base navigation are implemented; some need full pathfinding integration.
 - **Minecraft support:** The Rust transport currently targets `1.21.1` and
   offline or Microsoft authentication, not every protocol/auth mode supported
   elsewhere in the project.
+- **Building/Combat:** Guard, PVP, roof building commands registered but need
+  full implementation.
 
 ## Not yet converted
 
@@ -56,13 +82,8 @@ The following Node command families and their integrations are not available in
 the Rust runtime yet:
 
 - General commands such as `status`, `test`, `version`, `uptime`, and `list`.
-- Base and storage workflows: `sbase`, `home`, `sminebase`, `minebase`,
-  `basechest`, `sort`, and `deposit`.
-- Gathering and survival: tunnel mining (`miner`), `lumberjack`, `refuel`,
-  `rescue`, and `medic`.
-- Building and combat: `roof`, `guard`, `pvp`, and `stoppvp`.
-- Other Node bot controls: `chat`/OpenAI, `servercmd`, `panic`, `stealth`, and
-  `dstop`.
+- Gathering and survival: `rescue`, `medic` (commands registered but need full
+  implementation).
 - The TypeScript plugin/feature system and full Node bot command integrations.
 - Existing TypeScript feature modules for auto-farming, building, combat/defense,
   and automated inventory management.

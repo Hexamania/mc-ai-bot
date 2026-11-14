@@ -1,5 +1,6 @@
 // Socket.io event handlers for web dashboard
 use axum::extract::State;
+use serde_json::Value;
 use socketioxide::{
     SocketIo,
     extract::{Data, SocketRef},
@@ -8,7 +9,6 @@ use socketioxide::{
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
-use serde_json::Value;
 
 /**
  * Socket.io event handlers for web server
@@ -57,95 +57,93 @@ pub fn setup_main_namespace(
     io.ns(namespaces::MAIN, move |ns| {
         let state = state_clone.clone();
 
-        ns.on_connect(
-            move |socket: SocketRef| {
-                let state = state.clone();
-                let socket_id = socket.id.to_string();
+        ns.on_connect(move |socket: SocketRef| {
+            let state = state.clone();
+            let socket_id = socket.id.to_string();
 
-                // Get handshake data from socket
-                let handshake = socket.handshake();
-                let auth_value = handshake.auth.clone().unwrap_or_default();
-                let query_value = handshake.query.clone().unwrap_or_default();
+            // Get handshake data from socket
+            let handshake = socket.handshake();
+            let auth_value = handshake.auth.clone().unwrap_or_default();
+            let query_value = handshake.query.clone().unwrap_or_default();
 
-                // Store handshake data in state
-                let socket_data = crate::web::SocketData {
-                    handshake_auth: Some(auth_value.clone()),
-                    handshake_query: Some(query_value.clone()),
-                    ..Default::default()
-                };
-                let state_clone = state.clone();
-                let socket_id_clone = socket_id.clone();
-                tokio::spawn(async move {
-                    set_socket_data(&state_clone, socket_id_clone, socket_data).await;
-                });
+            // Store handshake data in state
+            let socket_data = crate::web::SocketData {
+                handshake_auth: Some(auth_value.clone()),
+                handshake_query: Some(query_value.clone()),
+                ..Default::default()
+            };
+            let state_clone = state.clone();
+            let socket_id_clone = socket_id.clone();
+            tokio::spawn(async move {
+                set_socket_data(&state_clone, socket_id_clone, socket_data).await;
+            });
 
-                // Authentication - extract token from socket handshake auth
-                let token = extract_socket_token(Some(&auth_value), Some(&query_value));
+            // Authentication - extract token from socket handshake auth
+            let token = extract_socket_token(Some(&auth_value), Some(&query_value));
 
-                if let Some(token) = token {
-                    let config = state.config.clone();
-                    if let Ok(claims) = verify_socket_token(&config, &token) {
-                        let user = SocketUser {
-                            username: claims.sub,
-                            role: claims.role,
-                        };
+            if let Some(token) = token {
+                let config = state.config.clone();
+                if let Ok(claims) = verify_socket_token(&config, &token) {
+                    let user = SocketUser {
+                        username: claims.sub,
+                        role: claims.role,
+                    };
 
-                        // Store user data in socket state
-                        let socket_data = crate::web::SocketData {
-                            user: Some(user.role),
-                            username: Some(user.username.clone()),
-                            handshake_auth: None,
-                            handshake_query: None,
-                        };
-                        let state_clone = state.clone();
-                        let socket_id_clone = socket_id.clone();
-                        tokio::spawn(async move {
-                            set_socket_data(&state_clone, socket_id_clone, socket_data).await;
-                        });
+                    // Store user data in socket state
+                    let socket_data = crate::web::SocketData {
+                        user: Some(user.role),
+                        username: Some(user.username.clone()),
+                        handshake_auth: None,
+                        handshake_query: None,
+                    };
+                    let state_clone = state.clone();
+                    let socket_id_clone = socket_id.clone();
+                    tokio::spawn(async move {
+                        set_socket_data(&state_clone, socket_id_clone, socket_data).await;
+                    });
 
-                        // Join default rooms
-                        socket.join(rooms::ALL).ok();
-                        match user.role {
-                            UserRole::Admin => {
-                                socket.join(rooms::ADMINS).ok();
-                            }
-                            UserRole::Trusted => {
-                                socket.join(rooms::TRUSTED).ok();
-                            }
-                            _ => {}
+                    // Join default rooms
+                    socket.join(rooms::ALL).ok();
+                    match user.role {
+                        UserRole::Admin => {
+                            socket.join(rooms::ADMINS).ok();
                         }
-
-                        // Send initial state - pass owned values
-                        send_initial_state(socket, state.clone());
-
-                        // Set up event handlers
-                        setup_socket_event_handlers(socket, state, ns.io().clone());
-                    } else {
-                        socket
-                            .emit(server_events::AUTH_FAILED, "Invalid token")
-                            .ok();
-                        socket.disconnect().ok();
+                        UserRole::Trusted => {
+                            socket.join(rooms::TRUSTED).ok();
+                        }
+                        _ => {}
                     }
+
+                    // Send initial state - pass owned values
+                    send_initial_state(socket, state.clone());
+
+                    // Set up event handlers
+                    setup_socket_event_handlers(socket, state, ns.io().clone());
                 } else {
                     socket
-                        .emit(server_events::AUTH_FAILED, "Authentication required")
+                        .emit(server_events::AUTH_FAILED, "Invalid token")
                         .ok();
                     socket.disconnect().ok();
                 }
+            } else {
+                socket
+                    .emit(server_events::AUTH_FAILED, "Authentication required")
+                    .ok();
+                socket.disconnect().ok();
+            }
 
-                // Handle disconnection
-                let state_disconnect = state.clone();
-                let socket_id_disconnect = socket_id.clone();
-                socket.on_disconnect(move |_socket: SocketRef, _reason: DisconnectReason| {
-                    let state = state_disconnect.clone();
-                    let socket_id = socket_id_disconnect.clone();
-                    tokio::spawn(async move {
-                        remove_socket_data(&state, &socket_id).await;
-                    });
-                    info!("[SOCKET] Dashboard disconnected");
+            // Handle disconnection
+            let state_disconnect = state.clone();
+            let socket_id_disconnect = socket_id.clone();
+            socket.on_disconnect(move |_socket: SocketRef, _reason: DisconnectReason| {
+                let state = state_disconnect.clone();
+                let socket_id = socket_id_disconnect.clone();
+                tokio::spawn(async move {
+                    remove_socket_data(&state, &socket_id).await;
                 });
-            },
-        );
+                info!("[SOCKET] Dashboard disconnected");
+            });
+        });
     });
 
     Ok(())

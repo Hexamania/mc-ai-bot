@@ -1008,7 +1008,11 @@ async fn get_commands(
         let commands_list: Vec<serde_json::Value> = commands
             .into_iter()
             .map(|cmd| {
-                let admin_only = cmd.permission.as_ref().map(|p| p.level == crate::commands::PermissionLevel::Admin).unwrap_or(false);
+                let admin_only = cmd
+                    .permission
+                    .as_ref()
+                    .map(|p| p.level == crate::commands::PermissionLevel::Admin)
+                    .unwrap_or(false);
                 let pm_only = cmd.permission.as_ref().map(|p| p.pm_only).unwrap_or(false);
                 json!({
                     "name": cmd.name,

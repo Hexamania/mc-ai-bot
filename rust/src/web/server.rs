@@ -56,7 +56,11 @@ impl WebServer {
         state.set_socket_io(Some(socket_io.clone())).await;
 
         // Create the HTTP router
-        let app = create_router(state.clone(), Some(socket_io.clone()), Some(socket_io_layer.clone()));
+        let app = create_router(
+            state.clone(),
+            Some(socket_io.clone()),
+            Some(socket_io_layer.clone()),
+        );
 
         Ok(Self {
             config,

@@ -7,19 +7,16 @@ use std::{
 use azalea::{
     Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3,
     auto_tool::AutoToolClientExt,
-    blocks::BlockState,
     block::BlockTrait,
-    ecs::{
-        event::Event as EcsEvent,
-        query::With,
-    },
+    blocks::BlockState,
+    ecs::{event::Event as EcsEvent, query::With},
     entity::{Attributes, Hand, Position, metadata::Player},
     hunger::Hunger,
     interact::InteractBlockEvent,
     inventory::{
         Inventory, SetSelectedHotbarSlotEvent,
-        components::Container,
         click::{ClickMode, ClickOperation, ClickType, MouseButton},
+        components::Container,
     },
     mining::{Mining, StopMiningBlockEvent},
     pathfinder::{

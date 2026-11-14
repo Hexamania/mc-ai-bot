@@ -37,7 +37,7 @@ use tower::Layer;
 /// Web server wrapper
 pub struct WebServer {
     config: Arc<AppConfig>,
-    state: Arc<WebState>,
+    state: Arc<RwLock<WebState>>,
     app: Router,
     socket_io: Option<SocketIo>,
     socket_io_layer: Option<tower::Layer>,
@@ -49,7 +49,7 @@ impl WebServer {
     pub async fn new(
         config: Arc<AppConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let state = Arc::new(WebState::new(config.clone()));
+        let state = Arc::new(RwLock::new(WebState::new(config.clone())));
 
         // Initialize Socket.io
         let (socket_io_layer, socket_io) = socket::initialize_socket_io(state.clone())?;
@@ -69,17 +69,17 @@ impl WebServer {
 
     /// Set the Minecraft connection
     pub async fn set_connection(&self, connection: MinecraftConnection) {
-        self.state.set_connection(connection).await;
+        self.state.write().await.set_connection(connection).await;
     }
 
     /// Set the Minecraft runtime (shared with main loop)
-    pub fn set_runtime(&self, runtime: Arc<RwLock<MinecraftRuntime>>) {
-        self.state.write().set_runtime(runtime);
+    pub async fn set_runtime(&self, runtime: Arc<RwLock<MinecraftRuntime>>) {
+        self.state.write().await.set_runtime(runtime);
     }
 
     /// Clear connection and runtime
     pub async fn clear(&self) {
-        self.state.clear().await;
+        self.state.write().await.clear().await;
     }
 
     /// Start the web server
@@ -119,7 +119,7 @@ impl WebServer {
     }
 
     /// Get the web state
-    pub fn state(&self) -> Arc<WebState> {
+    pub fn state(&self) -> Arc<RwLock<WebState>> {
         self.state.clone()
     }
 
@@ -131,7 +131,7 @@ impl WebServer {
 
 /// Create the main router with all middleware and routes
 fn create_router(
-    state: Arc<WebState>,
+    state: Arc<RwLock<WebState>>,
     socket_io: Option<SocketIo>,
     socket_io_layer: Option<tower::Layer>,
 ) -> Router {

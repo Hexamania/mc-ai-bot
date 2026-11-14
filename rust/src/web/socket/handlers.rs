@@ -32,26 +32,17 @@ pub fn setup_main_namespace(
     io: &SocketIo,
     state: Arc<WebState>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let io_clone = io.clone();
+    let state_clone = state.clone();
 
-    io.of(namespaces::MAIN)
-        .on_connection(move |socket: SocketRef| {
-            let state = state.clone();
-            let io = io_clone.clone();
+    io.ns(namespaces::MAIN)
+        .on_connect(move |socket: SocketRef| {
+            let state = state_clone.clone();
 
-            // Authentication middleware (handled in on_connection)
-            let token = extract_socket_token(
-                socket
-                    .extensions()
-                    .get::<serde_json::Value>()
-                    .cloned()
-                    .as_ref(),
-                socket
-                    .extensions()
-                    .get::<serde_json::Value>()
-                    .cloned()
-                    .as_ref(),
-            );
+            // Authentication - extract token from socket handshake auth
+            let auth_value = socket.auth();
+            let query_value = socket.query();
+
+            let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
             if let Some(token) = token {
                 let config = state.config.clone();
@@ -60,7 +51,9 @@ pub fn setup_main_namespace(
                         username: claims.sub,
                         role: claims.role,
                     };
-                    socket.extensions.insert(user.clone());
+
+                    // Store user data in socket
+                    socket.data.insert(user.clone());
 
                     // Join default rooms
                     socket.join(rooms::ALL).ok();
@@ -78,7 +71,7 @@ pub fn setup_main_namespace(
                     send_initial_state(&socket, &state);
 
                     // Set up event handlers
-                    setup_socket_event_handlers(socket, state, io);
+                    setup_socket_event_handlers(socket, state);
                 } else {
                     socket
                         .emit(server_events::AUTH_FAILED, "Invalid token")
@@ -106,25 +99,22 @@ pub fn setup_admin_namespace(
     io: &SocketIo,
     state: Arc<WebState>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let io_clone = io.clone();
+    let state_clone = state.clone();
 
-    io.of(namespaces::ADMIN)
-        .on_connection(move |socket: SocketRef| {
-            let state = state.clone();
-            let io = io_clone.clone();
+    io.ns(namespaces::ADMIN)
+        .on_connect(move |socket: SocketRef| {
+            let state = state_clone.clone();
 
-            // Check if user is admin
-            if let Some(user) = socket.extensions().get::<SocketUser>() {
-                if !matches!(user.role, crate::web::auth::UserRole::Admin) {
-                    socket
-                        .emit(server_events::AUTH_FAILED, "Admin access required")
-                        .ok();
-                    socket.disconnect().ok();
-                    return;
-                }
-            } else {
+            // Check if user is admin - get user from socket data
+            let is_admin = socket
+                .data
+                .get::<SocketUser>()
+                .map(|user| matches!(user.role, crate::web::auth::UserRole::Admin))
+                .unwrap_or(false);
+
+            if !is_admin {
                 socket
-                    .emit(server_events::AUTH_FAILED, "Authentication required")
+                    .emit(server_events::AUTH_FAILED, "Admin access required")
                     .ok();
                 socket.disconnect().ok();
                 return;
@@ -174,28 +164,22 @@ pub fn setup_commands_namespace(
     io: &SocketIo,
     state: Arc<WebState>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    io.of(namespaces::COMMANDS)
-        .on_connection(move |socket: SocketRef| {
-            let state = state.clone();
+    let state_clone = state.clone();
+
+    io.ns(namespaces::COMMANDS)
+        .on_connect(move |socket: SocketRef| {
+            let state = state_clone.clone();
 
             // Authentication
-            let token = extract_socket_token(
-                socket
-                    .extensions()
-                    .get::<serde_json::Value>()
-                    .cloned()
-                    .as_ref(),
-                socket
-                    .extensions()
-                    .get::<serde_json::Value>()
-                    .cloned()
-                    .as_ref(),
-            );
+            let auth_value = socket.auth();
+            let query_value = socket.query();
+
+            let token = extract_socket_token(auth_value.as_ref(), query_value.as_ref());
 
             if let Some(token) = token {
                 let config = state.config.clone();
                 if verify_socket_token(&config, &token).is_ok() {
-                    socket.extensions.insert(SocketUser {
+                    socket.data.insert(SocketUser {
                         username: "dashboard".to_string(),
                         role: crate::web::auth::UserRole::Admin,
                     });
@@ -500,7 +484,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.stop_all_movement().await;
 
                     // Broadcast feature toggled
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -514,7 +498,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 
                     // Broadcast bulk update
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -702,7 +686,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.toggle_kill_aura(enabled);
 
                     // Broadcast feature toggled
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -716,7 +700,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 
                     // Broadcast bulk update
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -736,7 +720,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     let mut runtime = runtime_arc.write().await;
                     runtime.toggle_auto_defense(enabled);
 
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -749,7 +733,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     }
 
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -898,7 +882,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.stop_all_tasks();
 
                     // Broadcast feature toggled
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(
                                 server_events::FEATURE_TOGGLED,
@@ -972,7 +956,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
                     runtime.update_settings(settings_value).await;
 
                     let bot_state = runtime.get_full_state().await;
-                    if let Some(ns) = io.of(namespaces::MAIN) {
+                    if let Some(ns) = io.ns(namespaces::MAIN) {
                         ns.to(rooms::ALL)
                             .emit(server_events::BULK_UPDATE, bot_state)
                             .ok();
@@ -1205,7 +1189,7 @@ fn setup_socket_event_handlers(socket: SocketRef, state: Arc<WebState>, io: Sock
 /// Broadcast bot status to all connected dashboards
 pub async fn broadcast_bot_status(state: &WebState, status: serde_json::Value) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.of(namespaces::MAIN) {
+        if let Some(ns) = io.ns(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(server_events::BOT_STATUS, status)
                 .ok();
@@ -1216,7 +1200,7 @@ pub async fn broadcast_bot_status(state: &WebState, status: serde_json::Value) {
 /// Broadcast bot state to all connected dashboards
 pub async fn broadcast_bot_state(state: &WebState, bot_state: serde_json::Value) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.of(namespaces::MAIN) {
+        if let Some(ns) = io.ns(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(server_events::BOT_STATE, bot_state)
                 .ok();
@@ -1227,7 +1211,7 @@ pub async fn broadcast_bot_state(state: &WebState, bot_state: serde_json::Value)
 /// Broadcast log entry to all connected dashboards
 pub async fn broadcast_log(state: &WebState, level: &str, tag: &str, message: &str) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.of(namespaces::MAIN) {
+        if let Some(ns) = io.ns(namespaces::MAIN) {
             ns.to(rooms::LOGS)
                 .emit(
                     server_events::LOG_ENTRY,
@@ -1251,7 +1235,7 @@ pub async fn broadcast_chat_message(
     message_type: &str,
 ) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.of(namespaces::MAIN) {
+        if let Some(ns) = io.ns(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(
                     server_events::CHAT_MESSAGE,
@@ -1270,7 +1254,7 @@ pub async fn broadcast_chat_message(
 /// Broadcast command output to all connected dashboards
 pub async fn broadcast_command_output(state: &WebState, message: &str, output_type: &str) {
     if let Ok(io) = state.get_socket_io() {
-        if let Some(ns) = io.of(namespaces::MAIN) {
+        if let Some(ns) = io.ns(namespaces::MAIN) {
             ns.to(rooms::ALL)
                 .emit(
                     server_events::COMMAND_OUTPUT,

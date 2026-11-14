@@ -14,8 +14,9 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, deco
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::RwLock;
 
-use crate::config::AppConfig;
+use crate::{config::AppConfig, web::WebState};
 
 /// Token payload with user info
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -171,10 +172,11 @@ fn extract_token(headers: &HeaderMap, cookies: &str, query_token: Option<&str>) 
 
 /// Authentication middleware - requires valid token
 pub async fn auth_middleware(
-    State(config): State<Arc<AppConfig>>,
+    State(state): State<Arc<RwLock<WebState>>>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AuthError> {
+    let config = state.read().await.config.clone();
     let headers = request.headers().clone();
     let cookies = headers
         .get(header::COOKIE)
@@ -197,10 +199,11 @@ pub async fn auth_middleware(
 
 /// Optional authentication middleware - adds user if token is valid but doesn't require it
 pub async fn optional_auth_middleware(
-    State(config): State<Arc<AppConfig>>,
+    State(state): State<Arc<RwLock<WebState>>>,
     mut request: Request,
     next: Next,
 ) -> Response {
+    let config = state.read().await.config.clone();
     let headers = request.headers().clone();
     let cookies = headers
         .get(header::COOKIE)
@@ -224,7 +227,7 @@ pub async fn optional_auth_middleware(
 /// Role-based authorization middleware
 pub fn require_role(allowed_roles: Vec<UserRole>) -> axum::middleware::Middleware<axum::Router> {
     axum::middleware::from_fn(
-        move |State(config): State<Arc<AppConfig>>, mut request: Request, next: Next| {
+        move |State(state): State<Arc<RwLock<WebState>>>, mut request: Request, next: Next| {
             let allowed = allowed_roles.clone();
             async move {
                 let claims = request

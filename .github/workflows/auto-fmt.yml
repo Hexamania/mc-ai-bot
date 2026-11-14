@@ -46,13 +46,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git diff --quiet rust/
-          if ($LASTEXITCODE -eq 0) {
+          $diffExit = $LASTEXITCODE
+          if ($diffExit -eq 0) {
             "changed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             Write-Host "No formatting changes needed"
           } else {
             "changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             Write-Host "Formatting changes detected"
           }
+          exit 0
 
       - name: Commit and push formatting changes
         if: steps.fmt-check.outputs.changed == 'true'

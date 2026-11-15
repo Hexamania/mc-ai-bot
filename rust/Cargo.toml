@@ -17,6 +17,8 @@ simdnbt-derive = { path = "../vendor/simdnbt/simdnbt-derive" }
 azalea = "=0.10.3+mc1.21.1"
 async-trait = "0.1"
 axum = { version = "0.7", features = ["macros", "json", "form", "ws", "multipart"] }
+hyper = { version = "1", features = ["server", "http1", "http2"] }
+bevy_ecs = "0.13"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 jsonwebtoken = "9"
 rand = { version = "=0.8.5", features = ["small_rng"] }

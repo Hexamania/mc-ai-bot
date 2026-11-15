@@ -6,17 +6,15 @@ use std::{
 
 use azalea::{
     Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3,
+    attack::AttackEvent,
     auto_tool::AutoToolClientExt,
-    block::BlockTrait,
-    blocks::BlockState,
+    block::{BlockState, BlockTrait},
     ecs::{event::Event as EcsEvent, query::With},
-    entity::{Attributes, Hand, Position, metadata::Player},
-    hunger::Hunger,
-    interact::InteractBlockEvent,
+    entity::{Attributes, Position, metadata::Player, Hunger, Rotation},
+    interact::{InteractBlockEvent, SetControlStateEvent},
     inventory::{
-        Inventory, SetSelectedHotbarSlotEvent,
-        click::{ClickMode, ClickOperation, ClickType, MouseButton},
-        components::Container,
+        Inventory, InventoryMenu, SetSelectedHotbarSlotEvent, DropItemEvent,
+        components::{ClickMode, ClickOperation, ClickType, MouseButton, Container},
     },
     mining::{Mining, StopMiningBlockEvent},
     pathfinder::{
@@ -26,6 +24,7 @@ use azalea::{
     registry::Block as RegistryBlock,
     world::{ChunkStorage, Direction},
 };
+use bevy_ecs::entity::Entity;
 use rand::Rng;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -2736,7 +2735,7 @@ impl MinecraftConnection {
         let saturation = food.saturation;
 
         // Get yaw/pitch from rotation component (separate from Position in azalea 0.10)
-        let rotation = self.client.component::<azalea::Rotation>();
+        let rotation = self.client.component::<Rotation>();
         let (yaw, pitch) = rotation.map(|r| (r.0, r.1)).unwrap_or((0.0, 0.0));
 
         // Dimension, time, gamemode - use defaults for now
@@ -2813,17 +2812,19 @@ impl MinecraftConnection {
         let bot_pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         let bot_username = self.username();
 
-        // Use ECS query to get entities with GameProfileComponent
-        let entities: Vec<_> = self
-            .client
+        // Use ECS query to get entities with GameProfileComponent - query requires &mut World
+        let mut ecs = self.client.ecs.lock();
+        let world = &mut *ecs;
+        let entities: Vec<_> = world
             .query::<(
-                azalea::bevy_ecs::entity::Entity,
+                Entity,
                 &GameProfileComponent,
                 Option<&Position>,
             )>()
-            .iter()
+            .iter(world)
             .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
             .collect();
+        drop(ecs);
 
         for (entity, profile, position) in entities {
             if let Some(pos) = position {
@@ -2892,10 +2893,10 @@ impl MinecraftConnection {
 
         // Get entities - query requires &mut World
         let mut ecs = self.client.ecs.lock();
-        let world = ecs.world_mut();
+        let world = &mut *ecs;
         let entity_query: Vec<_> = world
             .query::<(
-                azalea::bevy_ecs::entity::Entity,
+                Entity,
                 &GameProfileComponent,
                 Option<&Position>,
             )>()
@@ -3111,7 +3112,7 @@ impl MinecraftConnection {
             return;
         }
         let inventory = self.client.component::<Inventory>();
-        if let Some(player) = inventory.inventory_menu.as_player() {
+        if let InventoryMenu::Player(player) = &inventory.inventory_menu {
             let inventory = &player.inventory;
             if (slot as usize) < inventory.len() {
                 if let Some(item_stack) = inventory[slot as usize].as_present() {
@@ -3143,7 +3144,7 @@ impl MinecraftConnection {
             return;
         }
         let inventory = self.client.component::<Inventory>();
-        if let Some(player) = inventory.inventory_menu.as_player() {
+        if let InventoryMenu::Player(player) = &inventory.inventory_menu {
             let inventory = &player.inventory;
             // Iterate through main inventory (slots 0-35)
             for slot in 0..36 {

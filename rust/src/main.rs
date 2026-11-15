@@ -2,8 +2,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use mc_ai_bot_core::{
-    bot::runtime::{MinecraftRuntime, MinecraftRuntimeEvent},
     bot::minecraft::MinecraftEvent,
+    bot::runtime::{MinecraftRuntime, MinecraftRuntimeEvent},
     config::AppConfig,
     web::server::WebServerBuilder,
 };

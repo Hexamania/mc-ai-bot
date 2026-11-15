@@ -5,14 +5,14 @@ use std::{
 };
 
 use azalea::{
-    Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3, Hunger,
+    Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Hunger, Vec3,
     attack::AttackEvent,
     auto_tool::AutoToolClientExt,
     blocks::BlockState as AzaleaBlockState,
     container::{ContainerClientExt, ContainerHandleRef},
     core::direction::Direction,
     ecs::{event::Event as EcsEvent, query::With},
-    entity::{Attributes, LookDirection, Position, metadata::Player, Rotations},
+    entity::{Attributes, LookDirection, Position, Rotations, metadata::Player},
     interact::BlockInteractEvent,
     inventory::{
         ContainerClickEvent, Inventory, InventorySet, Menu, SetSelectedHotbarSlotEvent,
@@ -26,19 +26,21 @@ use azalea::{
     },
     protocol::packets::game::{
         serverbound_player_action_packet::{Action as PlayerAction, ServerboundPlayerActionPacket},
-        serverbound_player_command_packet::{Action as CommandAction, ServerboundPlayerCommandPacket},
+        serverbound_player_command_packet::{
+            Action as CommandAction, ServerboundPlayerCommandPacket,
+        },
     },
     registry::Block as RegistryBlock,
     world::{ChunkStorage, MinecraftEntityId},
 };
-use azalea_block::BlockStates;
 use azalea_block::Block;
+use azalea_block::BlockStates;
 use azalea_entity::LocalEntity;
 use bevy_ecs::entity::Entity;
 use bevy_ecs::world::Mut;
-use std::sync::Arc;
 use rand::Rng;
 use serde_json::{Value, json};
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle, time::sleep};
 
@@ -324,7 +326,7 @@ impl MinecraftConnection {
                 // Check if not air and destroyable
                 let is_air = state == AzaleaBlockState::AIR;
                 let block: Box<dyn Block> = Box::from(state);
-let destroy_time = block.behavior().destroy_time;
+                let destroy_time = block.behavior().destroy_time;
                 (!is_air && destroy_time >= 0.0).then_some((target, state))
             })
             .min_by(|(first, _), (second, _)| {
@@ -732,30 +734,36 @@ let destroy_time = block.behavior().destroy_time;
                         let window_id = container_handle.id();
                         for (_item_name, slots_list) in item_map {
                             for &slot_idx in &slots_list {
-                            if slot_idx != target_slot && target_slot < slots.len() {
-                                // Move item to target slot - use ContainerClickEvent with PickupClick
-                                use azalea::inventory::operations::{ClickOperation, PickupClick};
-                                // Pick up from source slot
-                                client.ecs.lock().send_event(ContainerClickEvent {
-                                    entity: client.entity,
-                                    window_id,
-                                    operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(slot_idx as u16) }),
-                                });
-                                // Place in target slot
-                                client.ecs.lock().send_event(ContainerClickEvent {
-                                    entity: client.entity,
-                                    window_id,
-                                    operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(target_slot as u16) }),
-                                });
-                                target_slot += 1;
-                                tokio::time::sleep(Duration::from_millis(100)).await;
-                            } else if slot_idx == target_slot {
-                                target_slot += 1;
+                                if slot_idx != target_slot && target_slot < slots.len() {
+                                    // Move item to target slot - use ContainerClickEvent with PickupClick
+                                    use azalea::inventory::operations::{
+                                        ClickOperation, PickupClick,
+                                    };
+                                    // Pick up from source slot
+                                    client.ecs.lock().send_event(ContainerClickEvent {
+                                        entity: client.entity,
+                                        window_id,
+                                        operation: ClickOperation::Pickup(PickupClick::Left {
+                                            slot: Some(slot_idx as u16),
+                                        }),
+                                    });
+                                    // Place in target slot
+                                    client.ecs.lock().send_event(ContainerClickEvent {
+                                        entity: client.entity,
+                                        window_id,
+                                        operation: ClickOperation::Pickup(PickupClick::Left {
+                                            slot: Some(target_slot as u16),
+                                        }),
+                                    });
+                                    target_slot += 1;
+                                    tokio::time::sleep(Duration::from_millis(100)).await;
+                                } else if slot_idx == target_slot {
+                                    target_slot += 1;
+                                }
                             }
                         }
                     }
                 }
-            }
             }
         });
 
@@ -1015,39 +1023,51 @@ let destroy_time = block.behavior().destroy_time;
 
                                     if !is_essential {
                                         // Move to chest - click player inventory slot, then click chest slot
-                                        use azalea::inventory::operations::{ClickOperation, PickupClick};
+                                        use azalea::inventory::operations::{
+                                            ClickOperation, PickupClick,
+                                        };
                                         let window_id = container_handle.id();
                                         // Pick up from player inventory slot
                                         client.ecs.lock().send_event(ContainerClickEvent {
                                             entity: client.entity,
                                             window_id,
-                                            operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(slot_idx as u16) }),
+                                            operation: ClickOperation::Pickup(PickupClick::Left {
+                                                slot: Some(slot_idx as u16),
+                                            }),
                                         });
 
                                         // Find empty slot in chest (chest slots start after player inventory)
                                         let chest_start = 36; // Approximate
                                         for chest_slot in chest_start..slots.len() {
-                                            if let Some(chest_item) = container_menu.slot(chest_slot) {
+                                            if let Some(chest_item) =
+                                                container_menu.slot(chest_slot)
+                                            {
                                                 if chest_item.is_empty() {
                                                     // Place in chest slot
-                                                    client.ecs.lock().send_event(ContainerClickEvent {
-                                                        entity: client.entity,
-                                                        window_id,
-                                                        operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(chest_slot as u16) }),
-                                                    });
+                                                    client.ecs.lock().send_event(
+                                                        ContainerClickEvent {
+                                                            entity: client.entity,
+                                                            window_id,
+                                                            operation: ClickOperation::Pickup(
+                                                                PickupClick::Left {
+                                                                    slot: Some(chest_slot as u16),
+                                                                },
+                                                            ),
+                                                        },
+                                                    );
                                                     break;
                                                 }
                                             }
                                         }
 
-                                    tokio::time::sleep(Duration::from_millis(100)).await;
+                                        tokio::time::sleep(Duration::from_millis(100)).await;
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
         });
 
         Ok(())
@@ -1141,7 +1161,9 @@ let destroy_time = block.behavior().destroy_time;
                             let block = RegistryBlock::from(state);
                             if !matches!(
                                 block,
-                                RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
+                                RegistryBlock::Air
+                                    | RegistryBlock::CaveAir
+                                    | RegistryBlock::VoidAir
                             ) {
                                 // Check if breakable
                                 let block: Box<dyn Block> = Box::from(state);
@@ -1167,9 +1189,8 @@ let destroy_time = block.behavior().destroy_time;
                                 // Look at block and mine
                                 client.look_at(Vec3::from(block_pos.center()));
                                 let mut ticks = client.get_tick_broadcaster();
-                                let _ =
-                                    tokio::time::timeout(Duration::from_secs(2), ticks.recv())
-                                        .await;
+                                let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv())
+                                    .await;
 
                                 // Mine the block
                                 let _ = tokio::time::timeout(
@@ -1181,9 +1202,8 @@ let destroy_time = block.behavior().destroy_time;
                                 // No suitable tool, still try to mine with hand
                                 client.look_at(Vec3::from(block_pos.center()));
                                 let mut ticks = client.get_tick_broadcaster();
-                                let _ =
-                                    tokio::time::timeout(Duration::from_secs(2), ticks.recv())
-                                        .await;
+                                let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv())
+                                    .await;
                                 let _ = tokio::time::timeout(
                                     Duration::from_secs(30),
                                     client.mine(block_pos),
@@ -1250,13 +1270,10 @@ let destroy_time = block.behavior().destroy_time;
                         }
                         client.look_at(Vec3::from(block_pos.center()));
                         let mut ticks = client.get_tick_broadcaster();
+                        let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
                         let _ =
-                            tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
-                        let _ = tokio::time::timeout(
-                            Duration::from_secs(30),
-                            client.mine(block_pos),
-                        )
-                        .await;
+                            tokio::time::timeout(Duration::from_secs(30), client.mine(block_pos))
+                                .await;
                     }
                 }
 
@@ -1348,58 +1365,55 @@ let destroy_time = block.behavior().destroy_time;
 
                         if destroy_time >= 0.0 {
                             if let Some(state) = state_opt {
+                                // Pathfind to position to mine this block
+                                // Stand at a safe offset
+                                let stand_x = x as f64 + 0.5;
+                                let stand_z = z as f64 + 0.5;
+                                let stand_y = (y - 1) as f64; // Stand below
+                                let stand_pos = Vec3::new(stand_x, stand_y, stand_z);
 
-                                    // Pathfind to position to mine this block
-                                    // Stand at a safe offset
-                                    let stand_x = x as f64 + 0.5;
-                                    let stand_z = z as f64 + 0.5;
-                                    let stand_y = (y - 1) as f64; // Stand below
-                                    let stand_pos = Vec3::new(stand_x, stand_y, stand_z);
+                                client.goto_without_mining(RadiusGoal {
+                                    pos: stand_pos,
+                                    radius: 1.0,
+                                });
 
-                                    client.goto_without_mining(RadiusGoal {
-                                        pos: stand_pos,
-                                        radius: 1.0,
+                                // Wait for movement
+                                let mut ticks = client.get_tick_broadcaster();
+                                let deadline =
+                                    tokio::time::Instant::now() + Duration::from_secs(10);
+                                loop {
+                                    let pos = client.position();
+                                    if pos.distance_to(&stand_pos) <= 1.5 {
+                                        break;
+                                    }
+                                    match tokio::time::timeout_at(deadline, ticks.recv()).await {
+                                        Ok(Ok(())) => {}
+                                        _ => return,
+                                    }
+                                }
+
+                                // Select best tool
+                                let best_tool = client.best_tool_in_hotbar_for_block(state);
+                                if best_tool.percentage_per_tick > 0.0 {
+                                    client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                        entity: client.entity,
+                                        slot: best_tool.index as u8,
                                     });
+                                }
 
-                                    // Wait for movement
-                                    let mut ticks = client.get_tick_broadcaster();
-                                    let deadline =
-                                        tokio::time::Instant::now() + Duration::from_secs(10);
-                                    loop {
-                                        let pos = client.position();
-                                        if pos.distance_to(&stand_pos) <= 1.5 {
-                                            break;
-                                        }
-                                        match tokio::time::timeout_at(deadline, ticks.recv()).await
-                                        {
-                                            Ok(Ok(())) => {}
-                                            _ => return,
-                                        }
-                                    }
-
-                                    // Select best tool
-                                    let best_tool = client.best_tool_in_hotbar_for_block(state);
-                                    if best_tool.percentage_per_tick > 0.0 {
-                                        client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
-                                            entity: client.entity,
-                                            slot: best_tool.index as u8,
-                                        });
-                                    }
-
-                                    // Look at block and mine
-                                    client.look_at(Vec3::from(block_pos.center()));
-                                    let mut ticks = client.get_tick_broadcaster();
-                                    let _ =
-                                        tokio::time::timeout(Duration::from_secs(2), ticks.recv())
-                                            .await;
-
-                                    let _ = tokio::time::timeout(
-                                        Duration::from_secs(30),
-                                        client.mine(block_pos),
-                                    )
+                                // Look at block and mine
+                                client.look_at(Vec3::from(block_pos.center()));
+                                let mut ticks = client.get_tick_broadcaster();
+                                let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv())
                                     .await;
 
-                                    tokio::time::sleep(Duration::from_millis(300)).await;
+                                let _ = tokio::time::timeout(
+                                    Duration::from_secs(30),
+                                    client.mine(block_pos),
+                                )
+                                .await;
+
+                                tokio::time::sleep(Duration::from_millis(300)).await;
                             }
                         }
                     }
@@ -1534,14 +1548,11 @@ let destroy_time = block.behavior().destroy_time;
                         // Look at block and mine
                         client.look_at(Vec3::from(coal_pos.center()));
                         let mut ticks = client.get_tick_broadcaster();
-                        let _ =
-                            tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
+                        let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                        let _ = tokio::time::timeout(
-                            Duration::from_secs(30),
-                            client.mine(coal_pos),
-                        )
-                        .await;
+                        let _ =
+                            tokio::time::timeout(Duration::from_secs(30), client.mine(coal_pos))
+                                .await;
 
                         tokio::time::sleep(Duration::from_millis(500)).await;
                     }
@@ -1551,14 +1562,19 @@ let destroy_time = block.behavior().destroy_time;
             // If we have logs and no coal, smelt logs into charcoal
             // Check inventory for logs
             let inventory = client.component::<Inventory>();
-            let has_logs = inventory.menu().slots().iter().enumerate().any(|(slot, item)| {
-                if let Some(item_stack) = item.as_present() {
-                    let name = item_stack.kind.to_string();
-                    name.contains("_log") && !name.contains("planks")
-                } else {
-                    false
-                }
-            });
+            let has_logs = inventory
+                .menu()
+                .slots()
+                .iter()
+                .enumerate()
+                .any(|(slot, item)| {
+                    if let Some(item_stack) = item.as_present() {
+                        let name = item_stack.kind.to_string();
+                        name.contains("_log") && !name.contains("planks")
+                    } else {
+                        false
+                    }
+                });
 
             if has_logs {
                 // Find furnace near base or craft one
@@ -1633,7 +1649,9 @@ let destroy_time = block.behavior().destroy_time;
                     let world = world.read();
                     if let Some(state) = world.get_block_state(&log_pos) {
                         let block = RegistryBlock::from(state);
-                        if block.to_string().contains("_log") && !block.to_string().contains("planks") {
+                        if block.to_string().contains("_log")
+                            && !block.to_string().contains("planks")
+                        {
                             let block: Box<dyn Block> = Box::from(state);
                             (block.behavior().destroy_time, Some(state))
                         } else {
@@ -1686,8 +1704,7 @@ let destroy_time = block.behavior().destroy_time;
                         let mut bottom_log = log_pos;
                         for check_y in (log_pos.y - 10)..=log_pos.y {
                             let check_pos = BlockPos::new(log_pos.x, check_y, log_pos.z);
-                            if let Some(check_state) = chunk_storage.get_block_state(&check_pos)
-                            {
+                            if let Some(check_state) = chunk_storage.get_block_state(&check_pos) {
                                 let check_block = RegistryBlock::from(check_state);
                                 if check_block.to_string().contains("_log")
                                     && !check_block.to_string().contains("planks")
@@ -1717,11 +1734,9 @@ let destroy_time = block.behavior().destroy_time;
                                 {
                                     client.look_at(Vec3::from(mine_pos.center()));
                                     let mut ticks = client.get_tick_broadcaster();
-                                    let _ = tokio::time::timeout(
-                                        Duration::from_secs(2),
-                                        ticks.recv(),
-                                    )
-                                    .await;
+                                    let _ =
+                                        tokio::time::timeout(Duration::from_secs(2), ticks.recv())
+                                            .await;
 
                                     let _ = tokio::time::timeout(
                                         Duration::from_secs(30),
@@ -1798,9 +1813,7 @@ let destroy_time = block.behavior().destroy_time;
             for (slot, item) in inventory.menu().slots().iter().enumerate() {
                 if let Some(item_stack) = item.as_present() {
                     let kind_str = item_stack.kind.to_string();
-                    let name = kind_str
-                        .strip_prefix("minecraft:")
-                        .unwrap_or(&kind_str);
+                    let name = kind_str.strip_prefix("minecraft:").unwrap_or(&kind_str);
                     if preferred_blocks.contains(&name) && item_stack.count > 0 {
                         building_block_slot = Some((slot, name.to_owned()));
                         break;
@@ -1836,7 +1849,9 @@ let destroy_time = block.behavior().destroy_time;
                         if let Some(state) = world.get_block_state(&place_pos) {
                             matches!(
                                 RegistryBlock::from(state),
-                                RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
+                                RegistryBlock::Air
+                                    | RegistryBlock::CaveAir
+                                    | RegistryBlock::VoidAir
                             )
                         } else {
                             true
@@ -1950,7 +1965,11 @@ let destroy_time = block.behavior().destroy_time;
                 let world = client.world();
                 let world_read = world.read();
                 // Use entity_by_id to get (MinecraftEntityId, Entity) pairs
-                let entities: Vec<_> = world_read.entity_by_id.iter().map(|(id, entity)| (*id, *entity)).collect();
+                let entities: Vec<_> = world_read
+                    .entity_by_id
+                    .iter()
+                    .map(|(id, entity)| (*id, *entity))
+                    .collect();
                 drop(world_read);
                 let mut target_entity = None;
                 let mut target_id = None;
@@ -2181,7 +2200,9 @@ let destroy_time = block.behavior().destroy_time;
                 // Attack if in range
                 if dist <= 4.0 && last_attack.elapsed() >= Duration::from_millis(500) {
                     client.look_at(target_pos);
-                    if let Some(target_id) = client.get_entity_component::<MinecraftEntityId>(target_entity) {
+                    if let Some(target_id) =
+                        client.get_entity_component::<MinecraftEntityId>(target_entity)
+                    {
                         client.ecs.lock().send_event(AttackEvent {
                             entity: client.entity,
                             target: target_id,
@@ -2291,9 +2312,7 @@ let destroy_time = block.behavior().destroy_time;
             for (slot, item) in inventory.menu().slots().iter().enumerate() {
                 if let Some(item_stack) = item.as_present() {
                     let kind_str = item_stack.kind.to_string();
-                    let name = kind_str
-                        .strip_prefix("minecraft:")
-                        .unwrap_or(&kind_str);
+                    let name = kind_str.strip_prefix("minecraft:").unwrap_or(&kind_str);
                     if [
                         "cobblestone",
                         "stone",
@@ -2455,8 +2474,13 @@ let destroy_time = block.behavior().destroy_time;
 
                             // Drop the item (Q key) - use ServerboundPlayerActionPacket
                             let pos = client.component::<Position>();
-                            let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
-                            let sequence = *client.component::<azalea::interact::CurrentSequenceNumber>();
+                            let block_pos = BlockPos::new(
+                                pos.x.floor() as i32,
+                                pos.y.floor() as i32,
+                                pos.z.floor() as i32,
+                            );
+                            let sequence =
+                                *client.component::<azalea::interact::CurrentSequenceNumber>();
                             client.ecs.lock().send_event(SendPacketEvent {
                                 entity: client.entity,
                                 packet: ServerboundPlayerActionPacket {
@@ -2487,7 +2511,11 @@ let destroy_time = block.behavior().destroy_time;
                     // Find hostile mobs near target
                     let world = client.world();
                     let world_read = world.read();
-                    let entities: Vec<_> = world_read.entity_by_id.iter().map(|(id, entity)| (*id, *entity)).collect();
+                    let entities: Vec<_> = world_read
+                        .entity_by_id
+                        .iter()
+                        .map(|(id, entity)| (*id, *entity))
+                        .collect();
                     drop(world_read);
                     for (mob_id, mob_entity) in entities {
                         if mob_entity == client.entity || mob_entity == entity {
@@ -2632,8 +2660,13 @@ let destroy_time = block.behavior().destroy_time;
                         tokio::time::sleep(Duration::from_millis(200)).await;
 
                         let pos = client.component::<Position>();
-                        let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
-                        let sequence = *client.component::<azalea::interact::CurrentSequenceNumber>();
+                        let block_pos = BlockPos::new(
+                            pos.x.floor() as i32,
+                            pos.y.floor() as i32,
+                            pos.z.floor() as i32,
+                        );
+                        let sequence =
+                            *client.component::<azalea::interact::CurrentSequenceNumber>();
                         client.ecs.lock().send_event(SendPacketEvent {
                             entity: client.entity,
                             packet: ServerboundPlayerActionPacket {
@@ -2654,7 +2687,11 @@ let destroy_time = block.behavior().destroy_time;
                 let entities: Vec<_> = {
                     let world = client.world();
                     let world_read = world.read();
-                    world_read.entity_by_id.iter().map(|(id, entity)| (*id, *entity)).collect()
+                    world_read
+                        .entity_by_id
+                        .iter()
+                        .map(|(id, entity)| (*id, *entity))
+                        .collect()
                 }; // world_read dropped here
                 for (mob_id, mob_entity) in entities {
                     if mob_entity == client.entity || mob_entity == target_entity {
@@ -3075,8 +3112,14 @@ let destroy_time = block.behavior().destroy_time;
                         });
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     let pos = self.client.component::<Position>();
-                    let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
-                    let sequence = *self.client.component::<azalea::interact::CurrentSequenceNumber>();
+                    let block_pos = BlockPos::new(
+                        pos.x.floor() as i32,
+                        pos.y.floor() as i32,
+                        pos.z.floor() as i32,
+                    );
+                    let sequence = *self
+                        .client
+                        .component::<azalea::interact::CurrentSequenceNumber>();
                     for _ in 0..drop_count {
                         self.client.ecs.lock().send_event(SendPacketEvent {
                             entity: self.client.entity,
@@ -3105,8 +3148,14 @@ let destroy_time = block.behavior().destroy_time;
             let inventory = &player.inventory;
             // Iterate through main inventory (slots 0-35)
             let pos = self.client.component::<Position>();
-            let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
-            let sequence = *self.client.component::<azalea::interact::CurrentSequenceNumber>();
+            let block_pos = BlockPos::new(
+                pos.x.floor() as i32,
+                pos.y.floor() as i32,
+                pos.z.floor() as i32,
+            );
+            let sequence = *self
+                .client
+                .component::<azalea::interact::CurrentSequenceNumber>();
             for slot in 0..36 {
                 if slot < inventory.len() {
                     if let Some(item_stack) = inventory[slot].as_present() {
@@ -3140,14 +3189,18 @@ let destroy_time = block.behavior().destroy_time;
         self.client.ecs.lock().send_event(ContainerClickEvent {
             entity: self.client.entity,
             window_id,
-            operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(from as u16) }),
+            operation: ClickOperation::Pickup(PickupClick::Left {
+                slot: Some(from as u16),
+            }),
         });
         tokio::time::sleep(Duration::from_millis(100)).await;
         // Place in target slot
         self.client.ecs.lock().send_event(ContainerClickEvent {
             entity: self.client.entity,
             window_id,
-            operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(to as u16) }),
+            operation: ClickOperation::Pickup(PickupClick::Left {
+                slot: Some(to as u16),
+            }),
         });
     }
 

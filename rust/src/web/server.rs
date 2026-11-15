@@ -169,14 +169,13 @@ fn create_router(
     }
 
     // Add global middleware
-    router = router
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(CompressionLayer::new())
-                .layer(cors)
-                .layer(DefaultBodyLimit::max(10 * 1024 * 1024)), // 10MB
-        );
+    router = router.layer(
+        ServiceBuilder::new()
+            .layer(TraceLayer::new_for_http())
+            .layer(CompressionLayer::new())
+            .layer(cors)
+            .layer(DefaultBodyLimit::max(10 * 1024 * 1024)), // 10MB
+    );
 
     router
 }

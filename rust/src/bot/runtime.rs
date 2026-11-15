@@ -954,7 +954,8 @@ impl MinecraftRuntime {
             }
         }
         if result.success {
-            self.apply_command_actions(actions, &context, &mut result).await?;
+            self.apply_command_actions(actions, &context, &mut result)
+                .await?;
         }
         let mut replies = Vec::new();
         while let Ok(reply) = reply_receiver.try_recv() {
@@ -1371,9 +1372,7 @@ impl MinecraftRuntime {
                     let commands = self.command_registry.get_all().unwrap_or_default();
                     let cmd_list = commands
                         .iter()
-                        .map(|c| {
-                            format!("  {} - {}", c.name, c.description.as_str())
-                        })
+                        .map(|c| format!("  {} - {}", c.name, c.description.as_str()))
                         .collect::<Vec<_>>()
                         .join("\n");
                     context.private_reply(&format!(

@@ -24,7 +24,7 @@ use crate::{
         WebState,
         auth::{
             Claims, UserRole, auth_middleware, optional_auth_middleware, require_admin,
-            require_trusted, require_admin_middleware, require_trusted_middleware,
+            require_admin_middleware, require_trusted, require_trusted_middleware,
         },
         rate_limit::{RateLimiters, create_rate_limiters, rate_limit_middleware},
     },

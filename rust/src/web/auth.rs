@@ -229,11 +229,10 @@ pub fn require_role(
     allowed_roles: Vec<UserRole>,
 ) -> impl tower::Layer<axum::Router> + Clone + Send + Sync + 'static {
     let state = RequireRoleState { allowed_roles };
-    axum::middleware::from_fn_with_state::<
-        _,
-        RequireRoleState,
-        AuthError,
-    >(state, require_role_handler)
+    axum::middleware::from_fn_with_state::<_, RequireRoleState, AuthError>(
+        state,
+        require_role_handler,
+    )
 }
 
 /// State for the require_role middleware

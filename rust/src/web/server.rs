@@ -103,7 +103,9 @@ impl WebServer {
 
         let app = self.app.clone();
         let handle = tokio::spawn(async move {
-            axum::serve(listener, app).unwrap();
+            axum::serve(listener, app.into_make_service())
+                .await
+                .unwrap();
         });
 
         self.server_handle = Some(handle);

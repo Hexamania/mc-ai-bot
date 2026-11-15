@@ -927,18 +927,14 @@ async fn delete_memory_rule(
     State(state): State<Arc<WebState>>,
     axum::extract::Path(rule_id): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let mut memory = Memory::load(file_path.clone()).await.unwrap_or_default();
     let success = memory.remove_rule(&rule_id);
-    memory
-        .save(&state.config.memory.file_path)
-        .await
-        .map_err(|e| ErrorResponse {
-            success: false,
-            error: e.to_string(),
-            code: "INTERNAL_ERROR".to_string(),
-        })?;
+    memory.save(file_path).await.map_err(|e| ErrorResponse {
+        success: false,
+        error: e.to_string(),
+        code: "INTERNAL_ERROR".to_string(),
+    })?;
 
     Ok(Json(json!({
         "success": success,
@@ -976,10 +972,9 @@ async fn get_memory_players(
 async fn save_memory(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
-    let success = memory.save(&state.config.memory.file_path).await.is_ok();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path.clone()).await.unwrap_or_default();
+    let success = memory.save(file_path).await.is_ok();
     Ok(Json(json!({
         "success": success,
         "message": if success { "Memory saved" } else { "Memory is disabled" },
@@ -990,9 +985,8 @@ async fn save_memory(
 async fn clear_memory(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let mut memory = Memory::load(file_path).await.unwrap_or_default();
     let success = memory.clear().is_ok();
     Ok(Json(json!({
         "success": success,

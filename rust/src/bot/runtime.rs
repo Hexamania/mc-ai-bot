@@ -3092,7 +3092,7 @@ mod tests {
     #[test]
     fn follow_command_schedules_valid_target_and_rejects_out_of_range_values() {
         let registry = CommandRegistry::default();
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel(100);
         let sender = Arc::new(sender);
         register_follow_commands(&registry, sender).unwrap();
         let mut context = CommandContext::new(
@@ -3164,7 +3164,7 @@ mod tests {
     #[test]
     fn roam_commands_require_admin_and_schedule_valid_settings() {
         let registry = CommandRegistry::default();
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel(100);
         let sender = Arc::new(sender);
         register_roam_commands(&registry, sender).unwrap();
         let mut guest_context = CommandContext::new(
@@ -3258,7 +3258,7 @@ mod tests {
     #[test]
     fn goto_command_requires_admin_and_validates_coordinates() {
         let registry = CommandRegistry::default();
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel(100);
         let sender = Arc::new(sender);
         register_navigation_commands(&registry, sender).unwrap();
         let mut guest_context = CommandContext::new(
@@ -3357,7 +3357,7 @@ mod tests {
     #[test]
     fn inventory_commands_schedule_read_only_queries_for_guest_users() {
         let registry = CommandRegistry::default();
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel(100);
         let sender = Arc::new(sender);
         register_inventory_commands(&registry, sender).unwrap();
         let mut inventory_context = CommandContext::new(
@@ -3439,7 +3439,7 @@ mod tests {
     #[test]
     fn coords_command_supports_guest_aliases_and_rejects_arguments() {
         let registry = CommandRegistry::default();
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel(100);
         let sender = Arc::new(sender);
         register_coordinate_commands(&registry, sender).unwrap();
         let mut context = CommandContext::new(
@@ -3473,7 +3473,7 @@ mod tests {
     #[test]
     fn mine_command_requires_admin_and_validates_block_names() {
         let registry = CommandRegistry::default();
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel(100);
         let sender = Arc::new(sender);
         register_mining_commands(&registry, sender).unwrap();
 

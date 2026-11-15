@@ -10,11 +10,11 @@ use azalea::{
     auto_tool::AutoToolClientExt,
     block::{BlockState, BlockTrait},
     ecs::{event::Event as EcsEvent, query::With},
-    entity::{Attributes, Position, metadata::Player, Hunger, Rotation},
+    entity::{Attributes, Hunger, Position, Rotation, metadata::Player},
     interact::{InteractBlockEvent, SetControlStateEvent},
     inventory::{
-        Inventory, InventoryMenu, SetSelectedHotbarSlotEvent, DropItemEvent,
-        components::{ClickMode, ClickOperation, ClickType, MouseButton, Container},
+        DropItemEvent, Inventory, InventoryMenu, SetSelectedHotbarSlotEvent,
+        components::{ClickMode, ClickOperation, ClickType, Container, MouseButton},
     },
     mining::{Mining, StopMiningBlockEvent},
     pathfinder::{
@@ -2816,11 +2816,7 @@ impl MinecraftConnection {
         let mut ecs = self.client.ecs.lock();
         let world = &mut *ecs;
         let entities: Vec<_> = world
-            .query::<(
-                Entity,
-                &GameProfileComponent,
-                Option<&Position>,
-            )>()
+            .query::<(Entity, &GameProfileComponent, Option<&Position>)>()
             .iter(world)
             .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
             .collect();
@@ -2895,11 +2891,7 @@ impl MinecraftConnection {
         let mut ecs = self.client.ecs.lock();
         let world = &mut *ecs;
         let entity_query: Vec<_> = world
-            .query::<(
-                Entity,
-                &GameProfileComponent,
-                Option<&Position>,
-            )>()
+            .query::<(Entity, &GameProfileComponent, Option<&Position>)>()
             .iter(world)
             .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
             .collect();

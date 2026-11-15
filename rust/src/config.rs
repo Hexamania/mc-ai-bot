@@ -30,6 +30,7 @@ pub struct BotConfig {
 pub struct WebConfig {
     pub port: u16,
     pub host: Option<String>,
+    pub jwt_secret: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -127,6 +128,10 @@ impl AppConfig {
                 port: web_port,
                 host: values
                     .get("WEB_HOST")
+                    .filter(|value| !value.is_empty())
+                    .cloned(),
+                jwt_secret: values
+                    .get("JWT_SECRET")
                     .filter(|value| !value.is_empty())
                     .cloned(),
             },

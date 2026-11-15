@@ -15,7 +15,10 @@ simdnbt-derive = { path = "../vendor/simdnbt/simdnbt-derive" }
 
 [dependencies]
 azalea = "=0.10.3+mc1.21.1"
+azalea-block = "=0.10.3+mc1.21.1"
+azalea-entity = "=0.10.3+mc1.21.1"
 async-trait = "0.1"
+hyper-util = { version = "0.1", features = ["server", "tokio"] }
 axum = { version = "0.7", features = ["macros", "json", "form", "ws", "multipart"] }
 hyper = { version = "1", features = ["server", "http1", "http2"] }
 bevy_ecs = "0.13"

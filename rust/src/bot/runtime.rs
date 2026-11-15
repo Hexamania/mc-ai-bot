@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, mpsc};
 
@@ -87,7 +88,8 @@ impl MinecraftRuntime {
             chat_config.public_prefix.clone(),
             chat_config.admin_prefix.clone(),
         );
-        let (action_sender, command_actions) = mpsc::unbounded_channel();
+        let (action_sender, command_actions) = mpsc::channel(100);
+        let action_sender = Arc::new(action_sender);
         let command_actions = Mutex::new(command_actions);
         let fatal_error = command_registry
             .register_help_command(chat_config.public_prefix.clone())
@@ -206,7 +208,7 @@ impl MinecraftRuntime {
     pub fn get_base_location(&self) -> Option<crate::web::socket::events::BotPosition> {
         self.connection
             .as_ref()
-            .and_then(|c| c.get_base_location())
+            .map(|c| c.get_base_location())
             .map(|pos| crate::web::socket::events::BotPosition {
                 x: pos.x,
                 y: pos.y,
@@ -218,7 +220,7 @@ impl MinecraftRuntime {
     pub fn get_position_blocking(&self) -> Option<crate::web::socket::events::BotPosition> {
         self.connection
             .as_ref()
-            .and_then(|c| c.get_position_blocking())
+            .map(|c| c.get_position_blocking())
             .map(|pos| crate::web::socket::events::BotPosition {
                 x: pos.x,
                 y: pos.y,
@@ -555,9 +557,11 @@ impl MinecraftRuntime {
     }
 
     /// Start lumberjack
-    pub fn start_lumberjack(&mut self) {
+    pub fn start_lumberjack(&mut self, radius: u32) -> Result<(), String> {
         if let Some(connection) = self.connection.as_mut() {
-            connection.start_lumberjack();
+            connection.start_lumberjack(radius)
+        } else {
+            Err("Not connected".to_string())
         }
     }
 
@@ -754,8 +758,8 @@ impl MinecraftRuntime {
         }
     }
 
-    /// Shutdown bot
-    pub async fn shutdown(&mut self) {
+    /// Shutdown connection
+    pub async fn shutdown_connection(&mut self) {
         if let Some(connection) = self.connection.as_mut() {
             connection.shutdown().await;
         }
@@ -950,7 +954,7 @@ impl MinecraftRuntime {
             }
         }
         if result.success {
-            self.apply_command_actions(actions, &context, &mut result)?;
+            self.apply_command_actions(actions, &context, &mut result).await?;
         }
         let mut replies = Vec::new();
         while let Ok(reply) = reply_receiver.try_recv() {
@@ -967,7 +971,7 @@ impl MinecraftRuntime {
         }))
     }
 
-    fn apply_command_actions(
+    async fn apply_command_actions(
         &mut self,
         actions: Vec<RuntimeCommandAction>,
         context: &CommandContext,
@@ -1002,7 +1006,7 @@ impl MinecraftRuntime {
                     radius,
                     update_interval,
                 } => {
-                    if connection.start_roaming(radius, update_interval)? {
+                    if connection.start_roaming(radius, update_interval).await? {
                         context.reply(&format!(
                             "🚶 Roaming started (radius {radius}, update every {} ms).",
                             update_interval.as_millis()
@@ -1016,7 +1020,7 @@ impl MinecraftRuntime {
                     }
                 }
                 RuntimeCommandAction::StopRoaming => {
-                    if connection.stop_roaming() {
+                    if connection.stop_roaming().await {
                         context.reply("Stopped roaming.");
                     } else {
                         context.reply("Roaming is not active.");
@@ -1094,7 +1098,7 @@ impl MinecraftRuntime {
                     }
                 }
                 RuntimeCommandAction::Home => {
-                    if let Err(e) = connection.go_home() {
+                    if let Err(e) = connection.go_home().await {
                         context.error(&e);
                         result.success = false;
                         result.error = Some(e);
@@ -1244,7 +1248,7 @@ impl MinecraftRuntime {
                     context.reply("🚨 Panic mode activated!");
                 }
                 RuntimeCommandAction::Stealth => {
-                    connection.toggle_stealth();
+                    connection.toggle_stealth(!connection.stealth_mode);
                     context.reply("👻 Stealth mode toggled.");
                 }
                 RuntimeCommandAction::StopDefense => {
@@ -1364,11 +1368,11 @@ impl MinecraftRuntime {
                     context.reply(&format!("⏱️ Uptime: {}h {}m {}s", hours, minutes, seconds));
                 }
                 RuntimeCommandAction::List => {
-                    let commands = connection.command_registry().get_all().unwrap_or_default();
+                    let commands = self.command_registry.get_all().unwrap_or_default();
                     let cmd_list = commands
                         .iter()
                         .map(|c| {
-                            format!("  {} - {}", c.name, c.description.as_deref().unwrap_or(""))
+                            format!("  {} - {}", c.name, c.description.as_str())
                         })
                         .collect::<Vec<_>>()
                         .join("\n");
@@ -1554,7 +1558,7 @@ enum RuntimeCommandAction {
 
 fn register_coordinate_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     let mut coords = CommandDefinition::new(
         "coords",
@@ -1567,6 +1571,7 @@ fn register_coordinate_commands(
                 }
                 sender
                     .send(RuntimeCommandAction::Coordinates)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1584,7 +1589,7 @@ fn register_coordinate_commands(
 
 fn register_follow_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     let follow_sender = action_sender.clone();
     let mut follow = CommandDefinition::new(
@@ -1613,6 +1618,7 @@ fn register_follow_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::Follow { target, range })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1641,6 +1647,7 @@ fn register_follow_commands(
                 }
                 sender
                     .send(RuntimeCommandAction::StopFollowing)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1654,7 +1661,7 @@ fn register_follow_commands(
 
 fn register_roam_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     let roam_sender = action_sender.clone();
     let mut roam = CommandDefinition::new(
@@ -1696,6 +1703,7 @@ fn register_roam_commands(
                         radius,
                         update_interval: interval,
                     })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1733,6 +1741,7 @@ fn register_roam_commands(
                 }
                 sender
                     .send(RuntimeCommandAction::StopRoaming)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1753,6 +1762,7 @@ fn register_roam_commands(
                 }
                 sender
                     .send(RuntimeCommandAction::StopAll)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1766,7 +1776,7 @@ fn register_roam_commands(
 
 fn register_navigation_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     let mut go_to = CommandDefinition::new(
         "goto",
@@ -1791,6 +1801,7 @@ fn register_navigation_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::MoveToPosition { x, y, z, range })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1823,7 +1834,7 @@ fn register_navigation_commands(
 
 fn register_inventory_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     let inventory_sender = action_sender.clone();
     let mut inventory = CommandDefinition::new(
@@ -1848,6 +1859,7 @@ fn register_inventory_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::Inventory { slot })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1879,6 +1891,7 @@ fn register_inventory_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::ItemCount { name: name.clone() })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1905,6 +1918,7 @@ fn register_inventory_commands(
                 }
                 sender
                     .send(RuntimeCommandAction::Equipment)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1918,7 +1932,7 @@ fn register_inventory_commands(
 
 fn register_mining_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     let mut mine = CommandDefinition::new(
         "mine",
@@ -1939,6 +1953,7 @@ fn register_mining_commands(
                 let name = id.strip_prefix("minecraft:").unwrap_or(&id).to_owned();
                 sender
                     .send(RuntimeCommandAction::MineBlock { name })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -1960,14 +1975,22 @@ fn register_mining_commands(
 
 fn register_base_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
+    let action_sender_1 = action_sender.clone();
+    let action_sender_2 = action_sender.clone();
+    let action_sender_3 = action_sender.clone();
+    let action_sender_4 = action_sender.clone();
+    let action_sender_5 = action_sender.clone();
+    let action_sender_6 = action_sender.clone();
+    let action_sender_7 = action_sender.clone();
+
     // sbase / setbase - Set base location
     let mut set_base = CommandDefinition::new(
         "sbase",
         "Set base location",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_1.clone();
             Box::pin(async move {
                 if context.raw_args.len() > 3 {
                     return Err("Usage: sbase [x] [y] [z]".to_owned());
@@ -1989,6 +2012,7 @@ fn register_base_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::SetBase { x, y, z })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2009,13 +2033,14 @@ fn register_base_commands(
         "home",
         "Return to base location",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_2.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: home".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Home)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2029,13 +2054,14 @@ fn register_base_commands(
         "sminebase",
         "Set mining base location",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_3.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: sminebase".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::SetMiningBase)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2049,13 +2075,14 @@ fn register_base_commands(
         "minebase",
         "Go to mining base",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_4.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: minebase".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::MiningBase)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2069,13 +2096,14 @@ fn register_base_commands(
         "basechest",
         "View base chest contents",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_5.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: basechest".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::BaseChest)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2089,13 +2117,14 @@ fn register_base_commands(
         "sort",
         "Auto-sort nearby chest",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_6.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: sort".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::SortChest)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2109,13 +2138,14 @@ fn register_base_commands(
         "deposit",
         "Deposit non-essential items to chest",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_7.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: deposit".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::DepositItems)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2129,14 +2159,21 @@ fn register_base_commands(
 
 fn register_mining_feature_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
+    let action_sender_1 = action_sender.clone();
+    let action_sender_2 = action_sender.clone();
+    let action_sender_3 = action_sender.clone();
+    let action_sender_4 = action_sender.clone();
+    let action_sender_5 = action_sender.clone();
+    let action_sender_6 = action_sender.clone();
+
     // miner - Start mining tunnel
     let mut miner = CommandDefinition::new(
         "miner",
         "Start a mining tunnel",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_1.clone();
             Box::pin(async move {
                 if context.raw_args.len() > 2 {
                     return Err("Usage: miner <north|south|east|west> [length]".to_owned());
@@ -2165,6 +2202,7 @@ fn register_mining_feature_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::StartMiner { direction, length })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2190,13 +2228,14 @@ fn register_mining_feature_commands(
         "stopminer",
         "Stop mining tunnel",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_2.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: stopminer".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::StopMiner)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2213,7 +2252,7 @@ fn register_mining_feature_commands(
         "minearea",
         "Start mining an area between two positions",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_3.clone();
             Box::pin(async move {
                 if context.raw_args.len() != 6 {
                     return Err("Usage: minearea <x1> <y1> <z1> <x2> <y2> <z2>".to_owned());
@@ -2230,6 +2269,7 @@ fn register_mining_feature_commands(
                         y2: coords[4],
                         z2: coords[5],
                     })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2261,13 +2301,14 @@ fn register_mining_feature_commands(
         "stopminearea",
         "Stop mining area",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_4.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: stopminearea".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::StopMineArea)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2284,13 +2325,14 @@ fn register_mining_feature_commands(
         "refuel",
         "Search for and mine coal",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_5.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: refuel".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Refuel)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2304,7 +2346,7 @@ fn register_mining_feature_commands(
         "lumberjack",
         "Start lumberjack mode (chop trees in radius)",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_6.clone();
             Box::pin(async move {
                 if context.raw_args.len() > 1 {
                     return Err("Usage: lumberjack [radius]".to_owned());
@@ -2320,6 +2362,7 @@ fn register_mining_feature_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::Lumberjack { radius })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2341,7 +2384,7 @@ fn register_mining_feature_commands(
 
 fn register_building_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     // roof - Build a roof at base
     let mut roof = CommandDefinition::new(
@@ -2364,6 +2407,7 @@ fn register_building_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::BuildRoof { radius })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2388,20 +2432,26 @@ fn register_building_commands(
 
 fn register_combat_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
+    let action_sender_1 = action_sender.clone();
+    let action_sender_2 = action_sender.clone();
+    let action_sender_3 = action_sender.clone();
+    let action_sender_4 = action_sender.clone();
+
     // guard - Guard current location
     let mut guard = CommandDefinition::new(
         "guard",
         "Guard current location",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_1.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: guard".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::StartGuard)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2418,13 +2468,14 @@ fn register_combat_commands(
         "stopguard",
         "Stop guarding",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_2.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: stopguard".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::StopGuard)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2441,7 +2492,7 @@ fn register_combat_commands(
         "pvp",
         "Engage PVP with player",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_3.clone();
             Box::pin(async move {
                 if context.raw_args.len() != 1 {
                     return Err("Usage: pvp <player>".to_owned());
@@ -2453,6 +2504,7 @@ fn register_combat_commands(
                     .send(RuntimeCommandAction::StartPvp {
                         target: target.clone(),
                     })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2475,13 +2527,14 @@ fn register_combat_commands(
         "stoppvp",
         "Stop PVP",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_4.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: stoppvp".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::StopPvp)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2498,20 +2551,25 @@ fn register_combat_commands(
 
 fn register_utility_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
+    let action_sender_1 = action_sender.clone();
+    let action_sender_2 = action_sender.clone();
+    let action_sender_3 = action_sender.clone();
+
     // panic - Activate panic mode
     let mut panic = CommandDefinition::new(
         "panic",
         "Activate panic mode (flee to safety)",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_1.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: panic".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Panic)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2528,13 +2586,14 @@ fn register_utility_commands(
         "stealth",
         "Toggle stealth mode (sneak)",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_2.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: stealth".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Stealth)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2551,13 +2610,14 @@ fn register_utility_commands(
         "dstop",
         "Stop auto-defense",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_3.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: dstop".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::StopDefense)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2574,14 +2634,17 @@ fn register_utility_commands(
 
 fn register_memory_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
+    let action_sender_1 = action_sender.clone();
+    let action_sender_2 = action_sender.clone();
+
     // remember - Remember a fact
     let mut remember = CommandDefinition::new(
         "remember",
         "Remember a fact",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_1.clone();
             Box::pin(async move {
                 if context.raw_args.is_empty() {
                     return Err("Usage: remember <key>=<fact>".to_owned());
@@ -2595,6 +2658,7 @@ fn register_memory_commands(
                 }
                 sender
                     .send(RuntimeCommandAction::Remember { key, fact })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2609,7 +2673,7 @@ fn register_memory_commands(
         "forget",
         "Forget a fact",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_2.clone();
             Box::pin(async move {
                 if context.raw_args.len() != 1 {
                     return Err("Usage: forget <key>".to_owned());
@@ -2619,6 +2683,7 @@ fn register_memory_commands(
                 };
                 sender
                     .send(RuntimeCommandAction::Forget { key: key.clone() })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2634,7 +2699,7 @@ fn register_memory_commands(
 
 fn register_chat_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     // chat - Chat with AI assistant
     let mut chat = CommandDefinition::new(
@@ -2649,6 +2714,7 @@ fn register_chat_commands(
                 let message = context.raw_args.join(" ");
                 sender
                     .send(RuntimeCommandAction::Chat { message })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2663,7 +2729,7 @@ fn register_chat_commands(
 
 fn register_admin_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
     // servercmd - Execute server command
     let mut server_cmd = CommandDefinition::new(
@@ -2678,6 +2744,7 @@ fn register_admin_commands(
                 let command = context.raw_args.join(" ");
                 sender
                     .send(RuntimeCommandAction::ServerCommand { command })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2695,20 +2762,29 @@ fn register_admin_commands(
 
 fn register_general_commands(
     registry: &CommandRegistry,
-    action_sender: mpsc::Sender<RuntimeCommandAction>,
+    action_sender: Arc<mpsc::Sender<RuntimeCommandAction>>,
 ) -> Result<(), CommandRegistryError> {
+    let action_sender_1 = action_sender.clone();
+    let action_sender_2 = action_sender.clone();
+    let action_sender_3 = action_sender.clone();
+    let action_sender_4 = action_sender.clone();
+    let action_sender_5 = action_sender.clone();
+    let action_sender_6 = action_sender.clone();
+    let action_sender_7 = action_sender.clone();
+
     // status - Show bot status
     let mut status = CommandDefinition::new(
         "status",
         "Show bot status",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_1.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: status".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Status)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2723,13 +2799,14 @@ fn register_general_commands(
         "test",
         "Test if bot is responsive",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_2.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: test".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Test)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2743,13 +2820,14 @@ fn register_general_commands(
         "version",
         "Show version information",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_3.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: version".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Version)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2764,13 +2842,14 @@ fn register_general_commands(
         "uptime",
         "Show bot uptime",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_4.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: uptime".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::Uptime)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2784,13 +2863,14 @@ fn register_general_commands(
         "list",
         "List all available commands",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_5.clone();
             Box::pin(async move {
                 if !context.raw_args.is_empty() {
                     return Err("Usage: list".to_owned());
                 }
                 sender
                     .send(RuntimeCommandAction::List)
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2805,7 +2885,7 @@ fn register_general_commands(
         "rescue",
         "Rescue a player (bring food, protect)",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_6.clone();
             Box::pin(async move {
                 if context.raw_args.len() != 1 {
                     return Err("Usage: rescue <player>".to_owned());
@@ -2817,6 +2897,7 @@ fn register_general_commands(
                     .send(RuntimeCommandAction::Rescue {
                         target: target.clone(),
                     })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -2836,7 +2917,7 @@ fn register_general_commands(
         "medic",
         "Continuous heal/protect a player",
         std::sync::Arc::new(move |context, _| {
-            let sender = action_sender.clone();
+            let sender = action_sender_7.clone();
             Box::pin(async move {
                 if context.raw_args.len() != 1 {
                     return Err("Usage: medic <player>".to_owned());
@@ -2848,6 +2929,7 @@ fn register_general_commands(
                     .send(RuntimeCommandAction::Medic {
                         target: target.clone(),
                     })
+                    .await
                     .map_err(|error| error.to_string())
             })
         }),
@@ -3012,6 +3094,7 @@ mod tests {
     fn follow_command_schedules_valid_target_and_rejects_out_of_range_values() {
         let registry = CommandRegistry::default();
         let (sender, receiver) = mpsc::channel();
+        let sender = Arc::new(sender);
         register_follow_commands(&registry, sender).unwrap();
         let mut context = CommandContext::new(
             "Alex",
@@ -3083,6 +3166,7 @@ mod tests {
     fn roam_commands_require_admin_and_schedule_valid_settings() {
         let registry = CommandRegistry::default();
         let (sender, receiver) = mpsc::channel();
+        let sender = Arc::new(sender);
         register_roam_commands(&registry, sender).unwrap();
         let mut guest_context = CommandContext::new(
             "Alex",
@@ -3176,6 +3260,7 @@ mod tests {
     fn goto_command_requires_admin_and_validates_coordinates() {
         let registry = CommandRegistry::default();
         let (sender, receiver) = mpsc::channel();
+        let sender = Arc::new(sender);
         register_navigation_commands(&registry, sender).unwrap();
         let mut guest_context = CommandContext::new(
             "Alex",
@@ -3274,6 +3359,7 @@ mod tests {
     fn inventory_commands_schedule_read_only_queries_for_guest_users() {
         let registry = CommandRegistry::default();
         let (sender, receiver) = mpsc::channel();
+        let sender = Arc::new(sender);
         register_inventory_commands(&registry, sender).unwrap();
         let mut inventory_context = CommandContext::new(
             "Alex",
@@ -3355,6 +3441,7 @@ mod tests {
     fn coords_command_supports_guest_aliases_and_rejects_arguments() {
         let registry = CommandRegistry::default();
         let (sender, receiver) = mpsc::channel();
+        let sender = Arc::new(sender);
         register_coordinate_commands(&registry, sender).unwrap();
         let mut context = CommandContext::new(
             "Alex",
@@ -3388,6 +3475,7 @@ mod tests {
     fn mine_command_requires_admin_and_validates_block_names() {
         let registry = CommandRegistry::default();
         let (sender, receiver) = mpsc::channel();
+        let sender = Arc::new(sender);
         register_mining_commands(&registry, sender).unwrap();
 
         let mut guest_context = CommandContext::new(

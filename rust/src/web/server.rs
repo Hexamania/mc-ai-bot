@@ -33,14 +33,11 @@ use crate::{
     },
 };
 
-use hyper::server::conn::http1;
-use tower::ServiceExt;
-
 /// Web server wrapper
 pub struct WebServer {
     config: Arc<AppConfig>,
     state: Arc<WebState>,
-    app: Router<Arc<WebState>>,
+    app: Router<()>,
     socket_io: Option<SocketIo>,
     socket_io_layer: Option<SocketIoLayer>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
@@ -107,23 +104,9 @@ impl WebServer {
 
         let router = self.app.clone();
         let handle = tokio::spawn(async move {
-            let http = http1::Builder::new();
-            loop {
-                let (stream, _) = match listener.accept().await {
-                    Ok(conn) => conn,
-                    Err(e) => {
-                        warn!("[WEB] Accept error: {}", e);
-                        continue;
-                    }
-                };
-                let router = router.clone();
-                let http = http.clone();
-                tokio::spawn(async move {
-                    let service = router.into_service();
-                    if let Err(err) = http.serve_connection(stream, service).await {
-                        warn!("[WEB] Connection error: {}", err);
-                    }
-                });
+            // In axum 0.7, Router<()> has into_make_service()
+            if let Err(err) = axum::serve(listener, router.into_make_service()).await {
+                warn!("[WEB] Server error: {}", err);
             }
         });
 
@@ -153,9 +136,9 @@ impl WebServer {
 /// Create the main router with all middleware and routes
 fn create_router(
     state: Arc<WebState>,
-    socket_io: Option<SocketIo>,
+    _socket_io: Option<SocketIo>,
     socket_io_layer: Option<SocketIoLayer>,
-) -> Router<Arc<WebState>> {
+) -> Router<()> {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([
@@ -193,8 +176,7 @@ fn create_router(
                 .layer(CompressionLayer::new())
                 .layer(cors)
                 .layer(DefaultBodyLimit::max(10 * 1024 * 1024)), // 10MB
-        )
-        .with_state(state);
+        );
 
     router
 }

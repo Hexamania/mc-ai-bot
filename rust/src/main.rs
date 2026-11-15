@@ -1,15 +1,15 @@
-use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use mc_ai_bot_core::{
-    bot::runtime::MinecraftRuntime,
+    bot::runtime::{MinecraftRuntime, MinecraftRuntimeEvent},
+    bot::minecraft::MinecraftEvent,
     config::AppConfig,
-    web::server::{WebServer, WebServerBuilder},
+    web::server::WebServerBuilder,
 };
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let app_config = Arc::new(AppConfig::from_env()?);
     let validation_errors = app_config.validate();
     if !validation_errors.is_empty() {
@@ -52,9 +52,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Some(event) => {
                         println!("{event:?}");
                         // Update web state with connection if we just connected
-                        if let mc_ai_bot_core::bot::MinecraftRuntimeEvent::Minecraft(
-                            mc_ai_bot_core::bot::MinecraftEvent::Login
-                        ) = &event {
+                        if let MinecraftRuntimeEvent::Minecraft(MinecraftEvent::Login) = &event {
                             // The connection is now available in runtime, web server can access it via runtime
                         }
                     }

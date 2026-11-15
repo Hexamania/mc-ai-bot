@@ -7,7 +7,7 @@ use crate::web::WebState;
 use axum::Router;
 use std::sync::Arc;
 
-/// Create all routes
-pub fn create_routes(state: Arc<WebState>) -> Router<Arc<WebState>> {
+/// Create all routes with state
+pub fn create_routes(state: Arc<WebState>) -> Router<()> {
     api::create_api_router(state)
 }

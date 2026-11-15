@@ -525,7 +525,7 @@ impl PermissionManager {
     pub fn get_admins(&self) -> Vec<String> {
         self.roles
             .iter()
-            .filter(|(_, &level)| level == PermissionLevel::Admin)
+            .filter(|&(_, &level)| level == PermissionLevel::Admin)
             .map(|(name, _)| name.clone())
             .chain(self.admin_sessions.iter().cloned())
             .collect()
@@ -535,7 +535,7 @@ impl PermissionManager {
     pub fn get_users(&self) -> Vec<String> {
         self.roles
             .iter()
-            .filter(|(_, &level)| level != PermissionLevel::Guest)
+            .filter(|&(_, &level)| level != PermissionLevel::Guest)
             .map(|(name, _)| name.clone())
             .chain(self.admin_sessions.iter().cloned())
             .collect()

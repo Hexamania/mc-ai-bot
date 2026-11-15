@@ -5,26 +5,38 @@ use std::{
 };
 
 use azalea::{
-    Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3,
+    Account, BlockPos, BotClientExt, Client, Event, GameProfileComponent, Vec3, Hunger,
     attack::AttackEvent,
     auto_tool::AutoToolClientExt,
-    block::{BlockState, BlockTrait},
+    blocks::BlockState as AzaleaBlockState,
+    container::{ContainerClientExt, ContainerHandleRef},
+    core::direction::Direction,
     ecs::{event::Event as EcsEvent, query::With},
-    entity::{Attributes, Hunger, Position, Rotation, metadata::Player},
-    interact::{InteractBlockEvent, SetControlStateEvent},
+    entity::{Attributes, LookDirection, Position, metadata::Player, Rotations},
+    interact::BlockInteractEvent,
     inventory::{
-        DropItemEvent, Inventory, InventoryMenu, SetSelectedHotbarSlotEvent,
-        components::{ClickMode, ClickOperation, ClickType, Container, MouseButton},
+        ContainerClickEvent, Inventory, InventorySet, Menu, SetSelectedHotbarSlotEvent,
+        operations::{ClickOperation, ClickType, PickupClick},
     },
     mining::{Mining, StopMiningBlockEvent},
+    packet_handling::game::SendPacketEvent,
     pathfinder::{
         PathfinderClientExt,
         goals::{Goal, RadiusGoal, ReachBlockPosGoal},
     },
+    protocol::packets::game::{
+        serverbound_player_action_packet::{Action as PlayerAction, ServerboundPlayerActionPacket},
+        serverbound_player_command_packet::{Action as CommandAction, ServerboundPlayerCommandPacket},
+    },
     registry::Block as RegistryBlock,
-    world::{ChunkStorage, Direction},
+    world::{ChunkStorage, MinecraftEntityId},
 };
+use azalea_block::BlockStates;
+use azalea_block::Block;
+use azalea_entity::LocalEntity;
 use bevy_ecs::entity::Entity;
+use bevy_ecs::world::Mut;
+use std::sync::Arc;
 use rand::Rng;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -97,7 +109,7 @@ pub struct MinecraftConnection {
     pvp_target: Option<String>,
     // Utility
     panic_mode: bool,
-    stealth_mode: bool,
+    pub stealth_mode: bool,
     auto_defense: bool,
     // Pending operations
     pending_base_chest: Option<Vec3>,
@@ -165,10 +177,8 @@ impl MinecraftConnection {
         &self.client.profile.name
     }
 
-    pub fn position(&mut self) -> Option<Vec3> {
-        let entity = self.client.entity;
-        let position: Position = self.client.get_entity_component(entity)?;
-        Some(Vec3::from(&position))
+    pub fn position(&self) -> Option<Vec3> {
+        Some(self.client.position())
     }
 
     pub fn inventory_snapshot(&self) -> Result<InventorySnapshot, MinecraftTransportError> {
@@ -246,57 +256,6 @@ impl MinecraftConnection {
         Ok(true)
     }
 
-    pub fn start_roaming(
-        &mut self,
-        radius: u32,
-        update_interval: Duration,
-    ) -> Result<bool, MinecraftTransportError> {
-        if self.state() != BotState::Connected {
-            return Err(MinecraftTransportError::NotConnected);
-        }
-        if !(1..=50).contains(&radius)
-            || update_interval < Duration::from_secs(1)
-            || update_interval > Duration::from_secs(60)
-        {
-            return Ok(false);
-        }
-        if self
-            .roam_task
-            .as_ref()
-            .is_some_and(|task| !task.is_finished())
-        {
-            return Ok(false);
-        }
-
-        self.stop_mining();
-        self.stop_following();
-        self.stop_roaming();
-        let roam_client = self.client.clone();
-        let goal = roam_goal(roam_client.position(), radius);
-        roam_client.goto_without_mining(goal);
-
-        self.roam_task = Some(tokio::spawn(async move {
-            loop {
-                sleep(update_interval).await;
-                let goal = roam_goal(roam_client.position(), radius);
-                roam_client.goto_without_mining(goal);
-            }
-        }));
-        Ok(true)
-    }
-
-    pub fn stop_roaming(&mut self) -> bool {
-        let was_active = self.roam_task.take().is_some_and(|task| {
-            let active = !task.is_finished();
-            task.abort();
-            active
-        });
-        if was_active && self.state() == BotState::Connected {
-            self.client.stop_pathfinding();
-        }
-        was_active
-    }
-
     pub fn move_to_position(
         &mut self,
         x: f64,
@@ -348,7 +307,10 @@ impl MinecraftConnection {
             return Ok(false);
         }
 
-        let block_states = vec![block];
+        let block_state = AzaleaBlockState::from(block);
+        let block_states = BlockStates {
+            set: std::collections::HashSet::from([block_state]),
+        };
         let world = self.client.world();
         let world = world.read();
         let position = self.client.position();
@@ -359,9 +321,11 @@ impl MinecraftConnection {
                     return None;
                 }
                 let state = world.get_block_state(&target)?;
-                let behavior = Box::<dyn BlockTrait>::from(state).behavior();
-                (state != BlockState::AIR && behavior.destroy_time >= 0.0)
-                    .then_some((target, state))
+                // Check if not air and destroyable
+                let is_air = state == AzaleaBlockState::AIR;
+                let block: Box<dyn Block> = Box::from(state);
+let destroy_time = block.behavior().destroy_time;
+                (!is_air && destroy_time >= 0.0).then_some((target, state))
             })
             .min_by(|(first, _), (second, _)| {
                 distance_squared(position, first.center())
@@ -394,7 +358,7 @@ impl MinecraftConnection {
         Ok(true)
     }
 
-    pub fn stop_mining(&mut self) -> bool {
+    fn stop_mining_impl(&mut self) -> bool {
         let Some(task) = self.mining_task.take() else {
             return false;
         };
@@ -406,6 +370,10 @@ impl MinecraftConnection {
         self.client.stop_pathfinding();
         task.abort();
         true
+    }
+
+    pub fn stop_mining(&mut self) -> bool {
+        self.stop_mining_impl()
     }
 
     pub fn stop_movement(&mut self) {
@@ -451,23 +419,6 @@ impl MinecraftConnection {
         let base_y = y.unwrap_or(position.y);
         let base_z = z.unwrap_or(position.z);
         self.base_location = Some(Vec3::new(base_x, base_y, base_z));
-        Ok(())
-    }
-
-    pub fn go_home(&mut self) -> Result<(), String> {
-        if self.state() != BotState::Connected {
-            return Err("Bot is not connected".to_owned());
-        }
-        let base = self
-            .base_location
-            .ok_or("No base location set. Use sbase first.")?;
-        self.stop_mining();
-        self.stop_following();
-        self.stop_roaming();
-        self.client.goto_without_mining(RadiusGoal {
-            pos: base,
-            radius: 1.0,
-        });
         Ok(())
     }
 
@@ -523,7 +474,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance_to(base_pos) <= 2.5 {
+                if pos.distance_to(&base_pos) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -533,10 +484,11 @@ impl MinecraftConnection {
             }
 
             // Find chest block near base
-            let world = client.world();
-            let world = world.read();
-            let chunk_storage = world.chunks.clone();
-            drop(world);
+            let chunk_storage = {
+                let world = client.world();
+                let world = world.read();
+                world.chunks.clone()
+            };
 
             let mut found_chest = None;
             let search_radius = 5;
@@ -600,8 +552,11 @@ impl MinecraftConnection {
                 // Wait for reaching chest
                 let mut ticks = client.get_tick_broadcaster();
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+                let chest_block_pos = BlockPos::from(chest_pos);
                 loop {
-                    if goal.success(BlockPos::from(client.position())) {
+                    // Check if we've reached the chest (distance <= 2)
+                    let pos = client.position();
+                    if pos.distance_to(&chest_block_pos.center()) <= 2.0 {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -616,14 +571,9 @@ impl MinecraftConnection {
                 let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
                 // Send use block packet to open chest
-                client.ecs.lock().send_event(InteractBlockEvent {
+                client.ecs.lock().send_event(BlockInteractEvent {
                     entity: client.entity,
                     position: chest_pos,
-                    direction: Direction::Up,
-                    hand: Hand::MainHand,
-                    cursor_position: None,
-                    inside_block: false,
-                    sequence: 0,
                 });
             }
         });
@@ -654,7 +604,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance_to(base_pos) <= 2.5 {
+                if pos.distance_to(&base_pos) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -664,10 +614,11 @@ impl MinecraftConnection {
             }
 
             // Find chest block near base
-            let world = client.world();
-            let world = world.read();
-            let chunk_storage = world.chunks.clone();
-            drop(world);
+            let chunk_storage = {
+                let world = client.world();
+                let world = world.read();
+                world.chunks.clone()
+            };
 
             let mut found_chest = None;
             let search_radius = 5;
@@ -731,8 +682,11 @@ impl MinecraftConnection {
                 // Wait for reaching chest
                 let mut ticks = client.get_tick_broadcaster();
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+                let chest_block_pos = BlockPos::from(chest_pos);
                 loop {
-                    if goal.success(BlockPos::from(client.position())) {
+                    // Check if we've reached the chest (distance <= 2)
+                    let pos = client.position();
+                    if pos.distance_to(&chest_block_pos.center()) <= 2.0 {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -746,14 +700,9 @@ impl MinecraftConnection {
                 let mut ticks = client.get_tick_broadcaster();
                 let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                client.ecs.lock().send_event(InteractBlockEvent {
+                client.ecs.lock().send_event(BlockInteractEvent {
                     entity: client.entity,
                     position: chest_pos,
-                    direction: Direction::Up,
-                    hand: Hand::MainHand,
-                    cursor_position: None,
-                    inside_block: false,
-                    sequence: 0,
                 });
 
                 // Wait for container to open
@@ -761,41 +710,42 @@ impl MinecraftConnection {
 
                 // Sort chest: iterate through slots and organize items
                 // This is a simplified sort - groups similar items together
-                let container = client.component::<Container>();
-                if let Some(container_menu) = container.current_menu() {
-                    let slots = container_menu.slots();
-                    let mut item_map: HashMap<String, Vec<usize>> = HashMap::new();
+                let container_handle = client.get_open_container();
+                if let Some(container_handle) = container_handle {
+                    if let Some(container_menu) = container_handle.menu() {
+                        let slots = container_menu.slots();
+                        let mut item_map: HashMap<String, Vec<usize>> = HashMap::new();
 
-                    // Collect items by type
-                    for (i, slot) in slots.iter().enumerate().skip(1) {
-                        // Skip slot 0 (result)
-                        if let Some(item_stack) = slot.item_stack() {
-                            if !item_stack.is_empty() {
-                                let name = item_stack.item().to_string();
-                                item_map.entry(name).or_default().push(i);
+                        // Collect items by type
+                        for (i, slot) in slots.iter().enumerate().skip(1) {
+                            // Skip slot 0 (result)
+                            if let Some(item_stack) = slot.as_present() {
+                                if !item_stack.is_empty() {
+                                    let name = item_stack.kind.to_string();
+                                    item_map.entry(name).or_default().push(i);
+                                }
                             }
                         }
-                    }
 
-                    // Sort items into chest (compact them)
-                    let mut target_slot = 1;
-                    for (_item_name, slots_list) in item_map {
-                        for &slot_idx in &slots_list {
+                        // Sort items into chest (compact them)
+                        let mut target_slot = 1;
+                        let window_id = container_handle.id();
+                        for (_item_name, slots_list) in item_map {
+                            for &slot_idx in &slots_list {
                             if slot_idx != target_slot && target_slot < slots.len() {
-                                // Move item to target slot
-                                client.ecs.lock().send_event(ClickOperation {
+                                // Move item to target slot - use ContainerClickEvent with PickupClick
+                                use azalea::inventory::operations::{ClickOperation, PickupClick};
+                                // Pick up from source slot
+                                client.ecs.lock().send_event(ContainerClickEvent {
                                     entity: client.entity,
-                                    slot: slot_idx,
-                                    click_type: ClickType::Pickup,
-                                    button: MouseButton::Left,
-                                    mode: ClickMode::Normal,
+                                    window_id,
+                                    operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(slot_idx as u16) }),
                                 });
-                                client.ecs.lock().send_event(ClickOperation {
+                                // Place in target slot
+                                client.ecs.lock().send_event(ContainerClickEvent {
                                     entity: client.entity,
-                                    slot: target_slot,
-                                    click_type: ClickType::Pickup,
-                                    button: MouseButton::Left,
-                                    mode: ClickMode::Normal,
+                                    window_id,
+                                    operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(target_slot as u16) }),
                                 });
                                 target_slot += 1;
                                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -805,6 +755,7 @@ impl MinecraftConnection {
                         }
                     }
                 }
+            }
             }
         });
 
@@ -834,7 +785,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance_to(base_pos) <= 2.5 {
+                if pos.distance_to(&base_pos) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -844,10 +795,11 @@ impl MinecraftConnection {
             }
 
             // Find chest block near base
-            let world = client.world();
-            let world = world.read();
-            let chunk_storage = world.chunks.clone();
-            drop(world);
+            let chunk_storage = {
+                let world = client.world();
+                let world = world.read();
+                world.chunks.clone()
+            };
 
             let mut found_chest = None;
             let search_radius = 5;
@@ -911,8 +863,11 @@ impl MinecraftConnection {
                 // Wait for reaching chest
                 let mut ticks = client.get_tick_broadcaster();
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+                let chest_block_pos = BlockPos::from(chest_pos);
                 loop {
-                    if goal.success(BlockPos::from(client.position())) {
+                    // Check if we've reached the chest (distance <= 2)
+                    let pos = client.position();
+                    if pos.distance_to(&chest_block_pos.center()) <= 2.0 {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -926,14 +881,9 @@ impl MinecraftConnection {
                 let mut ticks = client.get_tick_broadcaster();
                 let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                client.ecs.lock().send_event(InteractBlockEvent {
+                client.ecs.lock().send_event(BlockInteractEvent {
                     entity: client.entity,
                     position: chest_pos,
-                    direction: Direction::Up,
-                    hand: Hand::MainHand,
-                    cursor_position: None,
-                    inside_block: false,
-                    sequence: 0,
                 });
 
                 // Wait for container to open
@@ -1039,54 +989,56 @@ impl MinecraftConnection {
                     "bed",
                 ];
 
-                let container = client.component::<Container>();
-                if let Some(container_menu) = container.current_menu() {
-                    let slots = container_menu.slots();
-                    let player_inventory = client.component::<Inventory>();
+                // Get the open container handle
+                let container_handle = client.get_open_container();
+                if let Some(container_handle) = container_handle {
+                    if let Some(container_menu) = container_handle.menu() {
+                        let slots = container_menu.slots();
+                        let player_inventory = client.component::<Inventory>();
 
-                    // Iterate through player inventory (slots 9-35 for main inventory, 0-8 hotbar)
-                    // Actually, the player inventory is separate from container
-                    // We need to move items from player inventory to chest
-                    for slot_idx in 9..36 {
-                        // Player inventory slots
-                        if let Some(item_stack) = player_inventory.get_slot(slot_idx) {
-                            if !item_stack.is_empty() {
-                                let item_name = item_stack
-                                    .item()
-                                    .to_string()
-                                    .strip_prefix("minecraft:")
-                                    .unwrap_or(&item_stack.item().to_string())
-                                    .to_string();
+                        // Iterate through player inventory (slots 9-35 for main inventory, 0-8 hotbar)
+                        // Actually, the player inventory is separate from container
+                        // We need to move items from player inventory to chest
+                        for slot_idx in 9..36 {
+                            // Player inventory slots
+                            if let Some(item_stack) = player_inventory.menu().slot(slot_idx) {
+                                if !item_stack.is_empty() {
+                                    let item_name = item_stack
+                                        .kind()
+                                        .to_string()
+                                        .strip_prefix("minecraft:")
+                                        .unwrap_or(&item_stack.kind().to_string())
+                                        .to_string();
 
-                                let is_essential =
-                                    essential_items.iter().any(|&e| item_name.contains(e));
+                                    let is_essential =
+                                        essential_items.iter().any(|&e| item_name.contains(e));
 
-                                if !is_essential {
-                                    // Move to chest - click player inventory slot, then click chest slot
-                                    client.ecs.lock().send_event(ClickOperation {
-                                        entity: client.entity,
-                                        slot: slot_idx,
-                                        click_type: ClickType::Pickup,
-                                        button: MouseButton::Left,
-                                        mode: ClickMode::Normal,
-                                    });
+                                    if !is_essential {
+                                        // Move to chest - click player inventory slot, then click chest slot
+                                        use azalea::inventory::operations::{ClickOperation, PickupClick};
+                                        let window_id = container_handle.id();
+                                        // Pick up from player inventory slot
+                                        client.ecs.lock().send_event(ContainerClickEvent {
+                                            entity: client.entity,
+                                            window_id,
+                                            operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(slot_idx as u16) }),
+                                        });
 
-                                    // Find empty slot in chest (chest slots start after player inventory)
-                                    let chest_start = 36; // Approximate
-                                    for chest_slot in chest_start..slots.len() {
-                                        if let Some(chest_item) = container_menu.slot(chest_slot) {
-                                            if chest_item.is_empty() {
-                                                client.ecs.lock().send_event(ClickOperation {
-                                                    entity: client.entity,
-                                                    slot: chest_slot,
-                                                    click_type: ClickType::Pickup,
-                                                    button: MouseButton::Left,
-                                                    mode: ClickMode::Normal,
-                                                });
-                                                break;
+                                        // Find empty slot in chest (chest slots start after player inventory)
+                                        let chest_start = 36; // Approximate
+                                        for chest_slot in chest_start..slots.len() {
+                                            if let Some(chest_item) = container_menu.slot(chest_slot) {
+                                                if chest_item.is_empty() {
+                                                    // Place in chest slot
+                                                    client.ecs.lock().send_event(ContainerClickEvent {
+                                                        entity: client.entity,
+                                                        window_id,
+                                                        operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(chest_slot as u16) }),
+                                                    });
+                                                    break;
+                                                }
                                             }
                                         }
-                                    }
 
                                     tokio::time::sleep(Duration::from_millis(100)).await;
                                 }
@@ -1095,6 +1047,7 @@ impl MinecraftConnection {
                     }
                 }
             }
+        }
         });
 
         Ok(())
@@ -1171,7 +1124,7 @@ impl MinecraftConnection {
                     let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                     loop {
                         let pos = client.position();
-                        if pos.distance_to(stand_pos) <= 1.5 {
+                        if pos.distance_to(&stand_pos) <= 1.5 {
                             break;
                         }
                         match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1181,6 +1134,71 @@ impl MinecraftConnection {
                     }
 
                     // Check if block exists and is mineable
+                    let (destroy_time, state_opt) = {
+                        let world = client.world();
+                        let world = world.read();
+                        if let Some(state) = world.get_block_state(&block_pos) {
+                            let block = RegistryBlock::from(state);
+                            if !matches!(
+                                block,
+                                RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
+                            ) {
+                                // Check if breakable
+                                let block: Box<dyn Block> = Box::from(state);
+                                (block.behavior().destroy_time, Some(state))
+                            } else {
+                                (-1.0, None)
+                            }
+                        } else {
+                            (-1.0, None)
+                        }
+                    };
+
+                    if destroy_time >= 0.0 {
+                        if let Some(state) = state_opt {
+                            // Select best tool
+                            let best_tool = client.best_tool_in_hotbar_for_block(state);
+                            if best_tool.percentage_per_tick > 0.0 {
+                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                    entity: client.entity,
+                                    slot: best_tool.index as u8,
+                                });
+
+                                // Look at block and mine
+                                client.look_at(Vec3::from(block_pos.center()));
+                                let mut ticks = client.get_tick_broadcaster();
+                                let _ =
+                                    tokio::time::timeout(Duration::from_secs(2), ticks.recv())
+                                        .await;
+
+                                // Mine the block
+                                let _ = tokio::time::timeout(
+                                    Duration::from_secs(30),
+                                    client.mine(block_pos),
+                                )
+                                .await;
+                            } else {
+                                // No suitable tool, still try to mine with hand
+                                client.look_at(Vec3::from(block_pos.center()));
+                                let mut ticks = client.get_tick_broadcaster();
+                                let _ =
+                                    tokio::time::timeout(Duration::from_secs(2), ticks.recv())
+                                        .await;
+                                let _ = tokio::time::timeout(
+                                    Duration::from_secs(30),
+                                    client.mine(block_pos),
+                                )
+                                .await;
+                            }
+                        }
+                    }
+
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
+
+                // Also dig the block above head level for safety (y+2)
+                let block_pos = BlockPos::new(target_x, start_y + 2, target_z);
+                let (destroy_time, state_opt) = {
                     let world = client.world();
                     let world = world.read();
                     if let Some(state) = world.get_block_state(&block_pos) {
@@ -1189,114 +1207,57 @@ impl MinecraftConnection {
                             block,
                             RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
                         ) {
-                            // Check if breakable
-                            let destroy_time =
-                                Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
-                            if destroy_time >= 0.0 {
-                                drop(world);
-
-                                // Select best tool
-                                let best_tool = client.best_tool_in_hotbar_for_block(state);
-                                if best_tool.percentage_per_tick > 0.0 {
-                                    client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
-                                        entity: client.entity,
-                                        slot: best_tool.index as u8,
-                                    });
-
-                                    // Look at block and mine
-                                    client.look_at(Vec3::from(block_pos.center()));
-                                    let mut ticks = client.get_tick_broadcaster();
-                                    let _ =
-                                        tokio::time::timeout(Duration::from_secs(2), ticks.recv())
-                                            .await;
-
-                                    // Mine the block
-                                    let _ = tokio::time::timeout(
-                                        Duration::from_secs(30),
-                                        client.mine(block_pos),
-                                    )
-                                    .await;
-                                } else {
-                                    // No suitable tool, still try to mine with hand
-                                    client.look_at(Vec3::from(block_pos.center()));
-                                    let mut ticks = client.get_tick_broadcaster();
-                                    let _ =
-                                        tokio::time::timeout(Duration::from_secs(2), ticks.recv())
-                                            .await;
-                                    let _ = tokio::time::timeout(
-                                        Duration::from_secs(30),
-                                        client.mine(block_pos),
-                                    )
-                                    .await;
-                                }
-                            }
+                            let block: Box<dyn Block> = Box::from(state);
+                            (block.behavior().destroy_time, Some(state))
+                        } else {
+                            (-1.0, None)
                         }
                     } else {
-                        drop(world);
+                        (-1.0, None)
                     }
+                };
 
-                    tokio::time::sleep(Duration::from_millis(500)).await;
-                }
+                if destroy_time >= 0.0 {
+                    if let Some(state) = state_opt {
+                        let stand_x = target_x as f64 + 0.5;
+                        let stand_z = target_z as f64 + 0.5;
+                        let stand_y = (start_y - 1) as f64;
+                        let stand_pos = Vec3::new(stand_x, stand_y, stand_z);
+                        client.goto_without_mining(RadiusGoal {
+                            pos: stand_pos,
+                            radius: 1.0,
+                        });
 
-                // Also dig the block above head level for safety (y+2)
-                let block_pos = BlockPos::new(target_x, start_y + 2, target_z);
-                let world = client.world();
-                let world = world.read();
-                if let Some(state) = world.get_block_state(&block_pos) {
-                    let block = RegistryBlock::from(state);
-                    if !matches!(
-                        block,
-                        RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
-                    ) {
-                        let destroy_time =
-                            Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
-                        if destroy_time >= 0.0 {
-                            drop(world);
+                        let mut ticks = client.get_tick_broadcaster();
+                        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+                        loop {
+                            let pos = client.position();
+                            if pos.distance_to(&stand_pos) <= 1.5 {
+                                break;
+                            }
+                            match tokio::time::timeout_at(deadline, ticks.recv()).await {
+                                Ok(Ok(())) => {}
+                                _ => return,
+                            }
+                        }
 
-                            let stand_x = target_x as f64 + 0.5;
-                            let stand_z = target_z as f64 + 0.5;
-                            let stand_y = (start_y - 1) as f64;
-                            let stand_pos = Vec3::new(stand_x, stand_y, stand_z);
-                            client.goto_without_mining(RadiusGoal {
-                                pos: stand_pos,
-                                radius: 1.0,
+                        let best_tool = client.best_tool_in_hotbar_for_block(state);
+                        if best_tool.percentage_per_tick > 0.0 {
+                            client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                entity: client.entity,
+                                slot: best_tool.index as u8,
                             });
-
-                            let mut ticks = client.get_tick_broadcaster();
-                            let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-                            loop {
-                                let pos = client.position();
-                                if pos.distance_to(stand_pos) <= 1.5 {
-                                    break;
-                                }
-                                match tokio::time::timeout_at(deadline, ticks.recv()).await {
-                                    Ok(Ok(())) => {}
-                                    _ => return,
-                                }
-                            }
-
-                            let best_tool = client.best_tool_in_hotbar_for_block(state);
-                            if best_tool.percentage_per_tick > 0.0 {
-                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
-                                    entity: client.entity,
-                                    slot: best_tool.index as u8,
-                                });
-                            }
-                            client.look_at(Vec3::from(block_pos.center()));
-                            let mut ticks = client.get_tick_broadcaster();
-                            let _ =
-                                tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
-                            let _ = tokio::time::timeout(
-                                Duration::from_secs(30),
-                                client.mine(block_pos),
-                            )
-                            .await;
                         }
-                    } else {
-                        drop(world);
+                        client.look_at(Vec3::from(block_pos.center()));
+                        let mut ticks = client.get_tick_broadcaster();
+                        let _ =
+                            tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
+                        let _ = tokio::time::timeout(
+                            Duration::from_secs(30),
+                            client.mine(block_pos),
+                        )
+                        .await;
                     }
-                } else {
-                    drop(world);
                 }
 
                 tokio::time::sleep(Duration::from_millis(500)).await;
@@ -1364,20 +1325,29 @@ impl MinecraftConnection {
                         let block_pos = BlockPos::new(x, y, z);
 
                         // Check if block exists and is mineable
-                        let world = client.world();
-                        let world = world.read();
-                        if let Some(state) = world.get_block_state(&block_pos) {
-                            let block = RegistryBlock::from(state);
-                            if !matches!(
-                                block,
-                                RegistryBlock::Air
-                                    | RegistryBlock::CaveAir
-                                    | RegistryBlock::VoidAir
-                            ) {
-                                let destroy_time =
-                                    Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
-                                if destroy_time >= 0.0 {
-                                    drop(world);
+                        let (destroy_time, state_opt) = {
+                            let world = client.world();
+                            let world = world.read();
+                            if let Some(state) = world.get_block_state(&block_pos) {
+                                let block = RegistryBlock::from(state);
+                                if !matches!(
+                                    block,
+                                    RegistryBlock::Air
+                                        | RegistryBlock::CaveAir
+                                        | RegistryBlock::VoidAir
+                                ) {
+                                    let block: Box<dyn Block> = Box::from(state);
+                                    (block.behavior().destroy_time, Some(state))
+                                } else {
+                                    (-1.0, None)
+                                }
+                            } else {
+                                (-1.0, None)
+                            }
+                        };
+
+                        if destroy_time >= 0.0 {
+                            if let Some(state) = state_opt {
 
                                     // Pathfind to position to mine this block
                                     // Stand at a safe offset
@@ -1397,7 +1367,7 @@ impl MinecraftConnection {
                                         tokio::time::Instant::now() + Duration::from_secs(10);
                                     loop {
                                         let pos = client.position();
-                                        if pos.distance_to(stand_pos) <= 1.5 {
+                                        if pos.distance_to(&stand_pos) <= 1.5 {
                                             break;
                                         }
                                         match tokio::time::timeout_at(deadline, ticks.recv()).await
@@ -1430,14 +1400,7 @@ impl MinecraftConnection {
                                     .await;
 
                                     tokio::time::sleep(Duration::from_millis(300)).await;
-                                } else {
-                                    drop(world);
-                                }
-                            } else {
-                                drop(world);
                             }
-                        } else {
-                            drop(world);
                         }
                     }
                 }
@@ -1470,10 +1433,11 @@ impl MinecraftConnection {
             let search_radius = 32;
             let player_block_pos = BlockPos::from(pos);
 
-            let world = client.world();
-            let world = world.read();
-            let chunk_storage = world.chunks.clone();
-            drop(world);
+            let chunk_storage = {
+                let world = client.world();
+                let world = world.read();
+                world.chunks.clone()
+            };
 
             let mut coal_positions = Vec::new();
 
@@ -1527,7 +1491,7 @@ impl MinecraftConnection {
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
                 loop {
                     let pos = client.position();
-                    if pos.distance_to(stand_pos) <= 1.5 {
+                    if pos.distance_to(&stand_pos) <= 1.5 {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1537,54 +1501,57 @@ impl MinecraftConnection {
                 }
 
                 // Check block still exists
-                let world = client.world();
-                let world = world.read();
-                if let Some(state) = world.get_block_state(&coal_pos) {
-                    let block = RegistryBlock::from(state);
-                    if matches!(
-                        block,
-                        RegistryBlock::CoalOre | RegistryBlock::DeepslateCoalOre
-                    ) {
-                        let destroy_time =
-                            Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
-                        if destroy_time >= 0.0 {
-                            drop(world);
-
-                            // Select best tool (pickaxe)
-                            let best_tool = client.best_tool_in_hotbar_for_block(state);
-                            if best_tool.percentage_per_tick > 0.0 {
-                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
-                                    entity: client.entity,
-                                    slot: best_tool.index as u8,
-                                });
-                            }
-
-                            // Look at block and mine
-                            client.look_at(Vec3::from(coal_pos.center()));
-                            let mut ticks = client.get_tick_broadcaster();
-                            let _ =
-                                tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
-
-                            let _ = tokio::time::timeout(
-                                Duration::from_secs(30),
-                                client.mine(coal_pos),
-                            )
-                            .await;
-
-                            tokio::time::sleep(Duration::from_millis(500)).await;
+                let (destroy_time, state_opt) = {
+                    let world = client.world();
+                    let world = world.read();
+                    if let Some(state) = world.get_block_state(&coal_pos) {
+                        let block = RegistryBlock::from(state);
+                        if matches!(
+                            block,
+                            RegistryBlock::CoalOre | RegistryBlock::DeepslateCoalOre
+                        ) {
+                            let block: Box<dyn Block> = Box::from(state);
+                            (block.behavior().destroy_time, Some(state))
+                        } else {
+                            (-1.0, None)
                         }
                     } else {
-                        drop(world);
+                        (-1.0, None)
                     }
-                } else {
-                    drop(world);
+                };
+
+                if destroy_time >= 0.0 {
+                    if let Some(state) = state_opt {
+                        // Select best tool (pickaxe)
+                        let best_tool = client.best_tool_in_hotbar_for_block(state);
+                        if best_tool.percentage_per_tick > 0.0 {
+                            client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                entity: client.entity,
+                                slot: best_tool.index as u8,
+                            });
+                        }
+
+                        // Look at block and mine
+                        client.look_at(Vec3::from(coal_pos.center()));
+                        let mut ticks = client.get_tick_broadcaster();
+                        let _ =
+                            tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
+
+                        let _ = tokio::time::timeout(
+                            Duration::from_secs(30),
+                            client.mine(coal_pos),
+                        )
+                        .await;
+
+                        tokio::time::sleep(Duration::from_millis(500)).await;
+                    }
                 }
             }
 
             // If we have logs and no coal, smelt logs into charcoal
             // Check inventory for logs
             let inventory = client.component::<Inventory>();
-            let has_logs = inventory.iter().enumerate().any(|(slot, item)| {
+            let has_logs = inventory.menu().slots().iter().enumerate().any(|(slot, item)| {
                 if let Some(item_stack) = item.as_present() {
                     let name = item_stack.kind.to_string();
                     name.contains("_log") && !name.contains("planks")
@@ -1618,10 +1585,11 @@ impl MinecraftConnection {
 
         tokio::spawn(async move {
             // Search for logs in loaded chunks
-            let world = client.world();
-            let world = world.read();
-            let chunk_storage = world.chunks.clone();
-            drop(world);
+            let chunk_storage = {
+                let world_guard = client.world();
+                let world_guard = world_guard.read();
+                world_guard.chunks.clone()
+            };
 
             let mut log_positions = Vec::new();
 
@@ -1660,112 +1628,115 @@ impl MinecraftConnection {
             // Chop up to 20 logs
             for &log_pos in log_positions.iter().take(20) {
                 // Check if block still exists
-                let world = client.world();
-                let world = world.read();
-                if let Some(state) = world.get_block_state(&log_pos) {
-                    let block = RegistryBlock::from(state);
-                    if block.to_string().contains("_log") && !block.to_string().contains("planks") {
-                        let destroy_time =
-                            Box::<dyn BlockTrait>::from(state).behavior().destroy_time;
-                        if destroy_time >= 0.0 {
-                            drop(world);
-
-                            // Pathfind to mining position (stand at base of tree)
-                            let stand_x = log_pos.x as f64 + 0.5;
-                            let stand_z = log_pos.z as f64 + 0.5;
-                            let stand_y = log_pos.y as f64 - 1.0;
-                            let stand_pos = Vec3::new(stand_x, stand_y, stand_z);
-
-                            client.goto_without_mining(RadiusGoal {
-                                pos: stand_pos,
-                                radius: 1.0,
-                            });
-
-                            // Wait for movement
-                            let mut ticks = client.get_tick_broadcaster();
-                            let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
-                            loop {
-                                let pos = client.position();
-                                if pos.distance_to(stand_pos) <= 1.5 {
-                                    break;
-                                }
-                                match tokio::time::timeout_at(deadline, ticks.recv()).await {
-                                    Ok(Ok(())) => {}
-                                    _ => return,
-                                }
-                            }
-
-                            // Select best tool (axe)
-                            let best_tool = client.best_tool_in_hotbar_for_block(state);
-                            if best_tool.percentage_per_tick > 0.0 {
-                                client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
-                                    entity: client.entity,
-                                    slot: best_tool.index as u8,
-                                });
-                            }
-
-                            // Mine the log - mine from bottom up
-                            // First find the bottom log of the tree
-                            let mut current_y = log_pos.y;
-                            let mut bottom_log = log_pos;
-                            for check_y in (log_pos.y - 10)..=log_pos.y {
-                                let check_pos = BlockPos::new(log_pos.x, check_y, log_pos.z);
-                                if let Some(check_state) = chunk_storage.get_block_state(&check_pos)
-                                {
-                                    let check_block = RegistryBlock::from(check_state);
-                                    if check_block.to_string().contains("_log")
-                                        && !check_block.to_string().contains("planks")
-                                    {
-                                        bottom_log = check_pos;
-                                    } else {
-                                        break;
-                                    }
-                                } else {
-                                    break;
-                                }
-                            }
-
-                            // Mine from bottom to top
-                            for mine_y in bottom_log.y..(bottom_log.y + 30) {
-                                let mine_pos = BlockPos::new(bottom_log.x, mine_y, bottom_log.z);
-                                let world = client.world();
-                                let world = world.read();
-                                if let Some(mine_state) = world.get_block_state(&mine_pos) {
-                                    let mine_block = RegistryBlock::from(mine_state);
-                                    if mine_block.to_string().contains("_log")
-                                        && !mine_block.to_string().contains("planks")
-                                    {
-                                        drop(world);
-
-                                        client.look_at(Vec3::from(mine_pos.center()));
-                                        let mut ticks = client.get_tick_broadcaster();
-                                        let _ = tokio::time::timeout(
-                                            Duration::from_secs(2),
-                                            ticks.recv(),
-                                        )
-                                        .await;
-
-                                        let _ = tokio::time::timeout(
-                                            Duration::from_secs(30),
-                                            client.mine(mine_pos),
-                                        )
-                                        .await;
-                                        tokio::time::sleep(Duration::from_millis(300)).await;
-                                    } else {
-                                        drop(world);
-                                        break; // No more logs
-                                    }
-                                } else {
-                                    drop(world);
-                                    break;
-                                }
-                            }
+                let (destroy_time, state_opt) = {
+                    let world = client.world();
+                    let world = world.read();
+                    if let Some(state) = world.get_block_state(&log_pos) {
+                        let block = RegistryBlock::from(state);
+                        if block.to_string().contains("_log") && !block.to_string().contains("planks") {
+                            let block: Box<dyn Block> = Box::from(state);
+                            (block.behavior().destroy_time, Some(state))
+                        } else {
+                            (-1.0, None)
                         }
                     } else {
-                        drop(world);
+                        (-1.0, None)
                     }
-                } else {
-                    drop(world);
+                };
+
+                if destroy_time >= 0.0 {
+                    if let Some(state) = state_opt {
+                        // Pathfind to mining position (stand at base of tree)
+                        let stand_x = log_pos.x as f64 + 0.5;
+                        let stand_z = log_pos.z as f64 + 0.5;
+                        let stand_y = log_pos.y as f64 - 1.0;
+                        let stand_pos = Vec3::new(stand_x, stand_y, stand_z);
+
+                        client.goto_without_mining(RadiusGoal {
+                            pos: stand_pos,
+                            radius: 1.0,
+                        });
+
+                        // Wait for movement
+                        let mut ticks = client.get_tick_broadcaster();
+                        let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+                        loop {
+                            let pos = client.position();
+                            if pos.distance_to(&stand_pos) <= 1.5 {
+                                break;
+                            }
+                            match tokio::time::timeout_at(deadline, ticks.recv()).await {
+                                Ok(Ok(())) => {}
+                                _ => return,
+                            }
+                        }
+
+                        // Select best tool (axe)
+                        let best_tool = client.best_tool_in_hotbar_for_block(state);
+                        if best_tool.percentage_per_tick > 0.0 {
+                            client.ecs.lock().send_event(SetSelectedHotbarSlotEvent {
+                                entity: client.entity,
+                                slot: best_tool.index as u8,
+                            });
+                        }
+
+                        // Mine the log - mine from bottom up
+                        // First find the bottom log of the tree
+                        let mut current_y = log_pos.y;
+                        let mut bottom_log = log_pos;
+                        for check_y in (log_pos.y - 10)..=log_pos.y {
+                            let check_pos = BlockPos::new(log_pos.x, check_y, log_pos.z);
+                            if let Some(check_state) = chunk_storage.get_block_state(&check_pos)
+                            {
+                                let check_block = RegistryBlock::from(check_state);
+                                if check_block.to_string().contains("_log")
+                                    && !check_block.to_string().contains("planks")
+                                {
+                                    bottom_log = check_pos;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+
+                        // Mine from bottom to top
+                        for mine_y in bottom_log.y..(bottom_log.y + 30) {
+                            let mine_pos = BlockPos::new(bottom_log.x, mine_y, bottom_log.z);
+                            let mine_state_opt = {
+                                let world = client.world();
+                                let world = world.read();
+                                world.get_block_state(&mine_pos)
+                            };
+
+                            if let Some(mine_state) = mine_state_opt {
+                                let mine_block = RegistryBlock::from(mine_state);
+                                if mine_block.to_string().contains("_log")
+                                    && !mine_block.to_string().contains("planks")
+                                {
+                                    client.look_at(Vec3::from(mine_pos.center()));
+                                    let mut ticks = client.get_tick_broadcaster();
+                                    let _ = tokio::time::timeout(
+                                        Duration::from_secs(2),
+                                        ticks.recv(),
+                                    )
+                                    .await;
+
+                                    let _ = tokio::time::timeout(
+                                        Duration::from_secs(30),
+                                        client.mine(mine_pos),
+                                    )
+                                    .await;
+                                    tokio::time::sleep(Duration::from_millis(300)).await;
+                                } else {
+                                    break; // No more logs
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                    }
                 }
 
                 tokio::time::sleep(Duration::from_millis(500)).await;
@@ -1803,7 +1774,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance_to(base) <= 2.5 {
+                if pos.distance_to(&base) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1824,13 +1795,12 @@ impl MinecraftConnection {
                 "cobblestone",
             ];
 
-            for (slot, item) in inventory.iter().enumerate() {
+            for (slot, item) in inventory.menu().slots().iter().enumerate() {
                 if let Some(item_stack) = item.as_present() {
-                    let name = item_stack
-                        .kind
-                        .to_string()
+                    let kind_str = item_stack.kind.to_string();
+                    let name = kind_str
                         .strip_prefix("minecraft:")
-                        .unwrap_or(&item_stack.kind.to_string());
+                        .unwrap_or(&kind_str);
                     if preferred_blocks.contains(&name) && item_stack.count > 0 {
                         building_block_slot = Some((slot, name.to_owned()));
                         break;
@@ -1859,18 +1829,19 @@ impl MinecraftConnection {
                     let place_pos =
                         BlockPos::new(base_block_pos.x + dx, roof_y, base_block_pos.z + dz);
 
-                    // Check if block already exists
-                    let world = client.world();
-                    let world = world.read();
-                    let should_place = if let Some(state) = world.get_block_state(&place_pos) {
-                        matches!(
-                            RegistryBlock::from(state),
-                            RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
-                        )
-                    } else {
-                        true
-                    };
-                    drop(world);
+                    // Check if block already exists - use block to limit scope of lock
+                    let should_place = {
+                        let world = client.world();
+                        let world = world.read();
+                        if let Some(state) = world.get_block_state(&place_pos) {
+                            matches!(
+                                RegistryBlock::from(state),
+                                RegistryBlock::Air | RegistryBlock::CaveAir | RegistryBlock::VoidAir
+                            )
+                        } else {
+                            true
+                        }
+                    }; // world lock dropped here
 
                     if should_place {
                         // Pathfind to position to place block
@@ -1890,7 +1861,7 @@ impl MinecraftConnection {
                         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                         loop {
                             let pos = client.position();
-                            if pos.distance_to(stand_pos) <= 1.5 {
+                            if pos.distance_to(&stand_pos) <= 1.5 {
                                 break;
                             }
                             match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1906,14 +1877,9 @@ impl MinecraftConnection {
                         let mut ticks = client.get_tick_broadcaster();
                         let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                        client.ecs.lock().send_event(InteractBlockEvent {
+                        client.ecs.lock().send_event(BlockInteractEvent {
                             entity: client.entity,
                             position: target_pos,
-                            direction: Direction::Up,
-                            hand: Hand::MainHand,
-                            cursor_position: None,
-                            inside_block: false,
-                            sequence: 0,
                         });
 
                         tokio::time::sleep(Duration::from_millis(300)).await;
@@ -1955,7 +1921,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance_to(guard_position) <= 2.5 {
+                if pos.distance_to(&guard_position) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1972,7 +1938,7 @@ impl MinecraftConnection {
 
                 // Check if we're still at guard position, return if drifted
                 let pos = client.position();
-                if pos.distance_to(guard_position) > 5.0 {
+                if pos.distance_to(&guard_position) > 5.0 {
                     client.goto_without_mining(RadiusGoal {
                         pos: guard_position,
                         radius: 2.0,
@@ -1982,15 +1948,19 @@ impl MinecraftConnection {
 
                 // Find hostile entities nearby
                 let world = client.world();
-                let entities = world.read().entities();
+                let world_read = world.read();
+                // Use entity_by_id to get (MinecraftEntityId, Entity) pairs
+                let entities: Vec<_> = world_read.entity_by_id.iter().map(|(id, entity)| (*id, *entity)).collect();
+                drop(world_read);
                 let mut target_entity = None;
+                let mut target_id = None;
                 let mut min_dist = f64::MAX;
 
-                for entity in entities {
+                for (id, entity) in entities {
                     // Check if it's a living entity (mob or player)
                     if let Some(pos_comp) = client.get_entity_component::<Position>(entity) {
-                        let entity_pos = Vec3::from(&pos_comp);
-                        let dist = pos.distance_to(entity_pos);
+                        let entity_pos: Vec3 = Vec3::from(&pos_comp);
+                        let dist = pos.distance_to(&entity_pos);
 
                         if dist <= 10.0 && dist < min_dist {
                             // Check if hostile - for now, target any non-player entity that's not the bot
@@ -2003,23 +1973,24 @@ impl MinecraftConnection {
                                 // For guard mode, target hostile mobs
                                 // In a real implementation, check entity type
                                 target_entity = Some(entity);
+                                target_id = Some(id);
                                 min_dist = dist;
                             }
                         }
                     }
                 }
 
-                if let Some(target) = target_entity {
+                if let (Some(target), Some(id)) = (target_entity, target_id) {
                     if last_attack.elapsed() >= Duration::from_secs(1) {
                         // Attack the target
-                        client.look_at(
-                            client
-                                .entity_position(target)
-                                .unwrap_or(Vec3::new(0.0, 0.0, 0.0)),
-                        );
+                        let target_pos = client
+                            .get_entity_component::<Position>(target)
+                            .map(|pos| Vec3::from(&pos))
+                            .unwrap_or(Vec3::new(0.0, 0.0, 0.0));
+                        client.look_at(target_pos);
                         client.ecs.lock().send_event(AttackEvent {
                             entity: client.entity,
-                            target,
+                            target: id,
                         });
                         last_attack = Instant::now();
                     }
@@ -2030,7 +2001,7 @@ impl MinecraftConnection {
                 let mut best_weapon_slot = None;
                 let mut best_damage = 0.0;
 
-                for (slot, item) in inventory.iter().enumerate() {
+                for (slot, item) in inventory.menu().slots().iter().enumerate() {
                     if let Some(item_stack) = item.as_present() {
                         let name = item_stack.kind.to_string();
                         // Check for weapons
@@ -2144,7 +2115,7 @@ impl MinecraftConnection {
                 };
 
                 let bot_pos = client.position();
-                let dist = bot_pos.distance_to(target_pos);
+                let dist = bot_pos.distance_to(&target_pos);
 
                 // Pathfind to target if too far
                 if dist > 4.0 && last_pathfind.elapsed() >= Duration::from_secs(2) {
@@ -2160,7 +2131,7 @@ impl MinecraftConnection {
                 let mut best_weapon_slot = None;
                 let mut best_damage = 0.0;
 
-                for (slot, item) in inventory.iter().enumerate() {
+                for (slot, item) in inventory.menu().slots().iter().enumerate() {
                     if let Some(item_stack) = item.as_present() {
                         let name = item_stack.kind.to_string();
                         let damage = if name.contains("sword") {
@@ -2210,10 +2181,12 @@ impl MinecraftConnection {
                 // Attack if in range
                 if dist <= 4.0 && last_attack.elapsed() >= Duration::from_millis(500) {
                     client.look_at(target_pos);
-                    client.ecs.lock().send_event(AttackEvent {
-                        entity: client.entity,
-                        target: target_entity,
-                    });
+                    if let Some(target_id) = client.get_entity_component::<MinecraftEntityId>(target_entity) {
+                        client.ecs.lock().send_event(AttackEvent {
+                            entity: client.entity,
+                            target: target_id,
+                        });
+                    }
                     last_attack = Instant::now();
                 }
 
@@ -2223,7 +2196,7 @@ impl MinecraftConnection {
 
                 if health < 10.0 {
                     // Find food in inventory
-                    for (slot, item) in inventory.iter().enumerate() {
+                    for (slot, item) in inventory.menu().slots().iter().enumerate() {
                         if let Some(item_stack) = item.as_present() {
                             let name = item_stack.kind.to_string();
                             if name.contains("food")
@@ -2315,13 +2288,12 @@ impl MinecraftConnection {
             // Check for blocks in inventory to build with
             let inventory = client.component::<Inventory>();
             let mut building_block_slot = None;
-            for (slot, item) in inventory.iter().enumerate() {
+            for (slot, item) in inventory.menu().slots().iter().enumerate() {
                 if let Some(item_stack) = item.as_present() {
-                    let name = item_stack
-                        .kind
-                        .to_string()
+                    let kind_str = item_stack.kind.to_string();
+                    let name = kind_str
                         .strip_prefix("minecraft:")
-                        .unwrap_or(&item_stack.kind.to_string());
+                        .unwrap_or(&kind_str);
                     if [
                         "cobblestone",
                         "stone",
@@ -2371,7 +2343,7 @@ impl MinecraftConnection {
                             let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                             loop {
                                 let pos = client.position();
-                                if pos.distance_to(stand_pos) <= 1.5 {
+                                if pos.distance_to(&stand_pos) <= 1.5 {
                                     break;
                                 }
                                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -2388,14 +2360,9 @@ impl MinecraftConnection {
                             let _ =
                                 tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-                            client.ecs.lock().send_event(InteractBlockEvent {
+                            client.ecs.lock().send_event(BlockInteractEvent {
                                 entity: client.entity,
                                 position: target_pos,
-                                direction: Direction::Up,
-                                hand: Hand::MainHand,
-                                cursor_position: None,
-                                inside_block: false,
-                                sequence: 0,
                             });
 
                             tokio::time::sleep(Duration::from_millis(300)).await;
@@ -2405,16 +2372,6 @@ impl MinecraftConnection {
             }
 
             client.chat("🚨 Panic mode: Reached safety at high altitude and built shelter.");
-        });
-    }
-
-    pub fn toggle_stealth(&mut self) {
-        self.stealth_mode = !self.stealth_mode;
-        // Send sneak state to server
-        self.client.ecs.lock().send_event(SetControlStateEvent {
-            entity: self.client.entity,
-            control: "sneak".to_owned(),
-            state: self.stealth_mode,
         });
     }
 
@@ -2458,7 +2415,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
             loop {
                 let pos = client.position();
-                if pos.distance_to(target_pos) <= 3.0 {
+                if pos.distance_to(&target_pos) <= 3.0 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -2474,7 +2431,7 @@ impl MinecraftConnection {
             if health < 18.0 {
                 // Find food in inventory
                 let inventory = client.component::<Inventory>();
-                for (slot, item) in inventory.iter().enumerate() {
+                for (slot, item) in inventory.menu().slots().iter().enumerate() {
                     if let Some(item_stack) = item.as_present() {
                         let name = item_stack.kind.to_string();
                         if name.contains("food")
@@ -2496,11 +2453,19 @@ impl MinecraftConnection {
                             });
                             tokio::time::sleep(Duration::from_millis(200)).await;
 
-                            // Drop the item (Q key)
-                            client.ecs.lock().send_event(DropItemEvent {
+                            // Drop the item (Q key) - use ServerboundPlayerActionPacket
+                            let pos = client.component::<Position>();
+                            let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
+                            let sequence = *client.component::<azalea::interact::CurrentSequenceNumber>();
+                            client.ecs.lock().send_event(SendPacketEvent {
                                 entity: client.entity,
-                                slot: slot as u8,
-                                count: 1,
+                                packet: ServerboundPlayerActionPacket {
+                                    action: PlayerAction::DropItem,
+                                    pos: block_pos,
+                                    direction: Direction::Down,
+                                    sequence,
+                                }
+                                .get(),
                             });
 
                             client.chat(&format!("Here's some food, {}!", target_name));
@@ -2521,20 +2486,22 @@ impl MinecraftConnection {
 
                     // Find hostile mobs near target
                     let world = client.world();
-                    let entities = world.read().entities();
-                    for mob_entity in entities {
+                    let world_read = world.read();
+                    let entities: Vec<_> = world_read.entity_by_id.iter().map(|(id, entity)| (*id, *entity)).collect();
+                    drop(world_read);
+                    for (mob_id, mob_entity) in entities {
                         if mob_entity == client.entity || mob_entity == entity {
                             continue;
                         }
                         if let Some(mob_pos) = client.get_entity_component::<Position>(mob_entity) {
-                            let mob_pos = Vec3::from(&mob_pos);
-                            if mob_pos.distance_to(target_pos) <= 10.0 {
+                            let mob_pos: Vec3 = Vec3::from(&mob_pos);
+                            if mob_pos.distance_to(&target_pos) <= 10.0 {
                                 // Attack mob
                                 if last_attack.elapsed() >= Duration::from_secs(1) {
                                     client.look_at(mob_pos);
                                     client.ecs.lock().send_event(AttackEvent {
                                         entity: client.entity,
-                                        target: mob_entity,
+                                        target: mob_id,
                                     });
                                     last_attack = Instant::now();
                                 }
@@ -2601,7 +2568,7 @@ impl MinecraftConnection {
                 let health = 20.0;
 
                 let bot_pos = client.position();
-                let dist = bot_pos.distance_to(target_pos);
+                let dist = bot_pos.distance_to(&target_pos);
 
                 // Move closer if too far
                 if dist > 5.0 {
@@ -2617,7 +2584,7 @@ impl MinecraftConnection {
                     let inventory = client.component::<Inventory>();
                     let mut heal_item = None;
 
-                    for (slot, item) in inventory.iter().enumerate() {
+                    for (slot, item) in inventory.menu().slots().iter().enumerate() {
                         if let Some(item_stack) = item.as_present() {
                             let name = item_stack.kind.to_string();
                             let priority = if name.contains("golden_apple") {
@@ -2664,10 +2631,18 @@ impl MinecraftConnection {
                         });
                         tokio::time::sleep(Duration::from_millis(200)).await;
 
-                        client.ecs.lock().send_event(DropItemEvent {
+                        let pos = client.component::<Position>();
+                        let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
+                        let sequence = *client.component::<azalea::interact::CurrentSequenceNumber>();
+                        client.ecs.lock().send_event(SendPacketEvent {
                             entity: client.entity,
-                            slot: slot as u8,
-                            count: 1,
+                            packet: ServerboundPlayerActionPacket {
+                                action: PlayerAction::DropItem,
+                                pos: block_pos,
+                                direction: Direction::Down,
+                                sequence,
+                            }
+                            .get(),
                         });
 
                         client.chat(&format!("Here, {}! Eat this {}.", target_name, name));
@@ -2676,20 +2651,23 @@ impl MinecraftConnection {
                 }
 
                 // Protect from mobs
-                let world = client.world();
-                let entities = world.read().entities();
-                for mob_entity in entities {
+                let entities: Vec<_> = {
+                    let world = client.world();
+                    let world_read = world.read();
+                    world_read.entity_by_id.iter().map(|(id, entity)| (*id, *entity)).collect()
+                }; // world_read dropped here
+                for (mob_id, mob_entity) in entities {
                     if mob_entity == client.entity || mob_entity == target_entity {
                         continue;
                     }
                     if let Some(mob_pos) = client.get_entity_component::<Position>(mob_entity) {
-                        let mob_pos = Vec3::from(&mob_pos);
-                        if mob_pos.distance_to(target_pos) <= 8.0 {
+                        let mob_pos: Vec3 = Vec3::from(&mob_pos);
+                        if mob_pos.distance_to(&target_pos) <= 8.0 {
                             // Attack mob threatening target
                             client.look_at(mob_pos);
                             client.ecs.lock().send_event(AttackEvent {
                                 entity: client.entity,
-                                target: mob_entity,
+                                target: mob_id,
                             });
                             tokio::time::sleep(Duration::from_millis(500)).await;
                         }
@@ -2723,20 +2701,25 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return Err(MinecraftTransportError::NotConnected);
         }
-        let entity = self.client.entity;
-        let position: Option<Position> = self.client.get_entity_component(entity);
-        let attributes: Option<Attributes> = self.client.get_entity_component(entity);
-        let food = self.client.component::<Hunger>();
+        let position: Option<Position> = self.client.get_component::<Position>();
+        let food = self.client.get_component::<Hunger>();
 
         let pos = position.map(|p| Vec3::from(&p));
         // Health field may not exist in azalea 0.10 Attributes, use default
         let health_val = 20.0;
-        let food_level = food.food_level;
-        let saturation = food.saturation;
+        let (food_level, saturation) = if let Some(food) = food {
+            (food.food as f64, food.saturation as f64)
+        } else {
+            (0.0, 0.0)
+        };
 
         // Get yaw/pitch from rotation component (separate from Position in azalea 0.10)
-        let rotation = self.client.component::<Rotation>();
-        let (yaw, pitch) = rotation.map(|r| (r.0, r.1)).unwrap_or((0.0, 0.0));
+        let rotation = self.client.get_component::<LookDirection>();
+        let (yaw, pitch) = if let Some(rot) = rotation {
+            (rot.y_rot as f64, rot.x_rot as f64)
+        } else {
+            (0.0, 0.0)
+        };
 
         // Dimension, time, gamemode - use defaults for now
         let dimension = "overworld".to_string();
@@ -2782,7 +2765,7 @@ impl MinecraftConnection {
             "items": items,
             "usedSlots": used_slots,
             "totalSlots": 36,
-            "heldItem": None, // selected_hotbar_slot not available in new API
+            "heldItem": None::<Value>, // selected_hotbar_slot not available in new API
         }))
     }
 
@@ -2834,8 +2817,8 @@ impl MinecraftConnection {
                         "z": pos.z,
                     },
                     "health": 20.0, // Health field not available in azalea 0.10 Attributes
-                    "gamemode": None, // Not easily accessible
-                    "ping": None,
+                    "gamemode": None::<Value>, // Not easily accessible
+                    "ping": None::<Value>,
                     "isBot": profile.name == bot_username,
                 }));
             }
@@ -2906,7 +2889,7 @@ impl MinecraftConnection {
                 if distance < radius as f64 {
                     entities.push(json!({
                         "id": entity.to_bits(),
-                        "username": None,
+                        "username": None::<Value>,
                         "name": entity.to_bits().to_string(),
                         "position": {
                             "x": pos.x,
@@ -2939,7 +2922,7 @@ impl MinecraftConnection {
     }
 
     /// Get current position as BotPosition
-    pub fn get_position(&self) -> crate::web::socket::events::BotPosition {
+    pub fn get_position(&mut self) -> crate::web::socket::events::BotPosition {
         let pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         crate::web::socket::events::BotPosition {
             x: pos.x,
@@ -2988,10 +2971,19 @@ impl MinecraftConnection {
     /// Toggle stealth
     pub fn toggle_stealth(&mut self, enabled: bool) {
         self.stealth_mode = enabled;
-        self.client.ecs.lock().send_event(SetControlStateEvent {
+        let action = if enabled {
+            CommandAction::PressShiftKey
+        } else {
+            CommandAction::ReleaseShiftKey
+        };
+        self.client.ecs.lock().send_event(SendPacketEvent {
             entity: self.client.entity,
-            control: "sneak".to_owned(),
-            state: enabled,
+            packet: ServerboundPlayerCommandPacket {
+                id: self.client.entity.to_bits() as u32,
+                action,
+                data: 0,
+            }
+            .get(),
         });
     }
 
@@ -3006,48 +2998,13 @@ impl MinecraftConnection {
     }
 
     /// Stop roaming (web API)
-    pub fn stop_roaming_web(&mut self) {
-        self.stop_roaming();
-    }
-
-    /// Start farming
-    pub fn start_farming(&mut self) {
-        // Implementation would depend on feature system
-    }
-
-    /// Stop farming
-    pub fn stop_farming(&mut self) {
-        // Implementation would depend on feature system
-    }
-
-    /// Start mining
-    pub fn start_mining(&mut self) {
-        // Implementation would depend on feature system
+    pub async fn stop_roaming_web(&mut self) {
+        self.stop_roaming().await;
     }
 
     /// Stop mining (web API)
-    pub fn stop_mining_web(&mut self) {
-        self.stop_mining();
-    }
-
-    /// Start lumberjack
-    pub fn start_lumberjack(&mut self) {
-        let _ = self.start_lumberjack(10);
-    }
-
-    /// Stop lumberjack
-    pub fn stop_lumberjack(&mut self) {
-        // Implementation would depend on feature system
-    }
-
-    /// Start progression
-    pub fn start_progression(&mut self) {
-        // Implementation would depend on feature system
-    }
-
-    /// Stop all tasks
-    pub fn stop_all_tasks(&mut self) {
-        self.stop_movement();
+    pub async fn stop_mining_web(&mut self) {
+        self.stop_mining_async().await;
     }
 
     /// Save location
@@ -3104,7 +3061,7 @@ impl MinecraftConnection {
             return;
         }
         let inventory = self.client.component::<Inventory>();
-        if let InventoryMenu::Player(player) = &inventory.inventory_menu {
+        if let Menu::Player(player) = &inventory.inventory_menu {
             let inventory = &player.inventory;
             if (slot as usize) < inventory.len() {
                 if let Some(item_stack) = inventory[slot as usize].as_present() {
@@ -3117,11 +3074,19 @@ impl MinecraftConnection {
                             slot: slot as u8,
                         });
                     tokio::time::sleep(Duration::from_millis(100)).await;
+                    let pos = self.client.component::<Position>();
+                    let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
+                    let sequence = *self.client.component::<azalea::interact::CurrentSequenceNumber>();
                     for _ in 0..drop_count {
-                        self.client.ecs.lock().send_event(DropItemEvent {
+                        self.client.ecs.lock().send_event(SendPacketEvent {
                             entity: self.client.entity,
-                            slot: slot as u8,
-                            count: 1,
+                            packet: ServerboundPlayerActionPacket {
+                                action: PlayerAction::DropItem,
+                                pos: block_pos,
+                                direction: Direction::Down,
+                                sequence,
+                            }
+                            .get(),
                         });
                         tokio::time::sleep(Duration::from_millis(50)).await;
                     }
@@ -3136,18 +3101,26 @@ impl MinecraftConnection {
             return;
         }
         let inventory = self.client.component::<Inventory>();
-        if let InventoryMenu::Player(player) = &inventory.inventory_menu {
+        if let Menu::Player(player) = &inventory.inventory_menu {
             let inventory = &player.inventory;
             // Iterate through main inventory (slots 0-35)
+            let pos = self.client.component::<Position>();
+            let block_pos = BlockPos::new(pos.x.floor() as i32, pos.y.floor() as i32, pos.z.floor() as i32);
+            let sequence = *self.client.component::<azalea::interact::CurrentSequenceNumber>();
             for slot in 0..36 {
                 if slot < inventory.len() {
                     if let Some(item_stack) = inventory[slot].as_present() {
                         if !item_stack.is_empty() {
-                            // Use DropItemEvent instead of toss_stack
-                            self.client.ecs.lock().send_event(DropItemEvent {
+                            // Use ServerboundPlayerActionPacket for dropping items
+                            self.client.ecs.lock().send_event(SendPacketEvent {
                                 entity: self.client.entity,
-                                slot: slot as u8,
-                                count: item_stack.count as u8,
+                                packet: ServerboundPlayerActionPacket {
+                                    action: PlayerAction::DropItem,
+                                    pos: block_pos,
+                                    direction: Direction::Down,
+                                    sequence,
+                                }
+                                .get(),
                             });
                         }
                     }
@@ -3161,20 +3134,20 @@ impl MinecraftConnection {
         if self.state() != BotState::Connected {
             return;
         }
-        self.client.ecs.lock().send_event(ClickOperation {
+        let inventory = self.client.component::<Inventory>();
+        let window_id = inventory.id;
+        // Pick up from source slot
+        self.client.ecs.lock().send_event(ContainerClickEvent {
             entity: self.client.entity,
-            slot: from as u8,
-            click_type: ClickType::Pickup,
-            button: MouseButton::Left,
-            mode: ClickMode::Normal,
+            window_id,
+            operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(from as u16) }),
         });
         tokio::time::sleep(Duration::from_millis(100)).await;
-        self.client.ecs.lock().send_event(ClickOperation {
+        // Place in target slot
+        self.client.ecs.lock().send_event(ContainerClickEvent {
             entity: self.client.entity,
-            slot: to as u8,
-            click_type: ClickType::Pickup,
-            button: MouseButton::Left,
-            mode: ClickMode::Normal,
+            window_id,
+            operation: ClickOperation::Pickup(PickupClick::Left { slot: Some(to as u16) }),
         });
     }
 
@@ -3200,10 +3173,11 @@ impl MinecraftConnection {
             return;
         }
         let block_pos = BlockPos::new(x, y, z);
-        let world = self.client.world();
-        let world = world.read();
-        let chunk_storage = world.chunks.clone();
-        drop(world);
+        let chunk_storage = {
+            let world = self.client.world();
+            let world = world.read();
+            world.chunks.clone()
+        };
 
         let goal = ReachBlockPosGoal {
             pos: block_pos,
@@ -3242,14 +3216,9 @@ impl MinecraftConnection {
         let mut ticks = self.client.get_tick_broadcaster();
         let _ = tokio::time::timeout(Duration::from_secs(2), ticks.recv()).await;
 
-        self.client.ecs.lock().send_event(InteractBlockEvent {
+        self.client.ecs.lock().send_event(BlockInteractEvent {
             entity: self.client.entity,
             position: block_pos,
-            direction: Direction::Up,
-            hand: Hand::MainHand,
-            cursor_position: None,
-            inside_block: false,
-            sequence: 0,
         });
     }
 
@@ -3275,10 +3244,21 @@ impl MinecraftConnection {
     }
 
     /// Go home
-    pub async fn go_home(&mut self) {
-        if let Some(base) = self.base_location {
-            let _ = self.move_to_position(base.x, base.y, base.z, 1.0);
+    pub async fn go_home(&mut self) -> Result<(), String> {
+        if self.state() != BotState::Connected {
+            return Err("Bot is not connected".to_owned());
         }
+        let base = self
+            .base_location
+            .ok_or("No base location set. Use sbase first.")?;
+        self.stop_mining_async().await;
+        self.stop_following();
+        self.stop_roaming().await;
+        self.client.goto_without_mining(RadiusGoal {
+            pos: base,
+            radius: 1.0,
+        });
+        Ok(())
     }
 
     /// Set home
@@ -3288,16 +3268,56 @@ impl MinecraftConnection {
     }
 
     /// Start roaming
-    pub async fn start_roaming(&mut self) {
-        // This would need the actual roaming implementation
-        // For now, just log
-        log::info!("[MC] Start roaming requested (not implemented)");
+    pub async fn start_roaming(
+        &mut self,
+        radius: u32,
+        update_interval: Duration,
+    ) -> Result<bool, MinecraftTransportError> {
+        if self.state() != BotState::Connected {
+            return Err(MinecraftTransportError::NotConnected);
+        }
+        if !(1..=50).contains(&radius)
+            || update_interval < Duration::from_secs(1)
+            || update_interval > Duration::from_secs(60)
+        {
+            return Ok(false);
+        }
+        if self
+            .roam_task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
+            return Ok(false);
+        }
+
+        self.stop_mining_async().await;
+        self.stop_following();
+        self.stop_roaming().await;
+        let roam_client = self.client.clone();
+        let goal = roam_goal(roam_client.position(), radius);
+        roam_client.goto_without_mining(goal);
+
+        self.roam_task = Some(tokio::spawn(async move {
+            loop {
+                sleep(update_interval).await;
+                let goal = roam_goal(roam_client.position(), radius);
+                roam_client.goto_without_mining(goal);
+            }
+        }));
+        Ok(true)
     }
 
     /// Stop roaming
-    pub async fn stop_roaming(&mut self) {
-        // This would need the actual roaming implementation
-        log::info!("[MC] Stop roaming requested (not implemented)");
+    pub async fn stop_roaming(&mut self) -> bool {
+        let was_active = self.roam_task.take().is_some_and(|task| {
+            let active = !task.is_finished();
+            task.abort();
+            active
+        });
+        if was_active && self.state() == BotState::Connected {
+            self.client.stop_pathfinding();
+        }
+        was_active
     }
 
     /// Start farming
@@ -3315,16 +3335,9 @@ impl MinecraftConnection {
         // Feature-dependent
     }
 
-    /// Stop mining
-    pub async fn stop_mining(&mut self) {
-        // Feature-dependent
-        log::info!("[MC] Stop mining requested (not implemented)");
-    }
-
-    /// Start lumberjack
-    pub async fn start_lumberjack(&mut self) {
-        // Feature-dependent
-        log::info!("[MC] Start lumberjack requested (not implemented)");
+    /// Stop mining (async version for web API)
+    pub async fn stop_mining_async(&mut self) -> bool {
+        self.stop_mining_impl()
     }
 
     /// Stop lumberjack
@@ -3510,9 +3523,10 @@ async fn mine_block_task(
         let Some(state) = world.get_block_state(&target) else {
             return Err("target is no longer loaded");
         };
+        let block: Box<dyn Block> = Box::from(state);
         if state.is_air()
             || RegistryBlock::from(state) != expected_block
-            || Box::<dyn BlockTrait>::from(state).behavior().destroy_time < 0.0
+            || block.behavior().destroy_time < 0.0
         {
             return Err("target is no longer breakable");
         }

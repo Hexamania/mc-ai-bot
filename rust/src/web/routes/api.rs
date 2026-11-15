@@ -24,7 +24,7 @@ use crate::{
         WebState,
         auth::{
             Claims, UserRole, auth_middleware, optional_auth_middleware, require_admin,
-            require_trusted,
+            require_trusted, require_admin_middleware, require_trusted_middleware,
         },
         rate_limit::{RateLimiters, create_rate_limiters, rate_limit_middleware},
     },
@@ -158,6 +158,16 @@ struct ErrorResponse {
     code: String,
 }
 
+impl From<crate::bot::runtime::MinecraftRuntimeError> for ErrorResponse {
+    fn from(err: crate::bot::runtime::MinecraftRuntimeError) -> Self {
+        ErrorResponse {
+            success: false,
+            error: err.to_string(),
+            code: "RUNTIME_ERROR".to_string(),
+        }
+    }
+}
+
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(self)).into_response()
@@ -165,7 +175,7 @@ impl IntoResponse for ErrorResponse {
 }
 
 /// Create API router with all routes
-pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
+pub fn create_api_router(state: Arc<WebState>) -> Router<()> {
     let rate_limiters = Arc::new(create_rate_limiters(&state.config));
 
     Router::new()
@@ -246,7 +256,7 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
                 .patch(update_settings)
                 .layer(middleware::from_fn_with_state(
                     state.clone(),
-                    require_trusted(),
+                    require_trusted_middleware,
                 )),
         )
         // Locations
@@ -261,14 +271,14 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/locations",
             post(save_location).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_trusted(),
+                require_trusted_middleware,
             )),
         )
         .route(
             "/locations/:name",
             delete(delete_location).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         // Memory
@@ -297,14 +307,14 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/memory/facts",
             post(add_memory_fact).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_trusted(),
+                require_trusted_middleware,
             )),
         )
         .route(
             "/memory/facts/:key",
             delete(delete_memory_fact).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         .route(
@@ -318,14 +328,14 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/memory/rules",
             post(add_memory_rule).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         .route(
             "/memory/rules/:rule",
             delete(delete_memory_rule).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         .route(
@@ -346,14 +356,14 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/memory/save",
             post(save_memory).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         .route(
             "/memory/clear",
             post(clear_memory).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         // Commands
@@ -376,7 +386,7 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/config",
             get(get_config).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         // Stats
@@ -399,7 +409,7 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/chat",
             post(send_chat).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_trusted(),
+                require_trusted_middleware,
             )),
         )
         // Console
@@ -407,7 +417,7 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/console",
             post(execute_console).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         // Bot control
@@ -415,14 +425,14 @@ pub fn create_api_router(state: Arc<WebState>) -> Router<Arc<WebState>> {
             "/bot/restart",
             post(restart_bot).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         .route(
             "/bot/shutdown",
             post(shutdown_bot).layer(middleware::from_fn_with_state(
                 state.clone(),
-                require_admin(),
+                require_admin_middleware,
             )),
         )
         // Global rate limiting
@@ -695,27 +705,27 @@ async fn save_location(
 
     let file_path = state.config.memory.file_path.clone();
     let mut memory = Memory::load(file_path.clone()).await.unwrap_or_default();
-    let pos = payload.position.unwrap_or_else(|| {
-        if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
-            let runtime = runtime_arc.read().await;
-            runtime
-                .get_position_blocking()
-                .unwrap_or(crate::web::socket::events::BotPosition {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                })
-        } else {
-            crate::web::socket::events::BotPosition {
+    let pos = if let Some(pos) = payload.position {
+        pos
+    } else if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
+        let runtime = runtime_arc.read().await;
+        runtime
+            .get_position_blocking()
+            .unwrap_or(crate::web::socket::events::BotPosition {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
-            }
+            })
+    } else {
+        crate::web::socket::events::BotPosition {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
         }
-    });
+    };
 
     let location_type = payload.location_type.as_deref().unwrap_or("waypoint");
-    memory.save_location(&payload.name, pos, location_type);
+    memory.save_location(&payload.name, pos.clone(), location_type);
     memory
         .save(file_path.clone())
         .await
@@ -727,7 +737,7 @@ async fn save_location(
 
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let mut runtime = runtime_arc.write().await;
-        runtime.add_favorite(&payload.name, pos);
+        runtime.add_favorite(&payload.name, pos.clone());
     }
 
     Ok(Json(json!({
@@ -1246,7 +1256,7 @@ async fn shutdown_bot(
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
     if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
         let mut runtime = runtime_arc.write().await;
-        runtime.shutdown().await;
+        runtime.shutdown()?;
         Ok(Json(json!({
             "success": true,
             "message": "Bot shut down",

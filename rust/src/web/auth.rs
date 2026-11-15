@@ -225,34 +225,85 @@ pub async fn optional_auth_middleware(
 }
 
 /// Role-based authorization middleware
-pub fn require_role(allowed_roles: Vec<UserRole>) -> axum::middleware::Middleware<axum::Router> {
-    axum::middleware::from_fn(
-        move |State(_state): State<Arc<WebState>>, mut request: Request, next: Next| {
-            let allowed = allowed_roles.clone();
-            async move {
-                let claims = request
-                    .extensions()
-                    .get::<Claims>()
-                    .ok_or(AuthError::MissingToken)?;
-
-                if !allowed.contains(&claims.role) {
-                    return Err(AuthError::InsufficientPermissions);
-                }
-
-                Ok(next.run(request).await)
-            }
-        },
-    )
+pub fn require_role(
+    allowed_roles: Vec<UserRole>,
+) -> impl tower::Layer<axum::Router> + Clone + Send + Sync + 'static {
+    let state = RequireRoleState { allowed_roles };
+    axum::middleware::from_fn_with_state::<
+        _,
+        RequireRoleState,
+        AuthError,
+    >(state, require_role_handler)
 }
 
-/// Admin only middleware
-pub fn require_admin() -> axum::middleware::Middleware<axum::Router> {
+/// State for the require_role middleware
+#[derive(Clone)]
+struct RequireRoleState {
+    allowed_roles: Vec<UserRole>,
+}
+
+/// Middleware handler for role-based authorization
+async fn require_role_handler(
+    State(state): State<RequireRoleState>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, AuthError> {
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or(AuthError::MissingToken)?;
+
+    if !state.allowed_roles.contains(&claims.role) {
+        return Err(AuthError::InsufficientPermissions);
+    }
+
+    Ok(next.run(request).await)
+}
+
+/// Admin only middleware (Layer for Router)
+pub fn require_admin() -> impl tower::Layer<axum::Router> + Clone + Send + Sync + 'static {
     require_role(vec![UserRole::Admin])
 }
 
-/// Trusted or admin middleware
-pub fn require_trusted() -> axum::middleware::Middleware<axum::Router> {
+/// Trusted or admin middleware (Layer for Router)
+pub fn require_trusted() -> impl tower::Layer<axum::Router> + Clone + Send + Sync + 'static {
     require_role(vec![UserRole::Trusted, UserRole::Admin])
+}
+
+/// Admin only middleware function (for use with from_fn_with_state)
+pub async fn require_admin_middleware(
+    State(_state): State<Arc<WebState>>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, AuthError> {
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or(AuthError::MissingToken)?;
+
+    if claims.role != UserRole::Admin {
+        return Err(AuthError::InsufficientPermissions);
+    }
+
+    Ok(next.run(request).await)
+}
+
+/// Trusted or admin middleware function (for use with from_fn_with_state)
+pub async fn require_trusted_middleware(
+    State(_state): State<Arc<WebState>>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, AuthError> {
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or(AuthError::MissingToken)?;
+
+    if claims.role != UserRole::Trusted && claims.role != UserRole::Admin {
+        return Err(AuthError::InsufficientPermissions);
+    }
+
+    Ok(next.run(request).await)
 }
 
 /// Extract claims from request extensions

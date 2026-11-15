@@ -182,7 +182,7 @@ impl CommandStats {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegistrationWarning(pub String);
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq, serde::Serialize)]
 pub enum CommandRegistryError {
     #[error("Command registry lock was poisoned")]
     LockPoisoned,

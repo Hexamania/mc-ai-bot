@@ -74,6 +74,9 @@ pub mod server_events {
     // Error events
     pub const ERROR: &str = "error";
     pub const WARNING: &str = "warning";
+
+    // Utility events
+    pub const PONG: &str = "pong";
 }
 
 /// Event names - Client (Dashboard) -> Server

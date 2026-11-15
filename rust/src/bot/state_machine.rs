@@ -1,11 +1,12 @@
 use std::collections::VecDeque;
 
 use chrono::Utc;
+use serde::Serialize;
 use thiserror::Error;
 
 const HISTORY_LIMIT: usize = 100;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize)]
 pub enum BotState {
     #[default]
     Disconnected,
@@ -24,7 +25,7 @@ pub struct TransitionRecord {
     pub timestamp_ms: i64,
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq, Serialize)]
 #[error("invalid bot state transition: {from:?} -> {to:?}")]
 pub struct InvalidTransition {
     pub from: BotState,

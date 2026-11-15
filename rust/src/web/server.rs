@@ -33,6 +33,9 @@ use crate::{
     },
 };
 
+use hyper::server::conn::http1;
+use tower::ServiceExt;
+
 /// Web server wrapper
 pub struct WebServer {
     config: Arc<AppConfig>,
@@ -102,9 +105,26 @@ impl WebServer {
         info!("[WEB] Dashboard running at http://{}:{}", host, port);
         info!("[WEB] API available at http://{}:{}/api", host, port);
 
-        let app = self.app.clone();
+        let router = self.app.clone();
         let handle = tokio::spawn(async move {
-            axum::serve(listener, app.into_service()).await.unwrap();
+            let http = http1::Builder::new();
+            loop {
+                let (stream, _) = match listener.accept().await {
+                    Ok(conn) => conn,
+                    Err(e) => {
+                        warn!("[WEB] Accept error: {}", e);
+                        continue;
+                    }
+                };
+                let router = router.clone();
+                let http = http.clone();
+                tokio::spawn(async move {
+                    let service = router.into_service();
+                    if let Err(err) = http.serve_connection(stream, service).await {
+                        warn!("[WEB] Connection error: {}", err);
+                    }
+                });
+            }
         });
 
         self.server_handle = Some(handle);

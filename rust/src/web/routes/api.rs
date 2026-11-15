@@ -672,9 +672,8 @@ async fn update_settings(
 async fn get_locations(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path).await.unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.locations(),
@@ -694,9 +693,8 @@ async fn save_location(
         });
     }
 
-    let mut memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let mut memory = Memory::load(file_path.clone()).await.unwrap_or_default();
     let pos = payload.position.unwrap_or_else(|| {
         if let Some(runtime_arc) = state.runtime.read().await.as_ref() {
             let runtime = runtime_arc.read().await;
@@ -719,7 +717,7 @@ async fn save_location(
     let location_type = payload.location_type.as_deref().unwrap_or("waypoint");
     memory.save_location(&payload.name, pos, location_type);
     memory
-        .save(&state.config.memory.file_path)
+        .save(file_path.clone())
         .await
         .map_err(|e| ErrorResponse {
             success: false,
@@ -743,9 +741,8 @@ async fn delete_location(
     State(state): State<Arc<WebState>>,
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let mut memory = Memory::load(file_path.clone()).await.unwrap_or_default();
 
     if memory
         .get("locations")
@@ -760,7 +757,7 @@ async fn delete_location(
             locations.remove(&name);
         }
         memory
-            .save(&state.config.memory.file_path)
+            .save(file_path.clone())
             .await
             .map_err(|e| ErrorResponse {
                 success: false,
@@ -785,9 +782,8 @@ async fn delete_location(
 async fn get_memory(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path).await.unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory,
@@ -798,9 +794,8 @@ async fn get_memory(
 async fn get_memory_context(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path).await.unwrap_or_default();
     let context = memory.get_context();
     Ok(Json(json!({
         "success": true,
@@ -812,9 +807,8 @@ async fn get_memory_context(
 async fn get_memory_facts(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path).await.unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.learned_facts(),
@@ -834,18 +828,14 @@ async fn add_memory_fact(
         });
     }
 
-    let mut memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let mut memory = Memory::load(file_path.clone()).await.unwrap_or_default();
     let success = memory.remember_fact(&payload.key, &payload.fact);
-    memory
-        .save(&state.config.memory.file_path)
-        .await
-        .map_err(|e| ErrorResponse {
-            success: false,
-            error: e.to_string(),
-            code: "INTERNAL_ERROR".to_string(),
-        })?;
+    memory.save(file_path).await.map_err(|e| ErrorResponse {
+        success: false,
+        error: e.to_string(),
+        code: "INTERNAL_ERROR".to_string(),
+    })?;
 
     Ok(Json(json!({
         "success": success,
@@ -858,18 +848,14 @@ async fn delete_memory_fact(
     State(state): State<Arc<WebState>>,
     axum::extract::Path(key): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let mut memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let mut memory = Memory::load(file_path.clone()).await.unwrap_or_default();
     let success = memory.forget_fact(&key);
-    memory
-        .save(&state.config.memory.file_path)
-        .await
-        .map_err(|e| ErrorResponse {
-            success: false,
-            error: e.to_string(),
-            code: "INTERNAL_ERROR".to_string(),
-        })?;
+    memory.save(file_path).await.map_err(|e| ErrorResponse {
+        success: false,
+        error: e.to_string(),
+        code: "INTERNAL_ERROR".to_string(),
+    })?;
 
     Ok(Json(json!({
         "success": success,
@@ -881,9 +867,8 @@ async fn delete_memory_fact(
 async fn get_memory_rules(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path).await.unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.rules(),
@@ -903,18 +888,14 @@ async fn add_memory_rule(
         });
     }
 
-    let mut memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let mut memory = Memory::load(file_path.clone()).await.unwrap_or_default();
     let success = memory.add_rule(&payload.rule);
-    memory
-        .save(&state.config.memory.file_path)
-        .await
-        .map_err(|e| ErrorResponse {
-            success: false,
-            error: e.to_string(),
-            code: "INTERNAL_ERROR".to_string(),
-        })?;
+    memory.save(file_path).await.map_err(|e| ErrorResponse {
+        success: false,
+        error: e.to_string(),
+        code: "INTERNAL_ERROR".to_string(),
+    })?;
 
     Ok(Json(json!({
         "success": success,
@@ -946,9 +927,8 @@ async fn delete_memory_rule(
 async fn get_memory_task(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path).await.unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.current_task(),
@@ -959,9 +939,8 @@ async fn get_memory_task(
 async fn get_memory_players(
     State(state): State<Arc<WebState>>,
 ) -> Result<Json<serde_json::Value>, ErrorResponse> {
-    let memory = Memory::load(&state.config.memory.file_path)
-        .await
-        .unwrap_or_default();
+    let file_path = state.config.memory.file_path.clone();
+    let memory = Memory::load(file_path).await.unwrap_or_default();
     Ok(Json(json!({
         "success": true,
         "data": memory.players(),

@@ -21,11 +21,7 @@ pub trait Feature: Send + Sync + Debug {
     fn dependencies(&self) -> &'static [&'static str];
     fn enabled(&self) -> bool;
 
-    async fn initialize(
-        &self,
-        bot: &mut MinecraftConnection,
-        runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String>;
+    async fn initialize(&self, bot: &mut MinecraftConnection) -> Result<(), String>;
     async fn shutdown(&self) -> Result<(), String>;
 
     fn enable(&mut self) -> Result<(), String> {
@@ -128,11 +124,7 @@ impl FeatureRegistry {
     }
 
     /// Initialize all features in dependency order
-    pub async fn initialize_all(
-        &mut self,
-        bot: &mut MinecraftConnection,
-        runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String> {
+    pub async fn initialize_all(&mut self, bot: &mut MinecraftConnection) -> Result<(), String> {
         let sorted = self.topological_sort()?;
 
         for name in sorted {
@@ -163,7 +155,7 @@ impl FeatureRegistry {
             }
 
             log::info!("[PLUGINS] Initializing: {name}");
-            if let Err(e) = feature.initialize(bot, runtime).await {
+            if let Err(e) = feature.initialize(bot).await {
                 log::error!("[PLUGINS] Failed to initialize \"{name}\": {e}");
                 continue;
             }
@@ -300,11 +292,7 @@ impl Feature for CoreFeature {
         self.enabled
     }
 
-    async fn initialize(
-        &self,
-        _bot: &mut MinecraftConnection,
-        _runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String> {
+    async fn initialize(&self, _bot: &mut MinecraftConnection) -> Result<(), String> {
         log::info!("[CORE] Core feature initialized");
         Ok(())
     }
@@ -361,11 +349,7 @@ impl Feature for MovementFeature {
         self.enabled
     }
 
-    async fn initialize(
-        &self,
-        _bot: &mut MinecraftConnection,
-        _runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String> {
+    async fn initialize(&self, _bot: &mut MinecraftConnection) -> Result<(), String> {
         log::info!("[MOVEMENT] Movement feature initialized");
         Ok(())
     }
@@ -422,11 +406,7 @@ impl Feature for CombatFeature {
         self.enabled
     }
 
-    async fn initialize(
-        &self,
-        _bot: &mut MinecraftConnection,
-        _runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String> {
+    async fn initialize(&self, _bot: &mut MinecraftConnection) -> Result<(), String> {
         log::info!("[COMBAT] Combat feature initialized");
         Ok(())
     }
@@ -483,11 +463,7 @@ impl Feature for AutomationFeature {
         self.enabled
     }
 
-    async fn initialize(
-        &self,
-        _bot: &mut MinecraftConnection,
-        _runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String> {
+    async fn initialize(&self, _bot: &mut MinecraftConnection) -> Result<(), String> {
         log::info!("[AUTOMATION] Automation feature initialized");
         Ok(())
     }
@@ -544,11 +520,7 @@ impl Feature for MemoryFeature {
         self.enabled
     }
 
-    async fn initialize(
-        &self,
-        _bot: &mut MinecraftConnection,
-        _runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String> {
+    async fn initialize(&self, _bot: &mut MinecraftConnection) -> Result<(), String> {
         log::info!("[MEMORY] Memory feature initialized");
         Ok(())
     }
@@ -605,11 +577,7 @@ impl Feature for WebFeature {
         self.enabled
     }
 
-    async fn initialize(
-        &self,
-        _bot: &mut MinecraftConnection,
-        _runtime: &mut MinecraftRuntime,
-    ) -> Result<(), String> {
+    async fn initialize(&self, _bot: &mut MinecraftConnection) -> Result<(), String> {
         log::info!("[WEB] Web feature initialized (placeholder - not yet implemented in Rust)");
         Ok(())
     }

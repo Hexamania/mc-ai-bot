@@ -520,6 +520,26 @@ impl PermissionManager {
         }
         PermissionDecision::allow()
     }
+
+    /// Get all admin usernames
+    pub fn get_admins(&self) -> Vec<String> {
+        self.roles
+            .iter()
+            .filter(|(_, &level)| level == PermissionLevel::Admin)
+            .map(|(name, _)| name.clone())
+            .chain(self.admin_sessions.iter().cloned())
+            .collect()
+    }
+
+    /// Get all users with roles (trusted and admin)
+    pub fn get_users(&self) -> Vec<String> {
+        self.roles
+            .iter()
+            .filter(|(_, &level)| level != PermissionLevel::Guest)
+            .map(|(name, _)| name.clone())
+            .chain(self.admin_sessions.iter().cloned())
+            .collect()
+    }
 }
 
 fn normalize_username(username: &str) -> String {

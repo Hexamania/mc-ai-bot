@@ -390,7 +390,7 @@ impl MinecraftRuntime {
 
     /// Get command help
     pub async fn get_command_help(&self, command: &str, prefix: &str) -> String {
-        if let Some(cmd) = self.command_registry.get(command) {
+        if let Ok(Some(cmd)) = self.command_registry.get(command) {
             format!(
                 "{} {} - {}\nUsage: {}\nAliases: {}",
                 prefix,
@@ -719,7 +719,7 @@ impl MinecraftRuntime {
     /// Go home
     pub async fn go_home(&mut self) {
         if let Some(connection) = self.connection.as_mut() {
-            connection.go_home().await;
+            let _ = connection.go_home();
         }
     }
 
@@ -768,11 +768,7 @@ impl MinecraftRuntime {
                     self.state_machine.transition(BotState::Connected)?;
 
                     // Initialize features
-                    if let Err(e) = self
-                        .feature_registry
-                        .initialize_all(&mut connection, self)
-                        .await
-                    {
+                    if let Err(e) = self.feature_registry.initialize_all(&mut connection).await {
                         log::error!("[FEATURES] Failed to initialize features: {}", e);
                     }
 
@@ -903,7 +899,7 @@ impl MinecraftRuntime {
                 replies,
             }));
         }
-        let (reply_sender, reply_receiver) = mpsc::unbounded_channel();
+        let (reply_sender, mut reply_receiver) = mpsc::unbounded_channel();
         let public_sender = reply_sender.clone();
         let mut context = CommandContext::new(
             parsed.message.username.clone(),

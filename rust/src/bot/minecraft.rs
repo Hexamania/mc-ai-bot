@@ -2737,9 +2737,7 @@ impl MinecraftConnection {
 
         // Get yaw/pitch from rotation component (separate from Position in azalea 0.10)
         let rotation = self.client.component::<azalea::Rotation>();
-        let (yaw, pitch) = rotation
-            .map(|r| (r.0, r.1))
-            .unwrap_or((0.0, 0.0));
+        let (yaw, pitch) = rotation.map(|r| (r.0, r.1)).unwrap_or((0.0, 0.0));
 
         // Dimension, time, gamemode - use defaults for now
         let dimension = "overworld".to_string();
@@ -2818,7 +2816,11 @@ impl MinecraftConnection {
         // Use ECS query to get entities with GameProfileComponent
         let entities: Vec<_> = self
             .client
-            .query::<(azalea::bevy_ecs::entity::Entity, &GameProfileComponent, Option<&Position>)>()
+            .query::<(
+                azalea::bevy_ecs::entity::Entity,
+                &GameProfileComponent,
+                Option<&Position>,
+            )>()
             .iter()
             .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
             .collect();
@@ -2891,7 +2893,11 @@ impl MinecraftConnection {
         // Get entities
         let entity_query: Vec<_> = self
             .client
-            .query::<(azalea::bevy_ecs::entity::Entity, &GameProfileComponent, Option<&Position>)>()
+            .query::<(
+                azalea::bevy_ecs::entity::Entity,
+                &GameProfileComponent,
+                Option<&Position>,
+            )>()
             .iter()
             .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
             .collect();

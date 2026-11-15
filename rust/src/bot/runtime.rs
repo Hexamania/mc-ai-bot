@@ -357,7 +357,7 @@ impl MinecraftRuntime {
             kill_aura: combat_initialized,
             auto_defense: combat_initialized,
             auto_armor: false, // TODO: Get from settings
-            stealth: false, // TODO: Get from settings
+            stealth: false,    // TODO: Get from settings
             progression: automation_initialized,
             mining: automation_initialized,
             farming: automation_initialized,

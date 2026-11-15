@@ -340,6 +340,7 @@ impl MinecraftRuntime {
                         .and_then(|g| g.as_str())
                         .map(|s| s.to_owned()),
                     ping: p.get("ping").and_then(|p| p.as_i64()).map(|p| p as i32),
+                    is_bot: false, // TODO: Detect if this is the bot itself
                 })
             })
             .collect();
@@ -469,7 +470,7 @@ impl MinecraftRuntime {
     pub async fn execute_command_with_context(
         &self,
         command: &str,
-        context: crate::bot::runtime::CommandContext,
+        _context: crate::bot::runtime::CommandContext,
     ) -> Result<(), MinecraftRuntimeError> {
         // For now, just execute the command string
         // In the future, this could check permissions from context

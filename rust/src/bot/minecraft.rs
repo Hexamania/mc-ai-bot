@@ -2827,7 +2827,7 @@ impl MinecraftConnection {
 
         for (entity, profile, position) in entities {
             if let Some(pos) = position {
-                let distance = Vec3::from(&pos).distance_to(bot_pos);
+                let distance = Vec3::from(&pos).distance_to(&bot_pos);
                 players.push(json!({
                     "username": profile.name,
                     "entityId": entity.to_bits(),
@@ -2890,24 +2890,26 @@ impl MinecraftConnection {
             }
         }
 
-        // Get entities
-        let entity_query: Vec<_> = self
-            .client
+        // Get entities - query requires &mut World
+        let mut ecs = self.client.ecs.lock();
+        let world = ecs.world_mut();
+        let entity_query: Vec<_> = world
             .query::<(
                 azalea::bevy_ecs::entity::Entity,
                 &GameProfileComponent,
                 Option<&Position>,
             )>()
-            .iter()
+            .iter(world)
             .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
             .collect();
+        drop(ecs);
 
         for (entity, _profile, position) in entity_query {
             if entity == self.client.entity {
                 continue;
             }
             if let Some(pos) = position {
-                let distance = Vec3::from(&pos).distance_to(bot_pos);
+                let distance = Vec3::from(&pos).distance_to(&bot_pos);
                 if distance < radius as f64 {
                     entities.push(json!({
                         "id": entity.to_bits(),
@@ -3110,8 +3112,9 @@ impl MinecraftConnection {
         }
         let inventory = self.client.component::<Inventory>();
         if let Some(player) = inventory.inventory_menu.as_player() {
-            if (slot as usize) < player.inventory.len() {
-                if let Some(item_stack) = player.inventory[slot as usize].as_present() {
+            let inventory = &player.inventory;
+            if (slot as usize) < inventory.len() {
+                if let Some(item_stack) = inventory[slot as usize].as_present() {
                     let drop_count = count.unwrap_or(item_stack.count).min(item_stack.count);
                     self.client
                         .ecs
@@ -3141,12 +3144,18 @@ impl MinecraftConnection {
         }
         let inventory = self.client.component::<Inventory>();
         if let Some(player) = inventory.inventory_menu.as_player() {
+            let inventory = &player.inventory;
             // Iterate through main inventory (slots 0-35)
             for slot in 0..36 {
-                if slot < player.inventory.len() {
-                    if let Some(item_stack) = player.inventory[slot].as_present() {
+                if slot < inventory.len() {
+                    if let Some(item_stack) = inventory[slot].as_present() {
                         if !item_stack.is_empty() {
-                            let _ = self.toss_stack(&item_stack).await;
+                            // Use DropItemEvent instead of toss_stack
+                            self.client.ecs.lock().send_event(DropItemEvent {
+                                entity: self.client.entity,
+                                slot: slot as u8,
+                                count: item_stack.count as u8,
+                            });
                         }
                     }
                 }
@@ -3207,13 +3216,18 @@ impl MinecraftConnection {
             pos: block_pos,
             chunk_storage: chunk_storage.clone(),
         };
+        // Clone goal for later use since goto_without_mining takes ownership
+        let goal_clone = ReachBlockPosGoal {
+            pos: block_pos,
+            chunk_storage,
+        };
         self.client.goto_without_mining(goal);
 
         // Wait and mine
         let mut ticks = self.client.get_tick_broadcaster();
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
         loop {
-            if goal.success(BlockPos::from(self.client.position())) {
+            if goal_clone.success(BlockPos::from(self.client.position())) {
                 break;
             }
             match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -3269,7 +3283,9 @@ impl MinecraftConnection {
 
     /// Go home
     pub async fn go_home(&mut self) {
-        let _ = self.go_home();
+        if let Some(base) = self.base_location {
+            let _ = self.move_to_position(base.x, base.y, base.z, 1.0);
+        }
     }
 
     /// Set home
@@ -3280,12 +3296,15 @@ impl MinecraftConnection {
 
     /// Start roaming
     pub async fn start_roaming(&mut self) {
-        let _ = self.start_roaming(10, Duration::from_secs(5));
+        // This would need the actual roaming implementation
+        // For now, just log
+        log::info!("[MC] Start roaming requested (not implemented)");
     }
 
     /// Stop roaming
     pub async fn stop_roaming(&mut self) {
-        self.stop_roaming();
+        // This would need the actual roaming implementation
+        log::info!("[MC] Stop roaming requested (not implemented)");
     }
 
     /// Start farming
@@ -3305,12 +3324,14 @@ impl MinecraftConnection {
 
     /// Stop mining
     pub async fn stop_mining(&mut self) {
-        self.stop_mining();
+        // Feature-dependent
+        log::info!("[MC] Stop mining requested (not implemented)");
     }
 
     /// Start lumberjack
     pub async fn start_lumberjack(&mut self) {
-        let _ = self.start_lumberjack(10);
+        // Feature-dependent
+        log::info!("[MC] Start lumberjack requested (not implemented)");
     }
 
     /// Stop lumberjack

@@ -591,34 +591,38 @@ impl MinecraftRuntime {
 
     /// Remember fact
     pub async fn remember_fact(&self, key: &str, fact: &str) -> bool {
-        self.connection
-            .as_ref()
-            .map(|c| c.remember_fact(key, fact).await)
-            .unwrap_or(false)
+        if let Some(connection) = self.connection.as_ref() {
+            connection.remember_fact(key, fact).await
+        } else {
+            false
+        }
     }
 
     /// Forget fact
     pub async fn forget_fact(&self, key: &str) -> bool {
-        self.connection
-            .as_ref()
-            .map(|c| c.forget_fact(key).await)
-            .unwrap_or(false)
+        if let Some(connection) = self.connection.as_ref() {
+            connection.forget_fact(key).await
+        } else {
+            false
+        }
     }
 
     /// Add rule
     pub async fn add_rule(&self, rule: &str) -> bool {
-        self.connection
-            .as_ref()
-            .map(|c| c.add_rule(rule).await)
-            .unwrap_or(false)
+        if let Some(connection) = self.connection.as_ref() {
+            connection.add_rule(rule).await
+        } else {
+            false
+        }
     }
 
     /// Remove rule
     pub async fn remove_rule(&self, rule: &str) -> bool {
-        self.connection
-            .as_ref()
-            .map(|c| c.remove_rule(rule).await)
-            .unwrap_or(false)
+        if let Some(connection) = self.connection.as_ref() {
+            connection.remove_rule(rule).await
+        } else {
+            false
+        }
     }
 
     /// Update settings
@@ -703,10 +707,11 @@ impl MinecraftRuntime {
 
     /// Follow player
     pub async fn follow_player(&mut self, username: &str) -> bool {
-        self.connection
-            .as_mut()
-            .map(|c| c.follow_player(username).await)
-            .unwrap_or(false)
+        if let Some(connection) = self.connection.as_mut() {
+            connection.follow_player(username).await
+        } else {
+            false
+        }
     }
 
     /// Stop all movement

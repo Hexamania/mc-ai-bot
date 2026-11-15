@@ -524,7 +524,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance(base_pos) <= 2.5 {
+                if pos.distance_to(base_pos) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -655,7 +655,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance(base_pos) <= 2.5 {
+                if pos.distance_to(base_pos) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -835,7 +835,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance(base_pos) <= 2.5 {
+                if pos.distance_to(base_pos) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1172,7 +1172,7 @@ impl MinecraftConnection {
                     let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                     loop {
                         let pos = client.position();
-                        if pos.distance(stand_pos) <= 1.5 {
+                        if pos.distance_to(stand_pos) <= 1.5 {
                             break;
                         }
                         match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1267,7 +1267,7 @@ impl MinecraftConnection {
                             let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                             loop {
                                 let pos = client.position();
-                                if pos.distance(stand_pos) <= 1.5 {
+                                if pos.distance_to(stand_pos) <= 1.5 {
                                     break;
                                 }
                                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1398,7 +1398,7 @@ impl MinecraftConnection {
                                         tokio::time::Instant::now() + Duration::from_secs(10);
                                     loop {
                                         let pos = client.position();
-                                        if pos.distance(stand_pos) <= 1.5 {
+                                        if pos.distance_to(stand_pos) <= 1.5 {
                                             break;
                                         }
                                         match tokio::time::timeout_at(deadline, ticks.recv()).await
@@ -1528,7 +1528,7 @@ impl MinecraftConnection {
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
                 loop {
                     let pos = client.position();
-                    if pos.distance(stand_pos) <= 1.5 {
+                    if pos.distance_to(stand_pos) <= 1.5 {
                         break;
                     }
                     match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1687,7 +1687,7 @@ impl MinecraftConnection {
                             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
                             loop {
                                 let pos = client.position();
-                                if pos.distance(stand_pos) <= 1.5 {
+                                if pos.distance_to(stand_pos) <= 1.5 {
                                     break;
                                 }
                                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1804,7 +1804,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance(base) <= 2.5 {
+                if pos.distance_to(base) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1891,7 +1891,7 @@ impl MinecraftConnection {
                         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                         loop {
                             let pos = client.position();
-                            if pos.distance(stand_pos) <= 1.5 {
+                            if pos.distance_to(stand_pos) <= 1.5 {
                                 break;
                             }
                             match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1956,7 +1956,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
             loop {
                 let pos = client.position();
-                if pos.distance(guard_position) <= 2.5 {
+                if pos.distance_to(guard_position) <= 2.5 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -1973,7 +1973,7 @@ impl MinecraftConnection {
 
                 // Check if we're still at guard position, return if drifted
                 let pos = client.position();
-                if pos.distance(guard_position) > 5.0 {
+                if pos.distance_to(guard_position) > 5.0 {
                     client.goto_without_mining(RadiusGoal {
                         pos: guard_position,
                         radius: 2.0,
@@ -1991,7 +1991,7 @@ impl MinecraftConnection {
                     // Check if it's a living entity (mob or player)
                     if let Some(pos_comp) = client.get_entity_component::<Position>(entity) {
                         let entity_pos = Vec3::from(&pos_comp);
-                        let dist = pos.distance(entity_pos);
+                        let dist = pos.distance_to(entity_pos);
 
                         if dist <= 10.0 && dist < min_dist {
                             // Check if hostile - for now, target any non-player entity that's not the bot
@@ -2145,7 +2145,7 @@ impl MinecraftConnection {
                 };
 
                 let bot_pos = client.position();
-                let dist = bot_pos.distance(target_pos);
+                let dist = bot_pos.distance_to(target_pos);
 
                 // Pathfind to target if too far
                 if dist > 4.0 && last_pathfind.elapsed() >= Duration::from_secs(2) {
@@ -2372,7 +2372,7 @@ impl MinecraftConnection {
                             let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
                             loop {
                                 let pos = client.position();
-                                if pos.distance(stand_pos) <= 1.5 {
+                                if pos.distance_to(stand_pos) <= 1.5 {
                                     break;
                                 }
                                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -2459,7 +2459,7 @@ impl MinecraftConnection {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
             loop {
                 let pos = client.position();
-                if pos.distance(target_pos) <= 3.0 {
+                if pos.distance_to(target_pos) <= 3.0 {
                     break;
                 }
                 match tokio::time::timeout_at(deadline, ticks.recv()).await {
@@ -2529,7 +2529,7 @@ impl MinecraftConnection {
                         }
                         if let Some(mob_pos) = client.get_entity_component::<Position>(mob_entity) {
                             let mob_pos = Vec3::from(&mob_pos);
-                            if mob_pos.distance(target_pos) <= 10.0 {
+                            if mob_pos.distance_to(target_pos) <= 10.0 {
                                 // Attack mob
                                 if last_attack.elapsed() >= Duration::from_secs(1) {
                                     client.look_at(mob_pos);
@@ -2602,7 +2602,7 @@ impl MinecraftConnection {
                 let health = 20.0;
 
                 let bot_pos = client.position();
-                let dist = bot_pos.distance(target_pos);
+                let dist = bot_pos.distance_to(target_pos);
 
                 // Move closer if too far
                 if dist > 5.0 {
@@ -2685,7 +2685,7 @@ impl MinecraftConnection {
                     }
                     if let Some(mob_pos) = client.get_entity_component::<Position>(mob_entity) {
                         let mob_pos = Vec3::from(&mob_pos);
-                        if mob_pos.distance(target_pos) <= 8.0 {
+                        if mob_pos.distance_to(target_pos) <= 8.0 {
                             // Attack mob threatening target
                             client.look_at(mob_pos);
                             client.ecs.lock().send_event(AttackEvent {
@@ -2735,8 +2735,11 @@ impl MinecraftConnection {
         let food_level = food.food_level;
         let saturation = food.saturation;
 
-        // Get yaw/pitch from position component
-        let (yaw, pitch) = position.map(|p| (p.yaw, p.pitch)).unwrap_or((0.0, 0.0));
+        // Get yaw/pitch from rotation component (separate from Position in azalea 0.10)
+        let rotation = self.client.component::<azalea::Rotation>();
+        let (yaw, pitch) = rotation
+            .map(|r| (r.0, r.1))
+            .unwrap_or((0.0, 0.0));
 
         // Dimension, time, gamemode - use defaults for now
         let dimension = "overworld".to_string();
@@ -2812,15 +2815,20 @@ impl MinecraftConnection {
         let bot_pos = self.position().unwrap_or(Vec3::new(0.0, 0.0, 0.0));
         let bot_username = self.username();
 
-        for (entity, profile) in self.client.entities_with::<GameProfileComponent>() {
-            let position: Option<Position> = self.client.get_entity_component(entity);
-            let attributes: Option<Attributes> = self.client.get_entity_component(entity);
+        // Use ECS query to get entities with GameProfileComponent
+        let entities: Vec<_> = self
+            .client
+            .query::<(azalea::bevy_ecs::entity::Entity, &GameProfileComponent, Option<&Position>)>()
+            .iter()
+            .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
+            .collect();
 
-            if let (Some(pos), Some(profile)) = (position, profile) {
-                let distance = Vec3::from(&pos).distance(bot_pos);
+        for (entity, profile, position) in entities {
+            if let Some(pos) = position {
+                let distance = Vec3::from(&pos).distance_to(bot_pos);
                 players.push(json!({
                     "username": profile.name,
-                    "entityId": entity.0,
+                    "entityId": entity.to_bits(),
                     "position": {
                         "x": pos.x,
                         "y": pos.y,
@@ -2881,18 +2889,24 @@ impl MinecraftConnection {
         }
 
         // Get entities
-        for (entity, _) in self.client.entities_with::<GameProfileComponent>() {
+        let entity_query: Vec<_> = self
+            .client
+            .query::<(azalea::bevy_ecs::entity::Entity, &GameProfileComponent, Option<&Position>)>()
+            .iter()
+            .map(|(entity, profile, position)| (entity, profile.clone(), position.cloned()))
+            .collect();
+
+        for (entity, _profile, position) in entity_query {
             if entity == self.client.entity {
                 continue;
             }
-            let position: Option<Position> = self.client.get_entity_component(entity);
             if let Some(pos) = position {
-                let distance = Vec3::from(&pos).distance(bot_pos);
+                let distance = Vec3::from(&pos).distance_to(bot_pos);
                 if distance < radius as f64 {
                     entities.push(json!({
-                        "id": entity.0,
+                        "id": entity.to_bits(),
                         "username": None,
-                        "name": entity.0.to_string(),
+                        "name": entity.to_bits().to_string(),
                         "position": {
                             "x": pos.x,
                             "y": pos.y,
@@ -3089,24 +3103,26 @@ impl MinecraftConnection {
             return;
         }
         let inventory = self.client.component::<Inventory>();
-        if let Some(item) = inventory.slots.get(slot as usize) {
-            if let Some(item_stack) = item.as_present() {
-                let drop_count = count.unwrap_or(item_stack.count).min(item_stack.count);
-                self.client
-                    .ecs
-                    .lock()
-                    .send_event(SetSelectedHotbarSlotEvent {
-                        entity: self.client.entity,
-                        slot: slot as u8,
-                    });
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                for _ in 0..drop_count {
-                    self.client.ecs.lock().send_event(DropItemEvent {
-                        entity: self.client.entity,
-                        slot: slot as u8,
-                        count: 1,
-                    });
-                    tokio::time::sleep(Duration::from_millis(50)).await;
+        if let Some(player) = inventory.inventory_menu.as_player() {
+            if (slot as usize) < player.inventory.len() {
+                if let Some(item_stack) = player.inventory[slot as usize].as_present() {
+                    let drop_count = count.unwrap_or(item_stack.count).min(item_stack.count);
+                    self.client
+                        .ecs
+                        .lock()
+                        .send_event(SetSelectedHotbarSlotEvent {
+                            entity: self.client.entity,
+                            slot: slot as u8,
+                        });
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    for _ in 0..drop_count {
+                        self.client.ecs.lock().send_event(DropItemEvent {
+                            entity: self.client.entity,
+                            slot: slot as u8,
+                            count: 1,
+                        });
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
                 }
             }
         }
@@ -3118,9 +3134,17 @@ impl MinecraftConnection {
             return;
         }
         let inventory = self.client.component::<Inventory>();
-        let items = inventory.items().collect::<Vec<_>>();
-        for item in items {
-            let _ = self.toss_stack(&item).await;
+        if let Some(player) = inventory.inventory_menu.as_player() {
+            // Iterate through main inventory (slots 0-35)
+            for slot in 0..36 {
+                if slot < player.inventory.len() {
+                    if let Some(item_stack) = player.inventory[slot].as_present() {
+                        if !item_stack.is_empty() {
+                            let _ = self.toss_stack(&item_stack).await;
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -344,13 +344,24 @@ impl MinecraftRuntime {
             })
             .collect();
 
-        // Get features state
+        // Get features state - map feature names to FeatureStatePayload fields
+        let movement_initialized = self.feature_registry.is_initialized("movement");
+        let combat_initialized = self.feature_registry.is_initialized("combat");
+        let automation_initialized = self.feature_registry.is_initialized("automation");
+
         let features = crate::web::socket::events::FeatureStatePayload {
-            movement: self.feature_registry.is_initialized("movement"),
-            combat: self.feature_registry.is_initialized("combat"),
-            automation: self.feature_registry.is_initialized("automation"),
-            memory: self.feature_registry.is_initialized("memory"),
-            web: self.feature_registry.is_initialized("web"),
+            roaming: movement_initialized,
+            following: movement_initialized,
+            pvp_target: None, // TODO: Get from combat feature state
+            safe_mode: false, // TODO: Get from settings
+            kill_aura: combat_initialized,
+            auto_defense: combat_initialized,
+            auto_armor: false, // TODO: Get from settings
+            stealth: false, // TODO: Get from settings
+            progression: automation_initialized,
+            mining: automation_initialized,
+            farming: automation_initialized,
+            lumberjack: automation_initialized,
         };
 
         // Get settings from config

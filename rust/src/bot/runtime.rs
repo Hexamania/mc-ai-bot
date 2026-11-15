@@ -363,8 +363,8 @@ impl MinecraftRuntime {
         let logs = vec![]; // TODO: Get from logger
 
         // Get admins and users from permission manager
-        let admins: Vec<String> = self.permissions.get_admins().into_iter().cloned().collect();
-        let users: Vec<String> = self.permissions.get_users().into_iter().cloned().collect();
+        let admins: Vec<String> = self.permissions.get_admins();
+        let users: Vec<String> = self.permissions.get_users();
 
         crate::web::socket::events::BotStatePayload {
             position,
@@ -396,7 +396,7 @@ impl MinecraftRuntime {
                 prefix,
                 cmd.name,
                 cmd.description,
-                cmd.usage,
+                cmd.usage.as_deref().unwrap_or(""),
                 cmd.aliases.join(", ")
             )
         } else {
